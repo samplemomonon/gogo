@@ -601,3 +601,38 @@ under `internal/modules/`, so the domain cannot creep back in by accident.
 **Revisit when:** the platform adds tenant support, or suppliers become a
 platform concern. Until then gogo's product read path is defined entirely by
 those four contracts.
+### D-019 · Ports are registered once, and deployment publishes no host ports
+**Date:** 2026-10-15 · **Status:** accepted
+
+Every port lives in [`ports.txt`](ports.txt): the service, its kind, the
+environment variable, the container port, the development host port, and — when
+the port is also somebody else's documented default — *who*. The Go defaults,
+the `EXPOSE` lines, the compose mappings and the aggregator's dependency targets
+are checked against it by `internal/architecture/ports_test.go`.
+
+**Staging and production publish no host ports.** Services reach each other over
+the container network by service name. This is the load-bearing half of the
+decision, because it makes most of the collision problem disappear: the registry
+has a development column and no staging or production columns, because adding
+them would imply a mapping nobody should create.
+
+**Why one file and not documentation.** The port question was previously answered
+by five config files, four Dockerfiles, five compose files and the aggregator's
+defaults — seven places, no index, nothing that noticed when they disagreed. A
+moving service changed its `GRPC_PORT` and the aggregator kept dialling the old
+number, failing at request time with a connection error naming no configuration.
+
+**Why collisions are recorded rather than fixed.** The gRPC range sits on
+Prometheus's allocated range and, at 9092, Kafka's — Prometheus's own wiki marks
+9092 `UNALLOCATED (to avoid collision with Kafka)`. Renumbering changes the
+default every client and deployment manifest depends on, which is not worth the
+blast radius while nothing is deployed. The gate therefore **refuses a new
+collision that is not written down**, rather than refusing the four that are. That
+is the same trade as `docs/ADR_AGGREGATOR_BOUNDARIES.md`: a rule that blocks a
+known problem is a rule people route around, and routing around it is the failure.
+
+**Known and recorded:** `category-service` and `media-service` have no module in
+this repository, yet the aggregator's defaults dial `9090` and `9091` — Prometheus
+and its Pushgateway. Run beside a running Prometheus, the aggregator sends gRPC
+to Prometheus's HTTP port. They are described in `ports.txt` rather than listed as
+rows, because the gate verifies services that exist.

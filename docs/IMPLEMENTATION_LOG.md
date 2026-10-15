@@ -589,3 +589,72 @@ one `config.Load` helper in `graph/integration_test.go`, and eleven across the
 config package all now configure a token. Two graph integration tests were genuinely
 performing writes and had to start presenting a credential — which is the rule
 working, not the rule breaking something.
+
+---
+
+## 12. One place where a port is assigned
+
+**The question asked:** are ports hardcoded or environment variables, and do
+they collide with what a developer is already running?
+
+**Answer:** environment variables, but the defaults live in five separate config
+files, four Dockerfiles, five compose files and the aggregator's dependency
+targets — seven places, no index, and nothing that noticed when they disagreed.
+Compose maps `host:container` with identical numbers, so on a laptop the port is
+really taken.
+
+**The collision, verified rather than remembered.** The gRPC range 9090–9094 sits
+on Prometheus's allocated range and, at 9092, Kafka's:
+
+| Port | Repo | Belongs to |
+|---|---|---|
+| 9090 | aggregator default `CATEGORY_GRPC_TARGET` | Prometheus server |
+| 9091 | aggregator default `MEDIA_GRPC_TARGET` | Prometheus Pushgateway |
+| 9092 | `GRPC_PORT` product-service | **Kafka broker** |
+| 9093 | `GRPC_PORT` product-listing | Prometheus Alertmanager |
+| 9094 | `GRPC_PORT` product-search | Prometheus Alertmanager clustering |
+
+Prometheus's own port-allocation wiki marks 9092 `UNALLOCATED (to avoid
+collision with Kafka)`. Prometheus avoided 9092 to leave room for Kafka; this
+repository allocated it.
+
+**The sharpest failure mode is not a bind conflict.** `category-service` and
+`media-service` do not exist in this repository at all, yet the aggregator's
+defaults point at 9090 and 9091. Run the aggregator with defaults beside a
+running Prometheus and it sends gRPC to Prometheus's HTTP port — failing with a
+message that points nowhere useful.
+
+**Decided (D-019):** `ports.txt` at the repository root is the single place a
+port is assigned. `ports_test.go` walks out of it into every artefact that has to
+agree — Go defaults, `EXPOSE`, compose mappings, and the aggregator's gRPC
+targets, which previously had no link at all to what the peers bind.
+
+**Staging and production publish no host ports.** Services reach each other over
+the container network by service name. That is the load-bearing half: it makes
+most of the collision problem disappear, and it is why the registry has a dev
+column and no deployment columns. `TestNoDeploymentPublishesHostPorts` passes
+vacuously today — there are no deployment manifests yet — and exists so that
+adding one which publishes host ports fails with an explanation.
+
+**Renumbering was deliberately not done.** It changes the default every client,
+deployment manifest and client-side fallback depends on. Instead the gate refuses
+a *new* undocumented collision and accepts the four recorded ones. Same trade as
+the aggregator ratchet: a rule that blocks a known problem is a rule people route
+around.
+
+**Three negative tests, all confirmed to fail when they should:**
+
+| Sabotage | Caught by |
+|---|---|
+| Claim 9090 as `gogo` when Prometheus owns it | `TestNoPortCollidesSilentlyWithWellKnownDefaults` |
+| Change a service's `GRPC_PORT` without the registry | `TestPortRegistryMatchesReality`, `TestAggregatorTargetsMatchTheRegistry` |
+| Point two services at one dev host port | `TestNoPortIsClaimedTwice` |
+
+The third took two attempts: the first edit used an exact string that did not
+match the file's column spacing, so it silently changed nothing and the test
+passed. A negative test that passes because the sabotage did not apply is worse
+than no negative test, because it reports the rule as covered.
+
+**Not enforced, and recorded as such:** whether the developer's own machine
+already has something on a port. That is a runtime question. The dev column makes
+collisions rare, not impossible.
