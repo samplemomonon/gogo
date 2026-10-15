@@ -43,26 +43,28 @@
 //
 // # READ THIS BEFORE CHANGING WHAT THE RULE FORBIDS
 //
-// Two of this file's behaviours are open decisions, not settled architecture.
-// See docs/OPEN_DECISIONS.md.
+// Both open decisions in this file are now closed. See
+// docs/ADR_AGGREGATOR_BOUNDARIES.md for the reasoning and the evidence.
 //
-//   - OD-2: may this service ever hold a cache or a read model? UNDECIDED. This
-//     file forbids database/sql and nothing else, so it currently PERMITS an
-//     in-memory cache, a read model, and a Redis dependency. That permissiveness
-//     is the accident of a narrow rule, not a ratified position. If OD-2 closes
-//     as "no derived state either", the rule must be extended; if it closes as
-//     "derived state allowed", what happens today becomes intended and should be
-//     documented as such. Do not read the current behaviour as a decision.
+//   - OD-2: may this service ever hold a cache or a read model? DECIDED —
+//     derived, non-authoritative state is allowed, and this file's single rule
+//     is exactly that boundary rather than an accident of narrowness. Holding
+//     upstream data beyond one request is separately refused, because no
+//     service in this repository declares how fresh its data is. The caches this
+//     service actually has are declared and checked in caches_test.go, so what
+//     happens today is intended rather than merely permitted.
 //
 //   - OD-1: should enforcement be a fail-closed allowlist (depguard strict plus
-//     forbidigo on sql.Open) rather than a one-item denylist? DECIDED: not
-//     adopted without explicit approval, because it adds a lint dependency and
-//     changes the enforcement mechanism for the whole repository. The
-//     recommendation is recorded in the register; it is not rejected.
+//     forbidigo on sql.Open) rather than a one-item denylist? DECIDED — not
+//     adopted, because an allowlist is a hand-maintained list and this
+//     repository has three recorded instances of hand-maintained lists rotting.
+//     The adopted mechanism is a two-way ratchet in ratchet_test.go, plus the
+//     choke-point rule below, which closes the driver-arrival risk forbidigo was
+//     proposed for without a new toolchain dependency.
 //
-// What IS settled, and stated in this service's own README.md and
-// cmd/server/main.go, is that it holds no authoritative state today. This file
-// enforces that and nothing beyond it.
+// # What IS settled, and stated in this service's own README.md and
+// cmd/server/main.go, is that it holds no authoritative state. This file
+// enforces that, and nothing beyond it.
 //
 // # What is NOT checked, and why
 //
@@ -98,15 +100,21 @@
 // complementary controls. None of them run in a pull request or on a laptop, so
 // none of them is a substitute for a static check.
 //
-// # The stronger rule, for whoever takes this next
+// # What replaced the proposed allowlist
 //
-// The evidence-backed version is an allowlist, not a denylist: a fail-closed
-// depguard strict rule scoped to production files, plus a forbidigo rule on
-// ^sql\.(Open|OpenDB)$. That is recorded as OD-1 in docs/OPEN_DECISIONS.md and
-// was deliberately not adopted here — it adds lint dependencies to a repository
-// that enforces its architecture with plain go test, and choosing an enforcement
-// mechanism is the project owner's call. What this file has instead is a
-// denylist of one.
+// OD-1 proposed a fail-closed depguard strict rule plus forbidigo on
+// ^sql\.(Open|OpenDB)$, and proposed it for this file. It was declined, and the
+// reasoning is in ratchet_test.go: an allowlist is hand-maintained, and every
+// hand-maintained list in this repository has decayed — nineteen module roots
+// none of which existed, forty-four BUILD files for an uninstalled build system,
+// an import graph that had rotted to a third of the repository.
+//
+// The specific risk OD-1 was raised about — a new database driver arriving
+// unchallenged — is already closed here, and closed by construction rather than
+// by enumeration: database/sql is the single choke point every pure-Go SQL path
+// passes through, so a driver that does not exist yet still has nowhere to enter.
+// forbidigo on the same two function names would reimplement, with a new
+// toolchain dependency, a check one import line already performs.
 package architecture_test
 
 import (
@@ -378,27 +386,32 @@ func TestAggregatorHoldsNoDomainModel(t *testing.T) {
 // what can be checked mechanically is that the contract exists and has both
 // roots.
 //
-// TODO(architecture-decision): Decide whether category mutations are part of the
-// permanent aggregator contract. The assertion on the Mutation root below is a
-// TEMPORARY guard, not an architecture property, and must not be treated as one.
+// # OD-3: decided
 //
-// Owner: product / API contract owner. Tracked as OD-3 in docs/OPEN_DECISIONS.md.
+// The question was what to do with three mutations — createCategory,
+// updateCategory, deleteCategory — that are in the schema but cannot succeed.
+// category.v1 exposes no write RPC, so all three answer DEPENDENCY_UNAVAILABLE
+// unconditionally. A schema advertising surface that always fails is a contract
+// lying about its own capability.
 //
-// Why it is open: three category mutations (createCategory, updateCategory,
-// deleteCategory) always answer DEPENDENCY_UNAVAILABLE, because category.v1
-// exposes no write RPCs. So the Mutation root currently advertises surface that
-// cannot succeed. That may be a bug, or it may be a placeholder for a contract
-// that is coming, and the two demand different actions.
+// The three options considered were: keep the Mutation root and justify it,
+// remove it, or defer. The first two were wrong for the same reason. The
+// Mutation root is not in question — createProduct, updateProduct, deleteProduct,
+// registerMedia, completeMediaUpload and deleteMedia all work, and a service
+// with working writes will always have a Mutation root. And removing the
+// category mutations is not available: graphql.org's own governance guidance
+// classes removing a field as a breaking change, which is precisely the thing to
+// avoid introducing to resolve a problem caused by the field's presence.
 //
-// Close it by choosing one:
-//  1. The Mutation root must exist — keep this assertion and record why.
-//  2. The Mutation root must not exist — remove this assertion and the test that
-//     exists only to enforce its presence.
-//  3. Deferred — name the decision owner and a review date, so the TODO does not
-//     become permanent by being left alone.
+// What remains is graphql.guide's answer to the underlying question — *build
+// expected errors into the schema, so clients know what to handle* — combined
+// with graphql.org's mechanism for a field that should not be used:
+// `@deprecated` carrying a reason that names the alternative.
 //
-// Until it is closed: a test may enforce a contract that has been decided. It may
-// not quietly decide a product question by making the answer build-failing.
+// So the fields stay, the root stays, and each of the three now declares, in the
+// schema itself, that it cannot succeed and where to go instead. That is
+// discoverable through ordinary introspection, which is where a client author
+// looks, rather than only in this file or a README.
 func TestAggregatorOwnsItsSchemaContract(t *testing.T) {
 	root := moduleRoot(t)
 
@@ -413,10 +426,103 @@ func TestAggregatorOwnsItsSchemaContract(t *testing.T) {
 		t.Error("the GraphQL schema declares no Query root; the service would expose nothing")
 	}
 
-	// TODO(architecture-decision): temporary guard, see the doc comment above.
+	// Six of the ten mutations reach a service that exposes the capability. The
+	// Mutation root exists because they work, not because it is conventional.
 	if !strings.Contains(schema, "type Mutation") {
 		t.Error("the GraphQL schema declares no Mutation root.\n" +
-			"  This is a temporary assertion pending a product/API contract decision, not an " +
-			"established invariant — see the TODO(architecture-decision) above.")
+			"  Six mutations in this schema reach a service that implements them " +
+			"(createProduct, updateProduct, deleteProduct, registerMedia, completeMediaUpload, " +
+			"deleteMedia). A GraphQL service with working writes has a Mutation root.")
 	}
+
+	// The other three cannot succeed, and the schema has to say so.
+	for _, field := range categoryWriteMutations {
+		declaration, found := mutationFieldDeclaration(schema, field)
+		if !found {
+			t.Errorf("Mutation.%s is not declared in the GraphQL schema.\n"+
+				"  It is listed in categoryWriteMutations because it cannot succeed — "+
+				"category.v1 exposes no write RPC — so either it was removed, which is a "+
+				"breaking change clients may depend on, or the list here is wrong.", field)
+			continue
+		}
+		if !strings.Contains(declaration, "@deprecated(") {
+			t.Errorf("Mutation.%s cannot succeed but is not marked @deprecated in the schema.\n"+
+				"  declaration: %s\n"+
+				"  A mutation in the schema that always answers DEPENDENCY_UNAVAILABLE is a "+
+				"contract advertising a capability it does not have. @deprecated with a reason "+
+				"naming the alternative is the documented way to tell clients not to call it.",
+				field, declaration)
+			continue
+		}
+		if reason, found := deprecationReason(declaration); !found || strings.TrimSpace(reason) == "" {
+			t.Errorf("Mutation.%s is @deprecated without a usable reason.\n"+
+				"  declaration: %s\n"+
+				"  Deprecation without a reason tells a client the field is going away and nothing "+
+				"about what to use instead. The reason must say the capability is missing and name "+
+				"the category service's REST API.", field, declaration)
+		}
+	}
+}
+
+// categoryWriteMutations are the mutations whose capability this service does not
+// have. They are declared in the schema and resolve to DEPENDENCY_UNAVAILABLE.
+var categoryWriteMutations = []string{"createCategory", "updateCategory", "deleteCategory"}
+
+// deprecationReason extracts the reason argument from a @deprecated directive.
+//
+// Returns the text between the quotes. Checking for the presence of `reason: "`
+// is not enough: an empty reason matches it too, which is the one case the
+// assertion exists to catch.
+func deprecationReason(declaration string) (string, bool) {
+	const marker = `reason: "`
+	idx := strings.Index(declaration, marker)
+	if idx < 0 {
+		return "", false
+	}
+	rest := declaration[idx+len(marker):]
+	end := strings.Index(rest, `"`)
+	if end < 0 {
+		return "", false
+	}
+	return rest[:end], true
+}
+
+// mutationFieldDeclaration returns the schema text declaring Mutation.<field>,
+// up to and including the end of that field's declaration.
+//
+// Line-based, because a field's declaration is not one line: directives are
+// conventionally placed on continuation lines indented further than the field
+// itself. Matching on "\n  " instead of a newline boundary finds the first two
+// spaces of a four-space continuation and truncates the declaration before its
+// directives — which would silently pass every assertion below.
+func mutationFieldDeclaration(schema, field string) (string, bool) {
+	lines := strings.Split(schema, "\n")
+
+	prefix := "  " + field + "("
+	start := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			start = i
+			break
+		}
+	}
+	if start < 0 {
+		return "", false
+	}
+
+	declaration := []string{strings.TrimSpace(lines[start])}
+	for _, line := range lines[start+1:] {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		// A field declaration continues while the indentation is deeper than the
+		// field's own two spaces. Anything at two spaces or less is the next field,
+		// or the end of the type.
+		if len(line)-len(strings.TrimLeft(line, " ")) <= 2 {
+			break
+		}
+		declaration = append(declaration, trimmed)
+	}
+	return strings.Join(declaration, " "), true
 }

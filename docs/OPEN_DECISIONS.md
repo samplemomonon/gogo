@@ -9,7 +9,10 @@
 >
 > Where an item below is *undecided*, any behaviour in the code that appears to enforce an answer is an artefact of the undecided state, and is recorded as such rather than presented as an invariant.
 
-Three items are open. Two are structural (they need a repository decision). One belongs to a contract owner outside this codebase's architecture.
+Three items were open. All three are now closed — see
+`docs/ADR_AGGREGATOR_BOUNDARIES.md`. Their original text is kept below, unchanged,
+because what the register looked like *while* they were open is the useful part:
+it shows which code was enforcing an undecided answer, and where.
 
 | ID | Decision | Owner | Blocks | Rung today |
 |---|---|---|---|---|
@@ -21,7 +24,10 @@ Three items are open. Two are structural (they need a repository decision). One 
 
 ## OD-1 · Enforcement mechanism: allowlist and `forbidigo`
 
-**Status:** decided — **not adopted**. Recorded here so the recommendation is not silently lost, and so a later reader does not assume it was considered and rejected.
+**Status: CLOSED 2026-10-15 — declined, and replaced.** Not merely "not adopted":
+the one-item denylist this proposed to strengthen is no longer the only
+enforcement. `internal/architecture/ratchet_test.go` now mirrors the module's
+first-party import edges and fails on additions *and* stale entries. See the ADR.
 
 **The recommendation.** Research against published composition layers concluded that a *denylist of database libraries* is the wrong shape — fail-open, must be maintained forever, and cannot match standard library. The recommended replacement is two fail-closed rules:
 
@@ -46,7 +52,10 @@ Three items are open. Two are structural (they need a repository decision). One 
 
 ## OD-2 · May the aggregator hold a cache or read model?
 
-**Status:** undecided. **This is the question that determines how much the aggregator's architecture rule can say.**
+**Status: CLOSED 2026-10-15 — derived state allowed.** Authoritative state is
+still forbidden. Upstream-derived data may be held for one request and not beyond,
+because no upstream service declares freshness — measured at zero occurrences of
+`Cache-Control`/`max-age`/cache-tag across all five. See the ADR.
 
 **Why it is open, and why neither answer can be assumed.** The aggregator's `README.md` and `cmd/server/main.go` both state *"It owns no data and no database"*, and both explain that the reason is that everything is read from another service at request time. That is a statement about **today**. It is not a decision about whether the service may ever hold derived state, and treating it as one would be reading more into the prose than it carries.
 
@@ -75,9 +84,24 @@ So the industry does not draw this line consistently, which is exactly why it is
 
 ## OD-3 · Must `type Mutation` be part of the permanent aggregator contract?
 
-**Status:** undecided — and it belongs to a contract owner outside this codebase's architecture.
+**Status: CLOSED 2026-10-15 — yes, the Mutation root is permanent; the three
+category mutations are deprecated in-schema with a reason naming the alternative.**
 
-**Why it cannot be settled from the code.** Three category mutations — `createCategory`, `updateCategory`, `deleteCategory` — always answer `DEPENDENCY_UNAVAILABLE`, because `category.v1` exposes no write RPCs. So the `Mutation` root currently advertises surface that cannot succeed.
+The register's own argument below is that this "cannot be settled from the code",
+and that is correct — so it was settled as the product decision it is, by the
+project owner. Of the three intents listed below, the third was chosen: *a
+deliberate pointer*, a mutation that says "not available here" rather than a
+silent omission. The difference from today is that the schema now says so
+through `@deprecated`, where a client author sees it, instead of the fact being
+knowable only by reading a resolver.
+
+Note what was rejected and why, because it is the part that was not obvious:
+**removing** the three mutations is not available, since graphql.org's governance
+guidance classes field removal as a breaking change — that would introduce a
+breaking change to fix a problem caused by the field's presence. **Removing the
+Mutation root** is not available either, because six of its ten mutations work.
+
+**Why it could not be settled from the code.** Three category mutations — `createCategory`, `updateCategory`, `deleteCategory` — always answer `DEPENDENCY_UNAVAILABLE`, because `category.v1` exposes no write RPCs. So the `Mutation` root currently advertises surface that cannot succeed.
 
 That fact alone does not determine the answer. It is equally consistent with three different intents:
 
