@@ -32,11 +32,15 @@ RUN go build -trimpath \
       -o /out/product-service ./cmd/server
 
 # --- Nix binary stage ---
-# This stage copies a pre-built binary from Nix (if provided via build arg)
+# This stage copies a pre-built binary from Nix (if provided via build arg).
+# Always creates /out/product-service (empty if no Nix binary) so the COPY below succeeds.
 FROM alpine:3.20 AS nix-binary
 ARG NIX_BINARY
-RUN if [ -n "$NIX_BINARY" ] && [ -f "$NIX_BINARY" ]; then \
-      mkdir -p /out && cp "$NIX_BINARY" /out/product-service; \
+RUN mkdir -p /out && \
+    if [ -n "$NIX_BINARY" ] && [ -f "$NIX_BINARY" ]; then \
+      cp "$NIX_BINARY" /out/product-service; \
+    else \
+      touch /out/product-service; \
     fi
 
 # --- runtime stage ---
@@ -48,9 +52,14 @@ RUN apk add --no-cache ca-certificates tzdata \
 
 WORKDIR /app
 
-# Copy binary from Nix build if available, otherwise from Go builder
-COPY --from=nix-binary /out/product-service /bin/product-service
-COPY --from=builder /out/product-service /bin/product-service
+# Copy binary: prefer Nix build if it produced a non-empty file, else use Go builder
+COPY --from=nix-binary /out/product-service /tmp/nix-binary
+COPY --from=builder /out/product-service /tmp/go-binary
+RUN if [ -s /tmp/nix-binary ]; then \
+      cp /tmp/nix-binary /bin/product-service; \
+    else \
+      cp /tmp/go-binary /bin/product-service; \
+    fi
 
 ENV APP_PORT=8082 \
     GRPC_PORT=9092 \

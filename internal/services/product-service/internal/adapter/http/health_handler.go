@@ -23,6 +23,7 @@ func NewHealthHandler(check func(ctx context.Context) error, log *slog.Logger) *
 // RegisterRoutes mounts the health routes.
 func (h *HealthHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.Liveness)
+	mux.HandleFunc("GET /healthz", h.Liveness)
 	mux.HandleFunc("GET /readyz", h.Readiness)
 	mux.HandleFunc("GET /version", h.Version)
 }
