@@ -19,10 +19,17 @@ import (
 	"aggregator-service/internal/breaker"
 	"aggregator-service/internal/graph/model"
 	"aggregator-service/internal/retry"
+	"aggregator-service/internal/serviceauth"
 )
 
 // Targets holds the downstream addresses and resilience settings, read from config.
 type Targets struct {
+	// Credential is presented on every call. The platform services refuse
+	// unauthenticated callers, so a connection without it can dial and cannot do
+	// anything — and the failure would read as a wiring problem rather than a
+	// configuration one.
+	Credential serviceauth.Outgoing
+
 	Category string
 	Media    string
 	Product  string
@@ -74,6 +81,7 @@ func New(targets Targets) (*Clients, error) {
 		}
 		opts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithPerRPCCredentials(targets.Credential.GRPCCredentials()),
 			// WaitForReady is deliberately NOT set, which is worth explaining because
 			// it is the setting a resilient client usually reaches for first.
 			//

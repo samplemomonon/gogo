@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"product-search-service/internal/serviceauth"
 	"syscall"
 	"time"
 
@@ -188,7 +189,7 @@ func run() error {
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           buildHandler(svc, db, engine, projectorRepo, log),
+		Handler:           buildHandler(svc, db, engine, projectorRepo, log, cfg.InboundServiceTokens),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
@@ -372,12 +373,33 @@ func stopGRPC(ctx context.Context, server *grpc.Server, log *slog.Logger) error 
 }
 
 // buildHandler wires the layers together and wraps them in middleware.
+// probePaths are answered without a credential.
+//
+// They must be: an orchestrator that receives 401 from a liveness probe restarts
+// the container, and restarting the process answering the probe turns a partial
+// outage into a total one.
+var probePaths = []string{"/health", "/healthz", "/readyz", "/version"}
+
+// guardedHandler wraps mux with inbound authentication.
+//
+// Innermost in the chain, deliberately: logging runs before it so a refusal is
+// recorded, and rate limiting runs before it so an unauthenticated caller is
+// still throttled rather than being able to hammer the credential check.
+//
+// Extracted so the wiring is testable. A guard that only exists inline in the
+// chain can be deleted without any test noticing, which is what happened in
+// product-service before this was pulled out.
+func guardedHandler(mux http.Handler, tokens []string) http.Handler {
+	return serviceauth.NewTokenSet(tokens).HTTP(mux, probePaths)
+}
+
 func buildHandler(
 	svc handler.ProductSearchService,
 	db *sql.DB,
 	engine *repository.Engine,
 	projectorRepo *repository.Projector,
 	log *slog.Logger,
+	inboundTokens []string,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -398,11 +420,22 @@ func buildHandler(
 		},
 	}, log).RegisterRoutes(mux)
 
+	return wrapChain(mux, log, inboundTokens)
+}
+
+// wrapChain is the middleware chain, taking the mux rather than the full
+// dependency graph.
+//
+// Extracted so the chain is reachable from a test. buildHandler needs a wired
+// service, database and projector, so a test could not otherwise reach the chain
+// — and deleting the guard from it left the suite green until this existed.
+func wrapChain(mux http.Handler, log *slog.Logger, inboundTokens []string) http.Handler {
 	// Order matters: recover first so it also catches panics raised by the
-	// logging and header middleware.
+	// logging and header middleware. Authentication is innermost, so a refusal is
+	// still logged.
 	return handler.Recovery(log)(
 		handler.Logging(log)(
-			handler.SecurityHeaders(mux),
+			handler.SecurityHeaders(guardedHandler(mux, inboundTokens)),
 		),
 	)
 }

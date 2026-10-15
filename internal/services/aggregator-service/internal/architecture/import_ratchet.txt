@@ -15,6 +15,7 @@ aggregator-service/cmd/server -> aggregator-service/internal/grpcclient
 aggregator-service/cmd/server -> aggregator-service/internal/handler
 aggregator-service/cmd/server -> aggregator-service/internal/projection
 aggregator-service/cmd/server -> aggregator-service/internal/retry
+aggregator-service/cmd/server -> aggregator-service/internal/serviceauth
 aggregator-service/cmd/server -> aggregator-service/internal/telemetry
 aggregator-service/cmd/server -> aggregator-service/internal/version
 aggregator-service/graph -> aggregator-service/graph/generated
@@ -34,10 +35,12 @@ aggregator-service/internal/grpcclient -> aggregator-service/internal/apperror
 aggregator-service/internal/grpcclient -> aggregator-service/internal/breaker
 aggregator-service/internal/grpcclient -> aggregator-service/internal/graph/model
 aggregator-service/internal/grpcclient -> aggregator-service/internal/retry
+aggregator-service/internal/grpcclient -> aggregator-service/internal/serviceauth
 aggregator-service/internal/handler -> aggregator-service/internal/apperror
 aggregator-service/internal/handler -> aggregator-service/internal/config
 aggregator-service/internal/handler -> aggregator-service/internal/version
 aggregator-service/internal/projection -> aggregator-service/internal/graph/model
+aggregator-service/internal/projection -> aggregator-service/internal/serviceauth
 aggregator-service/internal/retry -> aggregator-service/internal/apperror
 aggregator-service/internal/retry -> aggregator-service/internal/breaker
 aggregator-service/internal/telemetry -> aggregator-service/graph

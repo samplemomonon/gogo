@@ -47,6 +47,7 @@ func authTestServer(t *testing.T, tokens []string) (http.Handler, *countingStore
 	// the token rule is enforced at load time, which is the earliest point at which
 	// a deployment that forgot it can be refused.
 	t.Setenv("MUTATION_TOKENS", strings.Join(tokens, ","))
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", "test-only-downstream-token-value")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)

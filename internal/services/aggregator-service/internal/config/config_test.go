@@ -20,6 +20,7 @@ const configTestToken = "config-test-mutation-token-value"
 func withToken(t *testing.T) {
 	t.Helper()
 	t.Setenv("MUTATION_TOKENS", configTestToken)
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", configTestToken)
 }
 
 func TestLoadAppliesDefaults(t *testing.T) {
@@ -356,6 +357,10 @@ func contains(haystack, needle string) bool {
 // required" — is how an endpoint with ten write mutations becomes public because
 // someone removed an environment variable rather than because anyone chose that.
 func TestAbsentMutationTokensRefuseToLoad(t *testing.T) {
+	// The downstream credential is set so that the rule under test is the
+	// mutation-token one; both are mandatory, and both would otherwise be
+	// reported by whichever check happens to run first.
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", configTestToken)
 	t.Setenv("MUTATION_TOKENS", "")
 
 	if _, err := Load(); err == nil {
@@ -375,6 +380,7 @@ func TestAMutationTokenIsAccepted(t *testing.T) {
 }
 
 func TestSeveralMutationTokensAreAccepted(t *testing.T) {
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", configTestToken)
 	t.Setenv("MUTATION_TOKENS", "first-token-value-here, second-token-value-here")
 
 	cfg, err := Load()
@@ -389,6 +395,7 @@ func TestSeveralMutationTokensAreAccepted(t *testing.T) {
 // A short token is not a token. Accepting one produces a configuration that looks
 // secured and is not.
 func TestAShortMutationTokenIsRejected(t *testing.T) {
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", configTestToken)
 	t.Setenv("MUTATION_TOKENS", "short")
 
 	_, err := Load()
@@ -401,9 +408,38 @@ func TestAShortMutationTokenIsRejected(t *testing.T) {
 }
 
 func TestADuplicateMutationTokenIsRejected(t *testing.T) {
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", configTestToken)
 	t.Setenv("MUTATION_TOKENS", "same-token-value-here-x, same-token-value-here-x")
 
 	if _, err := Load(); err == nil {
 		t.Fatal("a duplicated token was accepted; it suggests a misconfigured rotation")
+	}
+}
+
+// --- downstream credential -------------------------------------------------
+
+// The platform services refuse unauthenticated callers, so this service cannot
+// do its job without a credential to present. That is a refusal to start, not an
+// invitation to connect and fail on every call: an Unauthenticated error on every
+// request would read as a wiring problem rather than a missing variable.
+func TestAbsentDownstreamTokenRefusesToLoad(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", configTestToken)
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load succeeded with no downstream credential")
+	}
+	if !strings.Contains(err.Error(), "DOWNSTREAM_SERVICE_TOKEN") {
+		t.Errorf("error %q does not name the variable to set", err)
+	}
+}
+
+func TestAShortDownstreamTokenIsRejected(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", configTestToken)
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", "short")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("a four-character downstream credential was accepted")
 	}
 }

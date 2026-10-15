@@ -85,3 +85,10 @@ postgres                postgres DB_PORT   5432 5432 POSTGRESQL
 # of the whole stack rather than of one project. The per-service projects avoid
 # the clash by mapping 5434, 5436 and 5437 onto their own containers — that
 # offset exists for this reason.
+#
+# Publishing these ports in development is safe only because every platform
+# service refuses unauthenticated callers. Before that, an unauthenticated
+# POST /api/v1/products on 8082 wrote to the catalogue while the aggregator's
+# own token check sat unused a few ports away — which made the aggregator's
+# authentication decorative rather than a boundary. See
+# docs/ADR_SERVICE_TO_SERVICE_AUTH.md.

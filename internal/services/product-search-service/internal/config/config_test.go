@@ -30,9 +30,20 @@ func clearEnv(t *testing.T) {
 // listing service's. Sharing a port would make one of them unreachable, and
 // sharing a database would break the one-database-per-service rule the split rests
 // on.
+// A valid configuration needs an inbound credential: Load refuses to start
+// without one, because an absent variable must refuse every caller rather than
+// admit every one.
+const configTestToken = "config-test-inbound-token-value"
+
+func withToken(t *testing.T) {
+	t.Helper()
+	t.Setenv("INBOUND_SERVICE_TOKENS", configTestToken)
+}
+
 func TestDefaultsAreDistinctFromTheListingService(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -59,6 +70,7 @@ func TestDefaultsAreDistinctFromTheListingService(t *testing.T) {
 func TestConsumerGroupDiffersFromTheListingService(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -130,6 +142,7 @@ func TestValidateRejectsInconsistentValues(t *testing.T) {
 // through the environment, so they are checked against Validate directly.
 func TestValidateRejectsValuesTheEnvironmentCannotExpress(t *testing.T) {
 	clearEnv(t)
+	withToken(t)
 
 	base, err := Load()
 	if err != nil {
@@ -166,6 +179,7 @@ func TestConsumerCanBeDisabled(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("CONSUMER_ENABLED", "false")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -179,6 +193,7 @@ func TestDSNIsRedactedForLogging(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("DB_PASSWORD", "hunter2")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -198,6 +213,7 @@ func TestDSNIsRedactedForLogging(t *testing.T) {
 func TestAddrs(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -215,6 +231,7 @@ func TestDurationsAreParsed(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT", "45s")
 	t.Setenv("PROCESSED_EVENT_RETENTION", "2h")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
