@@ -16,7 +16,9 @@ K8S_DIR      := deploy/k8s
 # aggregator, product and product-search all returned an identical package list
 # under workspace mode — the gateway's — which is how three services can look
 # covered by a check that never touched them.
-SERVICES     := aggregator-service product-listing-service product-search-service product-service
+# The six platform services. Keep in step with ports.txt, which the port gate
+# checks against every go.mod default and Dockerfile EXPOSE in here.
+SERVICES     := aggregator-service category-service media-service product-listing-service product-search-service product-service
 SERVICES_DIR := internal/services
 
 .PHONY: services-vet services-test gofmt-check
@@ -32,7 +34,8 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
 
 .PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch \
 	module buf buf-lint buf-generate buf-check buf-breaking arch-graph \
-	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean
+	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
+	up down restart logs ps reset smoke dev-pull
 
 all: build
 
@@ -250,6 +253,84 @@ docker-push: docker-build
 # Render the final manifest set (kustomize) without applying.
 k8s-build:
 	kubectl kustomize $(K8S_DIR)
+
+# ---------------------------------------------------------------- dev stack
+
+# The whole system in one command: six platform services, the composition layer,
+# the gateway, and the three backing stores they need.
+#
+# docker-compose.dev.yml is the authoritative definition of the system as one
+# thing. The per-service compose files still exist for working on a service in
+# isolation; this file is what runs everything, and it is the only place that
+# decides what the services are called to each other.
+#
+# Note the two token settings the aggregator takes. MUTATION_TOKENS is what a
+# *client* presents; DOWNSTREAM_SERVICE_TOKEN is what the aggregator presents to
+# the services behind it. Two settings because they are two trust boundaries — a
+# caller is not a peer — and sharing one value would mean a client credential
+# would be accepted by a platform service.
+DEV_COMPOSE := docker compose -f docker-compose.dev.yml
+
+up:
+	$(DEV_COMPOSE) up -d --build
+	@$(MAKE) --no-print-directory smoke
+
+down:
+	$(DEV_COMPOSE) down
+
+# Stop and delete the data. The only way to re-apply deploy/dev-init.sql, since
+# postgres runs its init scripts once per data directory.
+reset:
+	$(DEV_COMPOSE) down -v
+
+restart:
+	$(DEV_COMPOSE) restart
+
+logs:
+	$(DEV_COMPOSE) logs -f --tail=100
+
+ps:
+	$(DEV_COMPOSE) ps
+
+# Health endpoints, on the published development ports.
+#
+# This is what makes `make up` worth something: without it, "up" means "compose
+# accepted the file", which is true long before anything serves a request.
+#
+# Every service answers its probes without a credential — that exemption is what
+# stops an orchestrator restarting a healthy container — so this is a real
+# reachability check rather than a second copy of the auth test.
+#
+# It reports every failure rather than stopping at the first, because the usual
+# reason a dependency is down is that something earlier in the chain is.
+smoke:
+	@fail=0; \
+	for target in \
+		"gateway|http://localhost:8080/healthz" \
+		"category-service|http://localhost:8086/healthz" \
+		"media-service|http://localhost:8081/healthz" \
+		"product-service|http://localhost:8082/healthz" \
+		"product-listing|http://localhost:8083/healthz" \
+		"product-search|http://localhost:8084/healthz" \
+		"aggregator|http://localhost:8085/healthz"; do \
+		name=$${target%%|*}; url=$${target#*|}; \
+		code=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 $$url 2>/dev/null); \
+		if [ "$$code" = "200" ]; then \
+			printf '  ok    %s\n' "$$name"; \
+		else \
+			printf '  FAIL  %s  (%s -> %s)\n' "$$name" "$$url" "$${code:-no response}"; \
+			fail=1; \
+		fi; \
+	done; \
+	if [ $$fail -ne 0 ]; then \
+		echo; \
+		echo "not fully up yet — 'make logs' shows why. The first run builds six"; \
+		echo "images and takes several minutes; later runs start in under a minute."; \
+	fi; \
+	exit $$fail
+
+dev-pull:
+	$(DEV_COMPOSE) pull --ignore-buildable
 
 # Apply the whole stack. Requires the gogo-secrets secret (see
 # deploy/k8s/secret.example.yaml):  make k8s-secrets CHANGEME  first.

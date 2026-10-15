@@ -1,0 +1,85 @@
+# Standalone orchestration for the media service.
+#
+# MinIO is built from source rather than pulled from Docker Hub: MinIO Community
+# Edition stopped publishing images in October 2025 and the repositories were
+# removed in September 2026. See docker/minio/Dockerfile for the details.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+      - "9091:9091"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: media_user
+      DB_PASSWORD: media_pass
+      DB_NAME: media_db
+      DB_SSLMODE: disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: media
+      MINIO_USE_SSL: "false"
+      APP_PORT: "8081"
+      GRPC_PORT: "9091"
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/media-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: media_user
+      POSTGRES_PASSWORD: media_pass
+      POSTGRES_DB: media_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media_user -d media_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    build:
+      context: ./docker/minio
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      # Development credentials. Override both for anything shared.
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # The image already declares this, but repeating it here keeps the check
+      # visible next to the ports it guards.
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  minio_data:

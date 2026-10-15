@@ -1,0 +1,372 @@
+# The whole system, in one command.
+#
+#   make up        start everything
+#   make down      stop it, keep the data
+#   make reset     stop it and delete the data
+#   make ps        what is running
+#   make logs      follow everything
+#   make smoke     check that every health endpoint answers
+#
+# # Why this file exists
+#
+# There was no way to run the whole system before it. The root compose brought up
+# postgres and the gateway; each platform service had its own separate compose
+# project with its own postgres. Nothing joined them, and they did not even agree
+# on each other's names: the root stack dialled product-app, product-listing-app
+# and product-search-app, while the services that were supposed to answer those
+# names were called app. category-service and media-service were dialled by both
+# the gateway and the aggregator and defined by nothing at all.
+#
+# So this file is not a convenience wrapper around the others. It is the first
+# definition of the system as one thing, and it is authoritative: the names here
+# are the ones every service is given.
+#
+# # Names
+#
+# One service, one name, used everywhere: <role>-service. The gateway is
+# gateway, the broker is kafka, the object store is minio. Every *_GRPC_TARGET
+# and *_ADDRESS below points at one of those names, so a rename is one edit in
+# one file rather than a scavenger hunt across five.
+#
+# # Database
+#
+# One postgres with six databases, created by an init script. Each service had
+# its own postgres container in its own compose file, which would have meant six
+# of them here; the databases are separate and the credentials are per-service,
+# so nothing is shared that should not be.
+#
+# # Credentials
+#
+# The tokens below are development credentials published on purpose. They exist
+# so the stack runs, and every one of them is local. Nothing here belongs in a
+# deployment, and the services refuse to start without them — see
+# docs/ADR_SERVICE_TO_SERVICE_AUTH.md for why that is fail-closed rather than
+# merely tidy.
+#
+# # Development only
+#
+# Every port published here is a development host port. Staging and production
+# publish none: services reach each other by name over the container network.
+# ports.txt records the assignments and the port gate checks them.
+
+name: gogo-dev
+
+x-service-token: &service-token "local-dev-service-token-not-a-secret"
+
+x-app: &app
+  restart: unless-stopped
+  networks: [gogo]
+
+x-app-env: &app-env
+  # Every platform service refuses callers without a credential, on both
+  # transports. They are all the same value here because this is one developer
+  # machine; a real deployment issues distinct ones.
+  INBOUND_SERVICE_TOKENS: *service-token
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_SSLMODE: disable
+  LOG_FORMAT: text
+  LOG_LEVEL: info
+
+services:
+  # ---------------------------------------------------------------- storage
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: gogo-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./deploy/dev-init.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [gogo]
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: gogo-dev-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # Two listeners so the same broker is reachable from inside the network and
+      # from the host, which need different advertised addresses.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Single node, so every replication factor must be 1. Left at Kafka's
+      # default of 3 the broker refuses to start.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_NUM_PARTITIONS: "3"
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [gogo]
+
+  minio:
+    build:
+      context: ./internal/services/media-service/docker/minio
+      dockerfile: Dockerfile
+    container_name: gogo-dev-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [gogo]
+
+  # ------------------------------------------------------- platform services
+
+  category-service:
+    <<: *app
+    build:
+      context: ./internal/services/category-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-category
+    ports: ["8086:8086", "9090:9090"]
+    environment:
+      <<: *app-env
+      DB_USER: category_user
+      DB_PASSWORD: category_pass
+      DB_NAME: category_db
+      APP_PORT: "8086"
+      GRPC_PORT: "9090"
+    healthcheck:
+      test: ["CMD", "/bin/category-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  media-service:
+    <<: *app
+    build:
+      context: ./internal/services/media-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-media
+    ports: ["8081:8081", "9091:9091"]
+    environment:
+      <<: *app-env
+      DB_USER: media_user
+      DB_PASSWORD: media_pass
+      DB_NAME: media_db
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: media
+      MINIO_USE_SSL: "false"
+      APP_PORT: "8081"
+      GRPC_PORT: "9091"
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/media-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  product-service:
+    <<: *app
+    build:
+      context: ./internal/services/product-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-product
+    ports: ["8082:8082", "9092:9092"]
+    environment:
+      <<: *app-env
+      DB_USER: product_user
+      DB_PASSWORD: product_pass
+      DB_NAME: product_db
+      # The outbox publishes product events to the broker; without this the
+      # service starts and silently never emits, and the two read models stay
+      # empty forever.
+      KAFKA_BROKERS: kafka:9092
+      CATEGORY_GRPC_TARGET: category-service:9090
+      MEDIA_GRPC_TARGET: media-service:9091
+      DEPENDENCY_TIMEOUT: 3s
+      DEFAULT_CURRENCY: IDR
+      APP_PORT: "8082"
+      GRPC_PORT: "9092"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/product-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  product-listing-service:
+    <<: *app
+    build:
+      context: ./internal/services/product-listing-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-listing
+    ports: ["8083:8083", "9093:9093"]
+    environment:
+      <<: *app-env
+      DB_USER: listing_user
+      DB_PASSWORD: listing_pass
+      DB_NAME: listing_db
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CONSUMER_GROUP: product-listing-service
+      KAFKA_TOPIC: product.events.v1
+      KAFKA_DEAD_LETTER_TOPIC: product.events.v1.dlq
+      APP_PORT: "8083"
+      GRPC_PORT: "9093"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/product-listing-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  product-search-service:
+    <<: *app
+    build:
+      context: ./internal/services/product-search-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-search
+    ports: ["8084:8084", "9094:9094"]
+    environment:
+      <<: *app-env
+      DB_USER: search_user
+      DB_PASSWORD: search_pass
+      DB_NAME: search_db
+      KAFKA_BROKERS: kafka:9092
+      # Must not be the listing service's group: two services in one group split
+      # the partitions, and each would index half the catalogue.
+      KAFKA_CONSUMER_GROUP: product-search-service
+      KAFKA_TOPIC: product.events.v1
+      KAFKA_DEAD_LETTER_TOPIC: product.events.v1.dlq
+      APP_PORT: "8084"
+      GRPC_PORT: "9094"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/product-search-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------- composition & gateway
+
+  aggregator:
+    build:
+      context: ./internal/services/aggregator-service
+      dockerfile: Dockerfile
+    container_name: gogo-dev-aggregator
+    restart: unless-stopped
+    networks: [gogo]
+    ports: ["8085:8085"]
+    environment:
+      # The internal gRPC ports, not the public REST ones. An aggregator is an
+      # internal client, so it must not depend on another service's public surface.
+      CATEGORY_GRPC_TARGET: category-service:9090
+      MEDIA_GRPC_TARGET: media-service:9091
+      PRODUCT_GRPC_TARGET: product-service:9092
+      LISTING_GRPC_TARGET: product-listing-service:9093
+      SEARCH_GRPC_TARGET: product-search-service:9094
+
+      # The two read services expose projection status over REST only, so the
+      # aggregator speaks HTTP for exactly these two endpoints.
+      LISTING_HTTP_BASE: http://product-listing-service:8083
+      SEARCH_HTTP_BASE: http://product-search-service:8084
+
+      REQUEST_TIMEOUT: 10s
+      DEPENDENCY_TIMEOUT: 3s
+
+      # What the client presents to the aggregator, and what the aggregator
+      # presents to everything behind it. Two settings, because they are two
+      # trust boundaries: a caller is not a peer.
+      MUTATION_TOKENS: "local-dev-mutation-token-not-a-secret"
+      DOWNSTREAM_SERVICE_TOKEN: *service-token
+
+      # Relaxed for local development: introspection and the playground are what
+      # make the composed schema explorable. Both default off in the image.
+      ENABLE_INTROSPECTION: "true"
+      ENABLE_PLAYGROUND: "true"
+      ALLOWED_ORIGINS: "*"
+
+      APP_PORT: "8085"
+      LOG_FORMAT: text
+      LOG_LEVEL: debug
+    healthcheck:
+      # Readiness, not liveness: it checks every dependency, so a partial outage
+      # removes this instance from the load balancer instead of restarting it.
+      test: ["CMD", "/bin/aggregator-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gogo-dev-gateway
+    restart: unless-stopped
+    networks: [gogo]
+    ports: ["8080:8080"]
+    environment:
+      SERVICE_NAME: gogo
+      PORT: "8080"
+      LOG_FORMAT: text
+      TRUSTED_PROXIES: 172.16.0.0/12
+      DATABASE_URL: postgres://gogo:gogo@postgres:5432/gogo?sslmode=disable
+      # The platform, by service name over the shared network.
+      PRODUCT_ADDRESS: dns:///product-service:9092
+      PRODUCT_LISTING_ADDRESS: dns:///product-listing-service:9093
+      PRODUCT_SEARCH_ADDRESS: dns:///product-search-service:9094
+      CATEGORY_ADDRESS: dns:///category-service:9090
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/gateway", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres-data:
+  kafka-data:
+  minio-data:
+
+networks:
+  gogo:
+    name: gogo-dev

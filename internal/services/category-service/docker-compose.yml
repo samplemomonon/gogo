@@ -1,0 +1,58 @@
+# Standalone orchestration for machines without Nix.
+# With Nix, prefer the generated manifest: nix run .#load-image
+#   docker compose -f "$(nix eval --raw .#compose)" up -d
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Stamped into /version so a running container reports the revision it
+      # actually serves. Defaults keep a bare `docker compose up` working.
+      args:
+        VERSION: ${VERSION:-0.0.0-dev}
+        COMMIT: ${COMMIT:-unknown}
+        DATE: ${DATE:-unknown}
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+      - "9090:9090"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: category_user
+      DB_PASSWORD: category_pass
+      DB_NAME: category_db
+      DB_SSLMODE: disable
+      APP_PORT: "8080"
+      GRPC_PORT: "9090"
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/category-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: category_user
+      POSTGRES_PASSWORD: category_pass
+      POSTGRES_DB: category_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U category_user -d category_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

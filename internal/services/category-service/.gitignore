@@ -1,0 +1,35 @@
+# Binaries
+/category-service
+/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and coverage output
+*.test
+*.out
+coverage.*
+
+# Dependency directories
+vendor/
+
+# Nix build results
+/result
+/result-*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.direnv/

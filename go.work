@@ -22,4 +22,6 @@ use (
 	./internal/services/product-listing-service
 	./internal/services/product-search-service
 	./internal/services/product-service
+	./internal/services/media-service
+	./internal/services/category-service
 )

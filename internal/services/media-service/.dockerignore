@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/media-service
+/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Documentation
+README.md
+*.md
+
+# Docker
+# The MinIO image is built from its own context, so excluding these from the
+# service image does not affect it.
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Local environment
+.env
+.env.local
+.direnv/
