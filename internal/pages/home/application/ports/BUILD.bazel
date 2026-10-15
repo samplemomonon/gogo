@@ -1,9 +1,0 @@
-load("@rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "ports",
-    srcs = ["listing.go"],
-    importpath = "gogo/internal/pages/home/application/ports",
-    visibility = ["//gogo:__subpackages__"],
-    deps = ["//gogo/internal/pages/home/application/results"],
-)

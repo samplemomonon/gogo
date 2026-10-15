@@ -80,6 +80,24 @@ jobs:
       - name: make check
         run: make check
 
+      # `make check` covers all six modules now — the four platform services via
+      # the services-vet and services-test prerequisites, each built on its own
+      # go.mod with GOWORK=off. This explicit step is a belt-and-braces listing of
+      # what that means: if a service is ever dropped from the Makefile's SERVICES
+      # list, this fails loudly instead of the platform tier silently losing its
+      # only gate.
+      - name: Platform services are covered by the gate
+        run: |
+          set -euo pipefail
+          for svc in aggregator-service product-listing-service \
+                      product-search-service product-service; do
+            dir="internal/services/$svc"
+            [ -f "$dir/go.mod" ] || { echo "missing go.mod: $dir"; exit 1; }
+            echo "==> $svc"
+            ( cd "$dir" && GOWORK=off go build ./... )
+            ( cd "$dir" && GOWORK=off go test ./... )
+          done
+
   docker:
     name: container image
     runs-on: ubuntu-latest

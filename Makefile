@@ -5,6 +5,22 @@ IMAGE        ?= gogo
 IMAGE_TAG    ?= latest
 K8S_DIR      := deploy/k8s
 
+# The platform services. Each is a separate Go module with its own go.mod,
+# deployed on its own release train, so each is built and tested on its own
+# module graph rather than on the gateway's.
+#
+# GOWORK=off is load-bearing, not hygiene. This repository ships a go.work, and
+# a directory that is not listed in it but lives inside the workspace tree does
+# not resolve to itself: a `go list ./...` run inside internal/services/… for
+# an unlisted service silently enumerates the *gateway's* packages. Measured:
+# aggregator, product and product-search all returned an identical package list
+# under workspace mode — the gateway's — which is how three services can look
+# covered by a check that never touched them.
+SERVICES     := aggregator-service product-listing-service product-search-service product-service
+SERVICES_DIR := internal/services
+
+.PHONY: services-vet services-test gofmt-check
+
 # Build-time identity, injected into internal/shared/version and surfaced in
 # the module registry and /metrics.
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -43,9 +59,32 @@ test: assets
 vet: assets
 	go vet ./...
 
-# Everything CI cares about in one shot: gofmt cleanliness, generated templ
-# and proto contracts up to date, static analysis and the full (race-enabled)
-# test suite.
+# Static analysis for the platform services, on their own module graphs.
+services-vet:
+	@set -e; for svc in $(SERVICES); do \
+		echo "==> vet $$svc"; \
+		(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go vet ./...); \
+	done
+
+# The platform test suites, including each service's own architecture tests.
+# aggregator-service carries the tripwire that keeps it a composition layer, and
+# this target is the only thing that ever runs it.
+services-test:
+	@set -e; for svc in $(SERVICES); do \
+		echo "==> test $$svc"; \
+		(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go test ./... -race); \
+	done
+
+# Everything CI cares about in one shot, across every module in the repository:
+# gofmt cleanliness, generated templ and proto contracts up to date, static
+# analysis, and the race-enabled test suite.
+#
+# "Every module" is the part this comment used to get wrong. It said "the full
+# test suite" while depending on `go test ./...`, which resolves within the root
+# module only — 97 of the repository's 172 packages. The four platform services
+# were never built and never tested, so a green CI run said nothing about them
+# and the aggregator's composition-layer tripwire never executed. services-vet
+# and services-test are now prerequisites for the same reason.
 #
 # The gofmt check asks `go list` for the directories that actually build, rather
 # than walking ./cmd and ./internal. Two reasons: a stray directory holding Go
@@ -53,10 +92,16 @@ vet: assets
 # the compiler, and a directory walk descends into tooling state that lives in
 # the tree — two devenv environments were 675 MB of Go module cache each, and
 # `gofmt -l ./internal` walked all of it on every run.
-check: vet test
+gofmt-check:
 	@dirs="$$(go list -f '{{.Dir}}' ./... | sort -u)"; \
+	for svc in $(SERVICES); do \
+		dirs="$$dirs $$(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go list -f '{{.Dir}}' ./... | sort -u)"; \
+	done; \
 	test -z "$$(gofmt -l $$dirs)" || \
 		(echo "gofmt needed on:"; gofmt -l $$dirs; exit 1)
+
+check: vet test services-vet services-test gofmt-check
+	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
 	@before="$$(git status --porcelain -- internal cmd)"; \
 	templ generate >/dev/null 2>&1; \
 	after="$$(git status --porcelain -- internal cmd)"; \

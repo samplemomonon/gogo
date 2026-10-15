@@ -721,8 +721,10 @@ Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (
 | `make dev`     | Watch templ & CSS changes, run the server          |
 | `make build`   | Generate templ + CSS, build `bin/gogo`             |
 | `make run`     | Build and run the binary                           |
-| `make test`    | Run all tests with the race detector               |
-| `make check`   | gofmt + templ up-to-date, `go vet`, `go test -race` |
+| `make test`    | Run the gateway tests with the race detector        |
+| `make check`   | The whole gate: gofmt, templ + contracts up-to-date, vet and tests across **all six modules** |
+| `make services-vet`  | `go vet` for the four platform services, on their own module graphs |
+| `make services-test` | Race-enabled tests for the four platform services, including their architecture tests |
 | `make templ`   | Regenerate `*_templ.go` from `.templ` sources      |
 | `make css`     | Compile the Tailwind stylesheet                    |
 | `make module`  | Scaffold a module: `make module name=billing desc="…"` |

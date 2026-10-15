@@ -130,9 +130,9 @@ func unixMillis(t time.Time) int64 {
 
 type permanentError struct{ err error }
 
-func (e *permanentError) Error() string   { return e.err.Error() }
-func (e *permanentError) Unwrap() error   { return e.err }
-func permanent(err error) error           { return &permanentError{err: err} }
+func (e *permanentError) Error() string { return e.err.Error() }
+func (e *permanentError) Unwrap() error { return e.err }
+func permanent(err error) error         { return &permanentError{err: err} }
 
 func IsPermanent(err error) bool {
 	var target *permanentError
