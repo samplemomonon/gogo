@@ -420,3 +420,96 @@ rotted to 43 of 119 packages. Deleted.
 | "`make check` is everything CI cares about" | 97 of 172 packages |
 | "39 orphan `BUILD.bazel` files" | 44 existed; the count was taken after 5 had already been deleted in this work |
 | "the aggregator tripwire is a rule we can add" | it now runs, and passes. It had never executed before |
+
+
+---
+
+## 10. Closing OD-1, OD-2 and OD-3
+
+The three open decisions in `docs/OPEN_DECISIONS.md` are closed. Reasoning and
+evidence: `docs/ADR_AGGREGATOR_BOUNDARIES.md`. What follows is what happened while
+closing them, including three bugs of my own that the tests caught.
+
+### OD-1 — the ratchet, and why it is not an allowlist
+
+`internal/architecture/ratchet_test.go` mirrors the module's 39 first-party import
+edges and fails on additions **and** stale entries.
+
+The argument against `depguard` strict is this repository's own record rather than
+a general position: three hand-maintained lists here have decayed — nineteen
+module roots of which *none* existed, forty-four BUILD files for an uninstalled
+build system, and an import graph that had rotted to a third of the repository
+while its own staleness gate was failing. A `depguard` allowlist is not derived
+from anything; someone edits YAML when a dependency is added.
+
+What the ratchet buys, measured rather than asserted. Adding
+`internal/retry → internal/graph/model`:
+
+```
+TestAggregatorOwnsNoDatastore     PASS
+TestAggregatorHoldsNoDomainModel  PASS
+TestImportRatchetIsCurrent       FAIL
+```
+
+The existing rules are blind to a first-party edge — which is precisely the gap
+OD-1 said existed. The mirror also surfaced, on its first run, two inward edges
+nothing had been tracking: `internal/telemetry → graph` and
+`internal/grpcclient → graph`.
+
+`database/sql` stays as the single forbidden import. The risk OD-1 was raised
+about — a new driver arriving unchallenged — is already closed by construction,
+because every pure-Go SQL path passes through `sql.Open`.
+
+### OD-2 — derived state allowed, and the fact that settles it
+
+Derived state is allowed; authoritative state is not; upstream-derived data may
+be held for one request and not beyond.
+
+The settling evidence is Apollo's GraphOS Router, the closest published analogue
+and the reference implementation of a *correctly* caching composition layer. It
+caches upstream subgraph responses in Redis — so caching at this layer is
+mainstream, not exotic. Its TTL is not invented by the router: it reads
+`Cache-Control: max-age` from the origin, derived from the origin's own
+`@cacheControl`, and requires an authenticated invalidation endpoint from the
+owning service for writes.
+
+**Freshness is declared by the party that owns the data.** Measured here: zero
+occurrences of `Cache-Control`, `max-age` or cache-tag across all five upstream
+services. The precondition is unmet, so the constraint is active rather than
+theoretical.
+
+`internal/architecture/caches_test.go` enforces two things: every cache
+constructor in the module is a declared one, and no declared cache holds
+upstream-derived data past the request. It deliberately does *not* try to
+distinguish a cache from a read model by inspection.
+
+### OD-3 — the Mutation root is permanent
+
+Six of the ten mutations work, so the root is not in question. The three category
+mutations cannot succeed and now carry `@deprecated` with a reason naming the
+category service's REST API — discoverable through ordinary introspection.
+
+Removing them was rejected: graphql.org's governance guidance classes field
+removal as a breaking change, which would mean introducing a breaking change to
+fix a problem caused by the field's presence.
+
+### Three bugs found by testing in both directions
+
+Recording these because each was a rule that **passed while being wrong**, which is
+the exact failure this repository has been closing all along.
+
+1. `recorded := make(map[string]bool)` was declared and never populated from
+   `committed`. Every edge reported as new; the test failed on a clean tree. It
+   could only have been found by running it.
+2. `mutationFieldDeclaration` cut at the first `"\n  "`, which matches the first
+   two spaces of a four-space continuation line — so every `@deprecated` directive
+   was truncated away before being checked, and all three OD-3 assertions passed
+   vacuously.
+3. The AST walk skipped the module root, because `filepath.Rel(root, root)` is
+   `"."` and `strings.HasPrefix(".", ".")` is true. The cache test found zero
+   constructors and tripped its own guard-on-the-guard — which is why that guard
+   exists.
+
+A fourth assertion was also wrong before it was fixed: the deprecation check
+looked for `reason: "` to be present, which is also true of `@deprecated(reason:
+"")` — the empty reason it existed to catch.

@@ -414,14 +414,17 @@ type Mutation {
   "Delete a product. The read models converge on the absence asynchronously."
   deleteProduct(id: ID!): Boolean!
 
-  "Create a category."
+  "Create a category. ALWAYS ANSWERS DEPENDENCY_UNAVAILABLE — see the @deprecated reason."
   createCategory(input: CreateCategoryInput!): Category!
+    @deprecated(reason: "Cannot succeed: category.v1 exposes no write RPC, so this always answers DEPENDENCY_UNAVAILABLE. Write categories through the category service's own REST API, which is the only writer of that table.")
 
-  "Rename a category, or move it. A move that would create a cycle is rejected."
+  "Rename a category, or move it. A move that would create a cycle is rejected. ALWAYS ANSWERS DEPENDENCY_UNAVAILABLE — see the @deprecated reason."
   updateCategory(id: ID!, input: UpdateCategoryInput!): Category!
+    @deprecated(reason: "Cannot succeed: category.v1 exposes no write RPC, so this always answers DEPENDENCY_UNAVAILABLE. Write categories through the category service's own REST API, which is the only writer of that table.")
 
-  "Delete a category."
+  "Delete a category. ALWAYS ANSWERS DEPENDENCY_UNAVAILABLE — see the @deprecated reason."
   deleteCategory(id: ID!): Boolean!
+    @deprecated(reason: "Cannot succeed: category.v1 exposes no write RPC, so this always answers DEPENDENCY_UNAVAILABLE. Write categories through the category service's own REST API, which is the only writer of that table.")
 
   "Register an upload and return a presigned target to PUT the bytes to."
   registerMedia(input: RegisterMediaInput!): MediaUpload!
