@@ -34,6 +34,7 @@ func validConfig(t *testing.T) Config {
 		t.Setenv(key, "")
 	}
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("the default config does not load: %v", err)
@@ -223,6 +224,7 @@ func TestLoadReadsTheResilienceSettingsFromTheEnvironment(t *testing.T) {
 	t.Setenv("TRACING_ENVIRONMENT", "staging")
 	t.Setenv("TRACING_SAMPLE_RATIO", "0.2")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -256,6 +258,7 @@ func TestTracingIsOffUnlessAskedFor(t *testing.T) {
 		t.Skip("TRACING_ENABLED is set in this environment")
 	}
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

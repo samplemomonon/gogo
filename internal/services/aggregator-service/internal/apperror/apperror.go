@@ -33,6 +33,16 @@ var (
 	// ErrInvalidInput, because the fix is to send a smaller query rather than a
 	// corrected one.
 	ErrRejected = errors.New("rejected")
+
+	// ErrUnauthenticated indicates the request carried no usable credential for
+	// the operation it asked to perform.
+	//
+	// It is deliberately NOT retryable and deliberately NOT ErrInvalidInput. A
+	// caller that retries the identical request without adding a credential gets
+	// the identical rejection, so reporting it as a transient dependency fault
+	// would teach clients to retry something that cannot succeed. And it is not a
+	// validation error either: the document may be perfectly well formed.
+	ErrUnauthenticated = errors.New("unauthenticated")
 )
 
 // IsNotFound reports whether err is, or wraps, the not-found sentinel.

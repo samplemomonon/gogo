@@ -84,6 +84,17 @@ func NewGraphQL(cfg *config.Config, exec graphql.ExecutableSchema, log *slog.Log
 		})
 	}
 
+	// Write operations require a bearer token. This is registered at the operation
+	// layer rather than as transport middleware because only gqlgen knows, after
+	// parsing and persisted-query resolution, whether the request is a write —
+	// and because a document that fails to parse never reaches a resolver, so
+	// there is nothing to protect on that path.
+	//
+	// Order matters relative to nothing above it: it reads the operation context,
+	// which is populated before extensions run.
+
+	srv.AroundOperations(RequireMutationToken(NewTokenSet(cfg.MutationTokens), log))
+
 	srv.SetErrorPresenter(errorPresenter(log))
 
 	// Query length, bounded on the raw document string. The parser token limit counts
@@ -229,6 +240,15 @@ func classifyGraphQLError(ctx context.Context, err error) *gqlerror.Error {
 				"code":      "DEPENDENCY_UNAVAILABLE",
 				"retryable": true,
 			},
+		}
+	case errors.Is(err, apperror.ErrUnauthenticated):
+		// retryable is absent rather than false. This is not a fault the server had
+		// and recovered from; it is a credential the caller has not supplied, and
+		// the same request will fail identically until they supply one.
+		return &gqlerror.Error{
+			Message:    "authentication is required for this operation",
+			Path:       path,
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
 		}
 	case errors.Is(err, apperror.ErrRejected):
 		return &gqlerror.Error{

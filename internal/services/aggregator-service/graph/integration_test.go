@@ -33,7 +33,27 @@ func newTestClient(t *testing.T) (*client.Client, *fakeCatalog, *fakeSearch, *fa
 
 	resolver, catalog, search, categories, media, products, projection := newTestResolver()
 
-	return client.New(handlerFor(resolver)), catalog, search, categories, media, products, projection
+	return client.New(handlerFor(t, resolver)), catalog, search, categories, media, products, projection
+}
+
+// testMutationToken is the credential the handler is configured with.
+//
+// config.Load refuses to return a configuration with no MUTATION_TOKENS: an absent
+// value must refuse every mutation rather than permitting them, so a harness that
+// wants a working server has to configure one.
+const testMutationToken = "test-only-mutation-token-value"
+
+// withToken presents the bearer token on an outgoing request.
+//
+// Writes require a credential; reads do not. These tests exercise the composition
+// rather than the auth rule, which has its own tests, so they supply the token
+// rather than asserting UNAUTHENTICATED on every mutation.
+func withToken(token string) client.Option {
+	return func(bd *client.Request) {
+		if bd.HTTP != nil {
+			bd.HTTP.Header.Set("Authorization", "Bearer "+token)
+		}
+	}
 }
 
 // handlerFor builds the real GraphQL handler around a resolver.
@@ -41,7 +61,9 @@ func newTestClient(t *testing.T) (*client.Client, *fakeCatalog, *fakeSearch, *fa
 // The production handler is used rather than a bare one so these tests exercise the
 // shipped configuration: the error presenter, the limits, the transport. A test
 // harness that omitted them would pass while the deployed service failed.
-func handlerFor(resolver *Resolver) http.Handler {
+func handlerFor(t *testing.T, resolver *Resolver) http.Handler {
+	t.Helper()
+	t.Setenv("MUTATION_TOKENS", testMutationToken)
 	cfg, err := config.Load()
 	if err != nil {
 		panic(err)
@@ -319,7 +341,7 @@ func TestCreateProductReturnsTheCommittedRow(t *testing.T) {
 			appliedEvents
 			product { id name priceCents }
 		}
-	}`, &response)
+	}`, &response, withToken(testMutationToken))
 	if err != nil {
 		t.Fatalf("mutation failed: %v", err)
 	}
@@ -345,7 +367,7 @@ func TestCreateProductReturnsTheCommittedRow(t *testing.T) {
 func TestEmptyUpdateIsRejectedAsAClientError(t *testing.T) {
 	c, _, _, _, _, products, _ := newTestClient(t)
 
-	resp, err := c.RawPost(`mutation { updateProduct(id: "1", input: {}) { projected } }`)
+	resp, err := c.RawPost(`mutation { updateProduct(id: "1", input: {}) { projected } }`, withToken(testMutationToken))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

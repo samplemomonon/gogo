@@ -37,10 +37,23 @@ func withPersistedQuery(hash string) client.Option {
 	}
 }
 
+// testMutationToken is the credential these tests present. config.Load refuses to
+// return a configuration with no MUTATION_TOKENS, because an absent value must
+// refuse every mutation rather than permitting them — so a harness that wants a
+// working server has to configure one.
+const testMutationToken = "test-only-mutation-token-value"
+
+// withMutationToken sets a token in the environment for the duration of the test.
+func withMutationToken(t *testing.T) {
+	t.Helper()
+	t.Setenv("MUTATION_TOKENS", testMutationToken)
+}
+
 // hardenedClient builds a client with the shipped configuration plus overrides.
 func hardenedClient(t *testing.T, mutate func(*config.Config)) *client.Client {
 	t.Helper()
 
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -397,6 +410,7 @@ func TestQueryLengthLimitRejectsAWideDocumentThroughTheServer(t *testing.T) {
 func TestPlaygroundIsOffByDefault(t *testing.T) {
 	// The playground executes arbitrary queries against real downstream services, so
 	// it must not be reachable without an explicit opt-in.
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -410,6 +424,7 @@ func TestPlaygroundIsOffByDefault(t *testing.T) {
 }
 
 func TestPlaygroundIsBuiltWhenEnabled(t *testing.T) {
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -431,6 +446,7 @@ func TestPlaygroundIsBuiltWhenEnabled(t *testing.T) {
 // so it would have taken the service down on first deploy rather than on a
 // configuration nobody runs. This asserts the whole wiring path the binary takes.
 func TestPlaygroundWiringIsSafeWhenDisabled(t *testing.T) {
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -456,6 +472,7 @@ func TestPlaygroundWiringIsSafeWhenDisabled(t *testing.T) {
 }
 
 func TestPlaygroundWiringIsSafeWhenEnabled(t *testing.T) {
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -482,6 +499,7 @@ func TestPlaygroundWiringIsSafeWhenEnabled(t *testing.T) {
 // the same reason. The nil fallback answers 503 instead, which leaves the probes
 // working so an operator can diagnose the wiring rather than seeing a crash loop.
 func TestServerStartsWithoutAGraphQLHandler(t *testing.T) {
+	withMutationToken(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
