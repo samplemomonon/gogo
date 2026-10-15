@@ -203,7 +203,7 @@ services:
       context: ./internal/services/product-service
       dockerfile: Dockerfile
     container_name: gogo-dev-product
-    ports: ["8082:8082", "9092:9092"]
+    ports: ["8082:8082"]
     environment:
       <<: *app-env
       DB_USER: product_user

@@ -295,7 +295,7 @@ func stopGRPC(ctx context.Context, server *grpc.Server, log *slog.Logger) error 
 // that receives 401 from a liveness probe restarts the container, and restarting
 // the process that was answering the probe turns a partial outage into a total
 // one. This is the same reason liveness does not touch its dependencies.
-var probePaths = []string{"/health", "/readyz", "/version"}
+var probePaths = []string{"/health", "/healthz", "/readyz", "/version"}
 
 // guardedHandler wraps mux with inbound authentication.
 //
