@@ -16,6 +16,14 @@ concurrency:
 env:
   GO_VERSION: "1.27.x"
   TEMPL_VERSION: "v0.3.1020"
+  # buf.yaml and buf.gen.yaml are both `version: v2`, so the CLI has to be a
+  # v2-capable release. buf.gen.yaml declares its plugins as `local:`, so the
+  # two protoc plugins have to be installed too — they are not vendored.
+  BUF_VERSION: "v1.74.0"
+  # protoc-gen-go tracks the protobuf runtime in go.mod, so codegen and the
+  # runtime cannot drift apart.
+  PROTOC_GEN_GO_VERSION: "v1.36.12"
+  PROTOC_GEN_GO_GRPC_VERSION: "v1.6.2"
 
 jobs:
   test:
@@ -36,6 +44,17 @@ jobs:
 
       - name: Install templ
         run: go install github.com/a-h/templ/cmd/templ@${{ env.TEMPL_VERSION }}
+
+      - name: Install buf
+        run: go install github.com/bufbuild/buf/cmd/buf@${{ env.BUF_VERSION }}
+
+      # `make check` runs buf lint, buf generate and buf breaking, and treats a
+      # missing tool as a failure rather than a skip — deliberately, so a green
+      # CI run cannot mean "the contract pipeline never ran".
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_GEN_GO_VERSION }}
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
 
       - name: Install bun
         uses: oven-sh/setup-bun@v2
