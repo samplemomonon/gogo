@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/ruangbercerita182-tech/product-listing-service/internal/serviceauth"
 	"io"
 	"log/slog"
 	"net"
@@ -217,7 +218,7 @@ func run() error {
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr(),
-		Handler:           buildHandler(svc, db, listingRepo, projectorRepo, log, m, rateLimiter),
+		Handler:           buildHandler(svc, db, listingRepo, projectorRepo, log, m, rateLimiter, cfg.InboundServiceTokens),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
@@ -422,6 +423,26 @@ func stopGRPC(ctx context.Context, server *grpc.Server, log *slog.Logger) error 
 }
 
 // buildHandler wires the layers together and wraps them in middleware.
+// probePaths are answered without a credential.
+//
+// They must be: an orchestrator that receives 401 from a liveness probe restarts
+// the container, and restarting the process answering the probe turns a partial
+// outage into a total one.
+var probePaths = []string{"/health", "/healthz", "/readyz", "/version"}
+
+// guardedHandler wraps mux with inbound authentication.
+//
+// Innermost in the chain, deliberately: logging runs before it so a refusal is
+// recorded, and rate limiting runs before it so an unauthenticated caller is
+// still throttled rather than being able to hammer the credential check.
+//
+// Extracted so the wiring is testable. A guard that only exists inline in the
+// chain can be deleted without any test noticing, which is what happened in
+// product-service before this was pulled out.
+func guardedHandler(mux http.Handler, tokens []string) http.Handler {
+	return serviceauth.NewTokenSet(tokens).HTTP(mux, probePaths)
+}
+
 func buildHandler(
 	svc handler.ProductListingService,
 	db *sql.DB,
@@ -430,6 +451,7 @@ func buildHandler(
 	log *slog.Logger,
 	m *metrics.Metrics,
 	rateLimiter *ratelimit.Limiter,
+	inboundTokens []string,
 ) http.Handler {
 	mux := http.NewServeMux()
 
@@ -453,7 +475,7 @@ func buildHandler(
 	// Metrics endpoint for Prometheus scraping
 	mux.Handle("/metrics", m.Handler())
 
-	return middlewareChain(mux, log, m, rateLimiter)
+	return middlewareChain(mux, log, m, rateLimiter, inboundTokens)
 }
 
 // middlewareChain wraps mux in the service's HTTP middleware.
@@ -481,13 +503,13 @@ func buildHandler(
 //	                └── metrics  (labels by route, not by concrete path)
 //	                    └── rateLimiter
 //	                        └── mux
-func middlewareChain(mux http.Handler, log *slog.Logger, m *metrics.Metrics, limiter *ratelimit.Limiter) http.Handler {
+func middlewareChain(mux http.Handler, log *slog.Logger, m *metrics.Metrics, limiter *ratelimit.Limiter, inboundTokens []string) http.Handler {
 	return handler.RequestID(
 		handler.Recovery(log)(
 			handler.Logging(log)(
 				handler.SecurityHeaders(
 					metricsMiddleware(m)(
-						limiter.Middleware(mux),
+						limiter.Middleware(guardedHandler(mux, inboundTokens)),
 					),
 				),
 			),

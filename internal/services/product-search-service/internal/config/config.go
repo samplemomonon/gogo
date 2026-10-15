@@ -70,6 +70,10 @@ type Config struct {
 
 	// AppPort is the TCP port the HTTP server listens on.
 	AppPort string
+
+	// InboundServiceTokens are the credentials this service accepts from callers.
+	// Empty does not mean "no credential required" — Validate refuses to start.
+	InboundServiceTokens []string
 	// GRPCPort is the TCP port the gRPC server listens on. The two listeners are
 	// separate so the internal API is not exposed on the public port.
 	GRPCPort string
@@ -110,10 +114,11 @@ func Load() (*Config, error) {
 		KafkaTopic:           getEnv("KAFKA_TOPIC", "product.events.v1"),
 		KafkaDeadLetterTopic: getEnv("KAFKA_DEAD_LETTER_TOPIC", "product.events.v1.dlq"),
 
-		AppPort:   getEnv("APP_PORT", "8084"),
-		GRPCPort:  getEnv("GRPC_PORT", "9094"),
-		LogLevel:  getEnv("LOG_LEVEL", "info"),
-		LogFormat: strings.ToLower(getEnv("LOG_FORMAT", "json")),
+		InboundServiceTokens: parseBrokers(getEnv("INBOUND_SERVICE_TOKENS", "")),
+		AppPort:              getEnv("APP_PORT", "8084"),
+		GRPCPort:             getEnv("GRPC_PORT", "9094"),
+		LogLevel:             getEnv("LOG_LEVEL", "info"),
+		LogFormat:            strings.ToLower(getEnv("LOG_FORMAT", "json")),
 	}
 
 	var err error
@@ -175,6 +180,27 @@ func Load() (*Config, error) {
 
 // Validate checks the configuration for internally inconsistent values.
 func (c *Config) Validate() error {
+	// Refusing to start without a credential is the point: an absent variable must
+	// mean "every caller is refused", not "every caller is welcome".
+	if len(c.InboundServiceTokens) == 0 {
+		return fmt.Errorf("config: INBOUND_SERVICE_TOKENS must list at least one token; " +
+			"an absent value refuses every caller rather than admitting every one")
+	}
+	seenTokens := make(map[string]bool, len(c.InboundServiceTokens))
+	for i, token := range c.InboundServiceTokens {
+		if strings.TrimSpace(token) == "" {
+			return fmt.Errorf("config: INBOUND_SERVICE_TOKENS[%d] is empty", i)
+		}
+		if len(token) < 16 {
+			return fmt.Errorf("config: INBOUND_SERVICE_TOKENS[%d] is %d characters; use at least 16",
+				i, len(token))
+		}
+		if seenTokens[token] {
+			return fmt.Errorf("config: INBOUND_SERVICE_TOKENS[%d] duplicates an earlier token", i)
+		}
+		seenTokens[token] = true
+	}
+
 	if len(c.KafkaBrokers) == 0 {
 		return fmt.Errorf("config: KAFKA_BROKERS must list at least one host:port broker")
 	}

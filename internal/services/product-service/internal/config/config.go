@@ -45,6 +45,14 @@ type Config struct {
 
 	// AppPort is the TCP port the HTTP server listens on.
 	AppPort string
+
+	// InboundServiceTokens are the credentials this service accepts from its
+	// callers, on both transports.
+	//
+	// Empty does not mean "no credential required" — Validate refuses to start in
+	// that state. See the package comment on internal/serviceauth for why the
+	// aggregator's own authentication is decorative without this.
+	InboundServiceTokens []string
 	// GRPCPort is the TCP port the gRPC server listens on. The two listeners are
 	// separate so the internal API is not exposed on the public port.
 	GRPCPort string
@@ -101,13 +109,14 @@ func Load() (*Config, error) {
 		DBName:     getEnv("DB_NAME", "product_db"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		CategoryGRPCTarget: getEnv("CATEGORY_GRPC_TARGET", "localhost:9090"),
-		MediaGRPCTarget:    getEnv("MEDIA_GRPC_TARGET", "localhost:9091"),
-		DefaultCurrency:    getEnv("DEFAULT_CURRENCY", "IDR"),
-		AppPort:            getEnv("APP_PORT", "8082"),
-		GRPCPort:           getEnv("GRPC_PORT", "9092"),
-		LogLevel:           getEnv("LOG_LEVEL", "info"),
-		LogFormat:          strings.ToLower(getEnv("LOG_FORMAT", "json")),
+		CategoryGRPCTarget:   getEnv("CATEGORY_GRPC_TARGET", "localhost:9090"),
+		MediaGRPCTarget:      getEnv("MEDIA_GRPC_TARGET", "localhost:9091"),
+		DefaultCurrency:      getEnv("DEFAULT_CURRENCY", "IDR"),
+		AppPort:              getEnv("APP_PORT", "8082"),
+		InboundServiceTokens: parseBrokers(getEnv("INBOUND_SERVICE_TOKENS", "")),
+		GRPCPort:             getEnv("GRPC_PORT", "9092"),
+		LogLevel:             getEnv("LOG_LEVEL", "info"),
+		LogFormat:            strings.ToLower(getEnv("LOG_FORMAT", "json")),
 
 		KafkaBrokers:  parseBrokers(getEnv("KAFKA_BROKERS", "localhost:9092")),
 		KafkaClientID: getEnv("KAFKA_CLIENT_ID", "product-service"),
@@ -171,6 +180,30 @@ func Load() (*Config, error) {
 
 // Validate checks the configuration for internally inconsistent values.
 func (c *Config) Validate() error {
+	// This service is the catalogue's single writer. Refusing to start without a
+	// credential is the whole point: an absent variable must mean "every caller is
+	// refused", not "every caller is welcome", because the alternative is an
+	// endpoint that writes the product catalogue with no authentication at all.
+	if len(c.InboundServiceTokens) == 0 {
+		return fmt.Errorf("config: INBOUND_SERVICE_TOKENS must list at least one token; " +
+			"an absent value refuses every caller rather than admitting every one")
+	}
+	seenTokens := make(map[string]bool, len(c.InboundServiceTokens))
+	for i, token := range c.InboundServiceTokens {
+		if strings.TrimSpace(token) == "" {
+			return fmt.Errorf("config: INBOUND_SERVICE_TOKENS[%d] is empty", i)
+		}
+		if len(token) < 16 {
+			return fmt.Errorf(
+				"config: INBOUND_SERVICE_TOKENS[%d] is %d characters; use at least 16 "+
+					"so the value is not guessable by brute force", i, len(token))
+		}
+		if seenTokens[token] {
+			return fmt.Errorf("config: INBOUND_SERVICE_TOKENS[%d] duplicates an earlier token", i)
+		}
+		seenTokens[token] = true
+	}
+
 	if len(c.KafkaBrokers) == 0 {
 		return fmt.Errorf("config: KAFKA_BROKERS must list at least one host:port broker")
 	}

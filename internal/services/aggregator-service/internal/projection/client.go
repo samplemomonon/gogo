@@ -14,6 +14,7 @@
 package projection
 
 import (
+	"aggregator-service/internal/serviceauth"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -56,6 +57,8 @@ type Reporter struct {
 	// depend on the tracing library: the composition root supplies either an
 	// otelhttp transport or the plain default, and a no-op one is the zero value.
 	transport http.RoundTripper
+	// credential is presented on every request; see Options.Credential.
+	credential serviceauth.Outgoing
 }
 
 // Options configures a Reporter.
@@ -70,6 +73,10 @@ type Options struct {
 	Timeout time.Duration
 	// Transport instruments the outbound request. Nil uses http.DefaultTransport.
 	Transport http.RoundTripper
+	// Credential is presented on every status request, for the same reason the
+	// gRPC connections carry one: the platform services refuse unauthenticated
+	// callers.
+	Credential serviceauth.Outgoing
 }
 
 // New builds a Reporter.
@@ -87,6 +94,7 @@ func New(opts Options) *Reporter {
 		listingBase: strings.TrimRight(opts.ListingBase, "/"),
 		searchBase:  strings.TrimRight(opts.SearchBase, "/"),
 		transport:   transport,
+		credential:  opts.Credential,
 		client: &http.Client{
 			Timeout: timeout,
 			// Redirects are not followed. A status endpoint that redirects is
@@ -137,6 +145,10 @@ func (r *Reporter) get(ctx context.Context, url string, dst any) error {
 	// Declared explicitly so an intermediary does not answer with a cached status
 	// and report a stalled projection as healthy.
 	req.Header.Set("Accept", "application/json")
+
+	if header := r.credential.Header(); header != "" {
+		req.Header.Set("Authorization", header)
+	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {

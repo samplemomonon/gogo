@@ -64,6 +64,7 @@ func withToken(token string) client.Option {
 func handlerFor(t *testing.T, resolver *Resolver) http.Handler {
 	t.Helper()
 	t.Setenv("MUTATION_TOKENS", testMutationToken)
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", testMutationToken)
 	cfg, err := config.Load()
 	if err != nil {
 		panic(err)

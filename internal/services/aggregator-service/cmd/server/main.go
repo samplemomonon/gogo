@@ -28,6 +28,7 @@ import (
 	"aggregator-service/internal/handler"
 	"aggregator-service/internal/projection"
 	"aggregator-service/internal/retry"
+	"aggregator-service/internal/serviceauth"
 	"aggregator-service/internal/telemetry"
 	"aggregator-service/internal/version"
 )
@@ -181,7 +182,12 @@ func run() error {
 	// deliberately.
 	writePolicy := retry.Sensitive()
 
+	// One credential for every downstream call. Config refuses to start without
+	// it, so this is always present in a running service.
+	downstream := serviceauth.NewOutgoing(cfg.DownstreamServiceToken)
+
 	clients, err := grpcclient.New(grpcclient.Targets{
+		Credential:   downstream,
 		Category:     cfg.CategoryGRPCTarget,
 		Media:        cfg.MediaGRPCTarget,
 		Product:      cfg.ProductGRPCTarget,
@@ -222,6 +228,7 @@ func run() error {
 	}()
 
 	projectionReporter := projection.New(projection.Options{
+		Credential:  downstream,
 		ListingBase: cfg.ListingHTTPBase,
 		SearchBase:  cfg.SearchHTTPBase,
 		Timeout:     cfg.DependencyTimeout,

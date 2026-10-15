@@ -27,9 +27,22 @@ func clearEnv(t *testing.T) {
 	}
 }
 
+// A valid configuration needs an inbound credential: Load refuses to start
+// without one, because this service writes the product catalogue and an absent
+// variable must refuse every caller rather than admit every one. Tests about
+// other settings get this baseline instead of tripping over a rule they are not
+// exercising.
+const configTestToken = "config-test-inbound-token-value"
+
+func withToken(t *testing.T) {
+	t.Helper()
+	t.Setenv("INBOUND_SERVICE_TOKENS", configTestToken)
+}
+
 func TestLoadDefaults(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -52,10 +65,33 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
-// The service must start with no configuration at all, which is what lets it boot
-// before the broker and the other services are up.
-func TestLoadWithoutAnyEnvironment(t *testing.T) {
+// With no configuration at all the service must NOT start.
+//
+// This used to assert the opposite — that it boots empty so it can come up before
+// its dependencies. That is still true of every other setting, and it was true of
+// this one until the catalogue's single writer had to refuse unauthenticated
+// callers. A service that boots with nothing configured and then answers
+// POST /api/v1/products for anyone is the exact failure this repository is trying
+// to close, so "boots with no configuration" now has to mean "refuses to boot",
+// and a deployment supplies the credential like everything else it depends on.
+func TestLoadWithoutAnyEnvironmentRefusesToStart(t *testing.T) {
 	clearEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load succeeded with no environment; this service writes the product " +
+			"catalogue and must not start without a credential")
+	}
+	if !strings.Contains(err.Error(), "INBOUND_SERVICE_TOKENS") {
+		t.Errorf("error %q does not name the variable to set", err)
+	}
+}
+
+// Everything else still has a default, so a configured credential is the only
+// thing Load needs beyond an empty environment.
+func TestLoadWithOnlyACredentialNeedsNoOtherConfiguration(t *testing.T) {
+	clearEnv(t)
+	withToken(t)
 
 	if _, err := Load(); err != nil {
 		t.Fatalf("Load: %v", err)
@@ -66,6 +102,7 @@ func TestKafkaBrokersAreParsedAsAList(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1:9092, broker-2:9092 ,")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -84,6 +121,7 @@ func TestKafkaBrokerMustBeHostPort(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1")
 
+	withToken(t)
 	_, err := Load()
 	if err == nil {
 		t.Fatal("err = nil, want a missing port to be rejected")
@@ -110,6 +148,7 @@ func TestOutboxSettingsAreConfigurable(t *testing.T) {
 	t.Setenv("OUTBOX_MAX_ATTEMPTS", "3")
 	t.Setenv("KAFKA_PUBLISH_TIMEOUT", "5s")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -159,6 +198,8 @@ func TestInvalidValuesAreRejected(t *testing.T) {
 			// whitespace in them, which the loader treats as unset too, so this
 			// case is asserted through the validator directly instead.
 			if tc.key == "DB_NAME" || tc.key == "DB_USER" {
+				withToken(t)
+				withToken(t)
 				cfg, err := Load()
 				if err != nil {
 					t.Fatalf("Load: %v", err)
@@ -188,6 +229,7 @@ func TestRedactedDSNHidesThePassword(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("DB_PASSWORD", "hunter2")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -210,6 +252,7 @@ func TestDependenciesIsSafeToLog(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1:9092,broker-2:9092")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -225,6 +268,7 @@ func TestDependenciesIsSafeToLog(t *testing.T) {
 func TestAddrsBindAllInterfaces(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)

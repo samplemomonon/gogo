@@ -43,10 +43,25 @@ func withPersistedQuery(hash string) client.Option {
 // working server has to configure one.
 const testMutationToken = "test-only-mutation-token-value"
 
+// testDownstreamToken is the credential this service presents to its peers.
+const testDownstreamToken = "test-only-downstream-token-value"
+
+// withServiceCredentials sets the credentials config.Load requires.
+//
+// A mutation token and a downstream token are both mandatory: without either, the
+// service either refuses every write or cannot call anything at all, and a test
+// harness building a server wants neither behaviour. The rule is enforced in
+// config, not here.
+func withServiceCredentials(t *testing.T) {
+	t.Helper()
+	t.Setenv("MUTATION_TOKENS", testMutationToken)
+	t.Setenv("DOWNSTREAM_SERVICE_TOKEN", testDownstreamToken)
+}
+
 // withMutationToken sets a token in the environment for the duration of the test.
 func withMutationToken(t *testing.T) {
 	t.Helper()
-	t.Setenv("MUTATION_TOKENS", testMutationToken)
+	withServiceCredentials(t)
 }
 
 // hardenedClient builds a client with the shipped configuration plus overrides.

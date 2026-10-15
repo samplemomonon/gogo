@@ -658,3 +658,85 @@ than no negative test, because it reports the rule as covered.
 **Not enforced, and recorded as such:** whether the developer's own machine
 already has something on a port. That is a runtime question. The dev column makes
 collisions rare, not impossible.
+
+---
+
+## 13. The control from the last ADR was bypassable
+
+**What was found.** Authenticating the composition layer does nothing if the
+services behind it are directly reachable — and they were. Measured before
+changing anything:
+
+```
+$ grep -rl 'Authorization|Bearer|JWT|OAuth' --include=*.go   (production)
+0
+```
+
+`product-service` holds the ten routes that write the catalogue, listens on host
+`8082` and `9092`, and builds its handler from a bare `http.NewServeMux()`:
+
+```
+POST   /api/v1/products          CreateProduct
+PUT    /api/v1/products/{id}     UpdateProduct
+DELETE /api/v1/products/{id}     DeleteProduct
+```
+
+So `curl localhost:8082/api/v1/products -d '{...}'` wrote to the catalogue with
+no token, while `MUTATION_TOKENS` sat unused a few ports away. The previous ADR's
+premise — "one point closes all APIs" — was true only of the paths that point
+went through. This was not the next problem; it was a hole in the control just
+shipped.
+
+**Decided** in `docs/ADR_SERVICE_TO_SERVICE_AUTH.md`: every platform service
+refuses unauthenticated callers on both transports, and none starts without a
+credential. The aggregator presents `DOWNSTREAM_SERVICE_TOKEN`.
+
+**The read models were guarded too.** Only product-service has writes, so it was
+the only one where the bypass corrupted data. Leaving two of four services open
+produces a posture nobody can reason about, and the next service would have no
+precedent.
+
+### The finding worth more than the fix
+
+Every guard is installed in a composition root, and **the composition root was not
+covered by any test.** Verified by sabotage — all four passed with the guard gone:
+
+| Sabotage | Suite result before |
+|---|---|
+| Remove the gRPC interceptor from product-service | 0 — unguarded |
+| Remove the HTTP guard from product-service | 0 — unguarded |
+| Remove `/health` from the exempt list | 0 — probes would answer 401 |
+| Neutralise the guard in listing / search | 0 — unguarded |
+
+The `serviceauth` tests all passed throughout: they test the mechanism, and
+deleting its *installation* is invisible to them. Three extractions closed it, each
+re-verified by re-running the same sabotage — `grpcServerOptions`, `wrapHandler` /
+`wrapChain`, and `probePaths` as a package value the test reads rather than
+restates. All four sabotages are now caught.
+
+The probe exemption is the one that would have hurt most: an orchestrator getting
+401 from a liveness probe restarts the container, and restarting the process
+answering the probe turns a partial outage into a total one.
+
+### Recorded rather than claimed
+
+The bearer token travels over an insecure gRPC connection, in the clear. This
+protects against reachability, not against an on-path attacker; closing that is
+TLS or mTLS, a separate decision. Written down in the source and the ADR so it is
+discovered there rather than in an incident.
+
+gRPC health is also not covered by a test — it is answered before interceptors run,
+so the chain cannot affect it, and covering it meant extracting the health
+registration out of `buildGRPCServer` as well.
+
+### Three test expectations inverted
+
+`TestLoadWithoutAnyEnvironment` asserted that a service boots with nothing
+configured, so it can come up before its dependencies. Still true of every other
+setting; no longer true of the credential. Inverted in all three services, with
+the reason written into the test rather than left implicit.
+
+Six existing tests across the three services broke on the new requirement and were
+updated rather than worked around — including `TestPanicIsRecoveredAndIdentified`,
+which would have passed for the wrong reason (asserting 500 against a 401 the
+guard produced) had the credential not been supplied.

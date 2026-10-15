@@ -29,6 +29,7 @@ import (
 	"product-service/internal/event"
 	"product-service/internal/messaging"
 	"product-service/internal/outbox"
+	"product-service/internal/serviceauth"
 	"product-service/internal/version"
 )
 
@@ -253,12 +254,15 @@ func serve(name string, run func() error) <-chan error {
 }
 
 func buildGRPCServer(app *di.App) *grpc.Server {
-	server := grpc.NewServer(
-		grpc.MaxRecvMsgSize(16<<20),
-		grpc.MaxSendMsgSize(16<<20),
-		grpc.UnaryInterceptor(recoveryInterceptor(app.Logger)),
-		grpc.StreamInterceptor(streamRecoveryInterceptor(app.Logger)),
-	)
+	// Inbound authentication is outermost: a caller without a credential is
+	// refused before the recovery interceptor sees the call, so the rejection is
+	// not logged as a server error and cannot be used to probe internals.
+	//
+	// gRPC's health service is exempt by construction — grpc_health_probe is
+	// answered before interceptors run — so an unauthenticated health check still
+	// succeeds.
+	server := grpc.NewServer(grpcServerOptions(
+		serviceauth.NewTokenSet(app.Config.InboundServiceTokens), app.Logger)...)
 
 	productpb.RegisterProductServiceServer(server, app.GRPCServer)
 
@@ -285,15 +289,61 @@ func stopGRPC(ctx context.Context, server *grpc.Server, log *slog.Logger) error 
 	}
 }
 
+// probePaths are answered without a credential.
+//
+// They must be, and getting it wrong is not a subtle failure: an orchestrator
+// that receives 401 from a liveness probe restarts the container, and restarting
+// the process that was answering the probe turns a partial outage into a total
+// one. This is the same reason liveness does not touch its dependencies.
+var probePaths = []string{"/health", "/readyz", "/version"}
+
+// guardedHandler wraps mux with inbound authentication.
+//
+// Extracted from buildHandler so the wiring is testable. The serviceauth package's
+// own tests prove the mechanism; this proves the service installs it, which is
+// the half that silently disappears if someone edits main.go.
+func guardedHandler(mux http.Handler, tokens []string) http.Handler {
+	return serviceauth.NewTokenSet(tokens).HTTP(mux, probePaths)
+}
+
+// grpcServerOptions returns the options this service's gRPC server is built with.
+//
+// Also extracted so a test can start a real server with exactly the options
+// production uses, rather than a reconstruction of them that can drift.
+func grpcServerOptions(auth *serviceauth.TokenSet, log *slog.Logger) []grpc.ServerOption {
+	return []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(16 << 20),
+		grpc.MaxSendMsgSize(16 << 20),
+		// Listed outermost-first: ChainUnaryInterceptor runs them in order, so a
+		// refused call never reaches recovery and is not logged as a server error.
+		grpc.ChainUnaryInterceptor(auth.Unary(), recoveryInterceptor(log)),
+		grpc.ChainStreamInterceptor(auth.Stream(), streamRecoveryInterceptor(log)),
+	}
+}
+
 func buildHandler(app *di.App, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	app.HealthHandler.RegisterRoutes(mux)
 	app.ProductHandler.RegisterRoutes(mux)
 
+	return wrapHandler(mux, app.Config, log)
+}
+
+// wrapHandler is the middleware chain, taking the mux rather than the container.
+//
+// Extracting it is what makes the chain testable end to end. buildHandler needs a
+// fully wired di.App, so a test could not otherwise reach the chain and deleting
+// the guard from it would leave the suite green — which is exactly what happened
+// until this existed.
+func wrapHandler(mux http.Handler, cfg *config.Config, log *slog.Logger) http.Handler {
+	// Authentication sits inside logging and outside everything else, so a refused
+	// request is still recorded without reaching a handler.
+	guarded := guardedHandler(mux, cfg.InboundServiceTokens)
+
 	return recoveryMiddleware(log)(
 		loggingMiddleware(log)(
-			securityHeadersMiddleware(mux),
+			securityHeadersMiddleware(guarded),
 		),
 	)
 }

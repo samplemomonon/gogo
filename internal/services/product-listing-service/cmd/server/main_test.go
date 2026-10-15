@@ -164,9 +164,14 @@ func TestAccessLogCarriesTheRequestID(t *testing.T) {
 	limiter := ratelimit.New(ratelimit.Options{Rate: 1000, Burst: 1000})
 	defer limiter.Stop()
 
-	h := middlewareChain(mux, log, metrics.New(), limiter)
+	// A credential is presented because the chain now requires one. This test is
+	// about the request id reaching the access log, and refusing the call first
+	// would make it pass for the wrong reason.
+	h := middlewareChain(mux, log, metrics.New(), limiter, []string{"test-inbound-token-value"})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/products/42", nil)
+	req.Header.Set("Authorization", "Bearer test-inbound-token-value")
+	req.Header.Set("Authorization", "Bearer test-inbound-token-value")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -203,7 +208,7 @@ func TestCallerSuppliedRequestIDIsPropagated(t *testing.T) {
 	limiter := ratelimit.New(ratelimit.Options{Rate: 1000, Burst: 1000})
 	defer limiter.Stop()
 
-	h := middlewareChain(mux, log, metrics.New(), limiter)
+	h := middlewareChain(mux, log, metrics.New(), limiter, []string{"test-inbound-token-value"})
 
 	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	req.Header.Set("X-Request-ID", "trace-from-gateway")
@@ -237,9 +242,13 @@ func TestPanicIsRecoveredAndIdentified(t *testing.T) {
 	limiter := ratelimit.New(ratelimit.Options{Rate: 1000, Burst: 1000})
 	defer limiter.Stop()
 
-	h := middlewareChain(mux, log, metrics.New(), limiter)
+	h := middlewareChain(mux, log, metrics.New(), limiter, []string{"test-inbound-token-value"})
 
 	req := httptest.NewRequest(http.MethodGet, "/boom", nil)
+	// A credential is presented so the request reaches the panicking handler;
+	// otherwise the chain refuses it first and this test would assert 500 on a
+	// response the guard produced.
+	req.Header.Set("Authorization", "Bearer test-inbound-token-value")
 	req.Header.Set("X-Request-ID", "panic-trace")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -283,12 +292,14 @@ func TestMiddlewareChainStillRateLimits(t *testing.T) {
 	limiter := ratelimit.New(ratelimit.Options{Rate: 0.0001, Burst: 2})
 	defer limiter.Stop()
 
-	h := middlewareChain(mux, log, metrics.New(), limiter)
+	h := middlewareChain(mux, log, metrics.New(), limiter, []string{"test-inbound-token-value"})
 
 	allowed, rejected := 0, 0
 	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+		req.Header.Set("Authorization", "Bearer test-inbound-token-value")
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ping", nil))
+		h.ServeHTTP(rec, req)
 		switch rec.Code {
 		case http.StatusTooManyRequests:
 			rejected++
@@ -318,10 +329,12 @@ func TestMiddlewareChainSetsSecurityHeaders(t *testing.T) {
 	limiter := ratelimit.New(ratelimit.Options{Rate: 1000, Burst: 1000})
 	defer limiter.Stop()
 
-	h := middlewareChain(mux, slog.New(sink), metrics.New(), limiter)
+	h := middlewareChain(mux, slog.New(sink), metrics.New(), limiter, []string{"test-inbound-token-value"})
 
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.Header.Set("Authorization", "Bearer test-inbound-token-value")
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ping", nil))
+	h.ServeHTTP(rec, req)
 
 	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
 		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
@@ -402,7 +415,7 @@ func TestRateLimitedRequestsAreCounted(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	h := middlewareChain(mux, slog.New(&capturingHandler{}), stats, limiter)
+	h := middlewareChain(mux, slog.New(&capturingHandler{}), stats, limiter, []string{"test-inbound-token-value"})
 
 	for i := 0; i < 4; i++ {
 		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ping", nil))

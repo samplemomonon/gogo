@@ -27,9 +27,20 @@ func clearEnv(t *testing.T) {
 	}
 }
 
+// A valid configuration needs an inbound credential: Load refuses to start
+// without one, because an absent variable must refuse every caller rather than
+// admit every one.
+const configTestToken = "config-test-inbound-token-value"
+
+func withToken(t *testing.T) {
+	t.Helper()
+	t.Setenv("INBOUND_SERVICE_TOKENS", configTestToken)
+}
+
 func TestLoadDefaults(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -57,10 +68,31 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
-// The service must start with no configuration at all, which is what lets it come
-// up before the broker is ready.
-func TestLoadWithoutAnyEnvironment(t *testing.T) {
+// With no configuration at all the service must NOT start.
+//
+// It used to assert the opposite — that it boots empty so it can come up before
+// the broker. That still holds for every other setting, but a service that boots
+// with nothing configured and then serves the product catalogue to anyone who can
+// reach the port is the failure this repository is closing. A deployment supplies
+// the credential like everything else it depends on.
+func TestLoadWithoutAnyEnvironmentRefusesToStart(t *testing.T) {
 	clearEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load succeeded with no environment; the service must not start " +
+			"without a credential for its callers")
+	}
+	if !strings.Contains(err.Error(), "INBOUND_SERVICE_TOKENS") {
+		t.Errorf("error %q does not name the variable to set", err)
+	}
+}
+
+// Everything else still has a default, so a credential is the only thing Load
+// needs beyond an empty environment.
+func TestLoadWithOnlyACredentialNeedsNoOtherConfiguration(t *testing.T) {
+	clearEnv(t)
+	withToken(t)
 
 	if _, err := Load(); err != nil {
 		t.Fatalf("Load: %v", err)
@@ -71,6 +103,7 @@ func TestKafkaBrokersAreParsedAsAList(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1:9092, broker-2:9092 ,")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -89,6 +122,7 @@ func TestKafkaBrokerMustBeHostPort(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1")
 
+	withToken(t)
 	_, err := Load()
 	if err == nil {
 		t.Fatal("err = nil, want a missing port to be rejected")
@@ -117,6 +151,7 @@ func TestKafkaBrokersMustNotBeEmpty(t *testing.T) {
 func TestDeadLetterTopicIsRequiredWithTheConsumer(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -139,6 +174,7 @@ func TestBlankValuesFallBackToDefaults(t *testing.T) {
 	t.Setenv("KAFKA_CONSUMER_GROUP", "  ")
 	t.Setenv("KAFKA_TOPIC", "  ")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -170,6 +206,7 @@ func TestConsumerCanBeDisabled(t *testing.T) {
 	t.Setenv("CONSUMER_ENABLED", "false")
 	t.Setenv("KAFKA_DEAD_LETTER_TOPIC", "")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -184,6 +221,7 @@ func TestConsumerEnabledAcceptsTheUsualSpellings(t *testing.T) {
 		clearEnv(t)
 		t.Setenv("CONSUMER_ENABLED", value)
 
+		withToken(t)
 		cfg, err := Load()
 		if err != nil {
 			t.Fatalf("CONSUMER_ENABLED=%s: %v", value, err)
@@ -197,6 +235,7 @@ func TestConsumerEnabledAcceptsTheUsualSpellings(t *testing.T) {
 		t.Setenv("CONSUMER_ENABLED", value)
 		t.Setenv("KAFKA_DEAD_LETTER_TOPIC", "")
 
+		withToken(t)
 		cfg, err := Load()
 		if err != nil {
 			t.Fatalf("CONSUMER_ENABLED=%s: %v", value, err)
@@ -219,6 +258,7 @@ func TestProcessedEventRetentionHasAFloor(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("PROCESSED_EVENT_RETENTION", "10s")
 
+	withToken(t)
 	_, err := Load()
 	if err == nil {
 		t.Error("err = nil, want a retention window below a minute to be rejected")
@@ -234,6 +274,7 @@ func TestConsumerSettingsAreConfigurable(t *testing.T) {
 	t.Setenv("PROCESSED_EVENT_RETENTION", "48h")
 	t.Setenv("PRUNE_INTERVAL", "15m")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -289,6 +330,7 @@ func TestInvalidValuesAreRejected(t *testing.T) {
 func TestValidateRejectsEmptyIdentity(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -325,6 +367,7 @@ func TestRedactedDSNHidesThePassword(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("DB_PASSWORD", "hunter2")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -347,6 +390,7 @@ func TestDependenciesIsSafeToLog(t *testing.T) {
 	clearEnv(t)
 	t.Setenv("KAFKA_BROKERS", "broker-1:9092,broker-2:9092")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -360,6 +404,7 @@ func TestDependenciesIsSafeToLog(t *testing.T) {
 func TestAddrsBindAllInterfaces(t *testing.T) {
 	clearEnv(t)
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)

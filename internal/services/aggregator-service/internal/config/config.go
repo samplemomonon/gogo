@@ -37,7 +37,10 @@ type Config struct {
 	//
 	// An empty slice does NOT mean "no authentication required" — it means every
 	// mutation is refused. See Validate.
-	MutationTokens         []string
+	MutationTokens []string
+	// DownstreamServiceToken is the credential this service presents to the
+	// platform services it calls.
+	DownstreamServiceToken string
 	RequestTimeout         time.Duration
 	DependencyTimeout      time.Duration
 	MaxQueryComplexity     int
@@ -107,9 +110,10 @@ func Load() (*Config, error) {
 
 		// The playground executes arbitrary queries against real downstream
 		// services, so it defaults off and belongs only in a local dev stack.
-		PlaygroundEnabled: getEnvBool("ENABLE_PLAYGROUND", false),
-		AllowedOrigins:    getEnvList("ALLOWED_ORIGINS", nil),
-		MutationTokens:    getEnvList("MUTATION_TOKENS", nil),
+		PlaygroundEnabled:      getEnvBool("ENABLE_PLAYGROUND", false),
+		AllowedOrigins:         getEnvList("ALLOWED_ORIGINS", nil),
+		MutationTokens:         getEnvList("MUTATION_TOKENS", nil),
+		DownstreamServiceToken: getEnv("DOWNSTREAM_SERVICE_TOKEN", ""),
 
 		// The whole-request budget. It must exceed DependencyTimeout, because a
 		// single downstream call is expected to fit inside it; if it does not, the
@@ -195,6 +199,21 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(target) == "" {
 			return fmt.Errorf("%s must not be empty", name)
 		}
+	}
+
+	// The downstream credential is required for the same reason inbound tokens are:
+	// without it every call this service makes to the platform services is refused,
+	// and the result is a service that cannot do its job rather than one that is
+	// dangerously open. Either way it should not start by accident.
+	if strings.TrimSpace(c.DownstreamServiceToken) == "" {
+		return fmt.Errorf(
+			"DOWNSTREAM_SERVICE_TOKEN must be set; it is the credential this service " +
+				"presents to the platform services, which refuse unauthenticated callers")
+	}
+	if len(c.DownstreamServiceToken) < 16 {
+		return fmt.Errorf(
+			"DOWNSTREAM_SERVICE_TOKEN is %d characters; use at least 16 so the value "+
+				"is not guessable by brute force", len(c.DownstreamServiceToken))
 	}
 
 	// Mutations are refused unless a token is configured. This is the one place

@@ -636,3 +636,29 @@ this repository, yet the aggregator's defaults dial `9090` and `9091` — Promet
 and its Pushgateway. Run beside a running Prometheus, the aggregator sends gRPC
 to Prometheus's HTTP port. They are described in `ports.txt` rather than listed as
 rows, because the gate verifies services that exist.
+
+### D-020 · Platform services authenticate their callers, on both transports
+**Date:** 2026-10-15 · **Status:** accepted
+
+Every platform service refuses callers that do not present a credential
+configured with `INBOUND_SERVICE_TOKENS`, on HTTP and gRPC alike; the aggregator
+presents `DOWNSTREAM_SERVICE_TOKEN`. A service with none configured does not
+start.
+
+This exists because [D-019's](#d-019) sibling decision — authenticating the
+composition layer — was decorative without it. The services publish host ports in
+development, and `product-service` exposed `POST /api/v1/products` with no
+middleware, so everything the aggregator's `MUTATION_TOKENS` protected was
+reachable directly.
+
+Two consequences worth stating plainly. **Health and readiness probes are exempt**,
+because an orchestrator answering 401 from a liveness probe restarts the
+container, and restarting the process answering the probe turns a partial outage
+into a total one. And **the credential is a shared secret, not an identity** — it
+answers "may this caller talk to me" and nothing more; there is still no principal
+and no per-caller authorisation.
+
+The guard protects against *reachability*, not against an on-path attacker: the
+gRPC connections use insecure transport credentials, so the bearer token travels
+in the clear. That is recorded rather than discovered — see
+[`ADR_SERVICE_TO_SERVICE_AUTH.md`](docs/ADR_SERVICE_TO_SERVICE_AUTH.md).
