@@ -46,6 +46,14 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ hashFiles('bun.lock') }}
 
+      # make check runs `make assets` -> `make css` -> `bun run css:build`,
+      # which runs the Tailwind CLI out of node_modules. Without an install step
+      # that directory never exists on a fresh runner and the build dies with
+      # "Can't resolve 'tailwindcss'". The cache above only caches bun's own
+      # download cache, not the installed tree.
+      - name: Install node dependencies
+        run: bun install --frozen-lockfile
+
       # make check is the single CI gate: gofmt cleanliness, templ
       # regeneration up-to-date, go vet and the full race-enabled suite.
       # (vet/test depend on `assets`, which generates templ + CSS first, so a
