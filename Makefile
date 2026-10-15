@@ -161,11 +161,38 @@ arch-graph:
 
 # ---- Contract (buf/protobuf) ----------------------------------------------
 
-# Fail on an incompatible contract change against main (the base branch). A
-# field may be deleted only when its number and name are reserved; every other
-# FILE-level break fails. Needs the base ref present, so CI checks out fully.
+# Fail on an incompatible contract change against the base branch. A field may be
+# deleted only when its number and name are reserved; every other FILE-level
+# break fails.
+#
+# The base is resolved to a commit SHA rather than named as `.git#branch=main`,
+# because "main" only exists locally in some of the places this runs:
+#
+#   - a push to main: refs/heads/main exists
+#   - a pull_request checkout: HEAD is a detached merge commit and there is no
+#     local main at all; only refs/remotes/origin/main
+#
+# `--against '.git#branch=main'` therefore fails on every pull request with
+# "couldn't find remote ref main" — which is what CI did until this was resolved
+# by name and then by ref, in that order.
+#
+# If neither ref exists — a repository whose first push has no base yet — the
+# check reports that and passes, because there is genuinely nothing to compare
+# against. It says so on stdout rather than going quiet.
 buf-breaking:
-	buf breaking --against '.git#branch=main'
+	@base=""; \
+	for ref in refs/remotes/origin/main refs/heads/main; do \
+		if sha="$$(git rev-parse --verify --quiet "$$ref" 2>/dev/null)"; then \
+			base="$$sha"; break; \
+		fi; \
+	done; \
+	if [ -z "$$base" ]; then \
+		echo "buf-breaking: no base ref found (tried refs/remotes/origin/main, refs/heads/main)"; \
+		echo "buf-breaking: nothing to compare against — skipping"; \
+		exit 0; \
+	fi; \
+	echo "buf breaking --against $$base"; \
+	buf breaking --against "$$base"
 
 # Lint the proto contract schemas (buf STANDARD) — no generation.
 buf-lint:
