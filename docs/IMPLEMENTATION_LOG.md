@@ -310,3 +310,113 @@ So `TT-043` as written was not implementable without inventing a rule. Two check
 | "P4: rewrite the eight existing subtests as data" | not done. They pass, they are individually named, and converting bespoke logic to a table risks regression for no gain. The new rules are data because they were a matrix |
 | "the aggregator tripwire is a rule we can add" | it lives in a different Go module and cannot be reached from this graph |
 | "W-2: `.dockerignore` omits `.devenv`" | understated. Two `COPY . .` stages made it a per-build 675 MB transfer |
+
+---
+
+## 8. The gate covered 97 of 172 packages
+
+Recorded here rather than in a commit message because both defects were
+invisible to the tool that was supposed to detect them.
+
+`make check` was the required CI status. It ran `go vet ./...` and `go test
+./...`, which resolve **inside the root module only**. The four platform services
+are separate Go modules, so `make check` never built and never tested them. The
+aggregator's composition-layer tripwire — the rule keeping it a composition layer
+rather than a sixth catalogue authority — had never executed.
+
+`make check`'s own comment claimed to be *"everything CI cares about … the full
+test suite"*, and the README described `make test` as running "all tests". Both
+were wrong, and both were load-bearing: a check that describes itself as complete
+stops anyone from looking for the part it is missing.
+
+| | packages covered |
+|---|---|
+| before | 97 (root module) |
+| after | **172** (6 modules) |
+
+aggregator 20, product-listing 20, product-search 16, product 19.
+
+`go test -race` also re-enabled on the services, and `gofmt-check` was widened to
+them. Its first run found 15 files in `product-service` that `gofmt` had never
+been asked about — 14 whitespace-only, one trailing blank line. They were never
+checked because nothing had ever checked them.
+
+### `GOWORK=off` is load-bearing, not hygiene
+
+A directory not listed in `go.work` but living inside the workspace tree does not
+resolve to itself. `go list ./...` inside `internal/services/aggregator-service`
+silently enumerates the **gateway's** packages. Measured: aggregator, product and
+product-search all returned an *identical* list under workspace mode.
+
+That is the mechanism by which three services could look covered by a check that
+never touched them — a false pass is worse than a crash, because nothing looks
+wrong. `make services-vet` and `make services-test` therefore set `GOWORK=off`
+and build each service on its own `go.mod`, the way it is deployed. The build
+graph is shared; the dependency graph is deliberately not. A service that could
+only build inside this workspace could not be released on its own.
+
+### `go work use -r .` is destructive in this tree
+
+The obvious fix for an incomplete `go.work`, and the one independent research
+recommended. The tree contains two devenv environments under
+`internal/services/*/.devenv` whose `state/go/pkg/mod` is a Go module cache. A
+recursive walk adopts every cached module into the workspace and the build fails
+with `module google.golang.org/protobuf appears multiple times in workspace`.
+
+`go.work` now lists all six modules by hand and carries a comment saying so. The
+same hazard that motivated ignoring `.devenv` in Git and Docker has a third
+appearance here; a directory can be invisible to Git and still be discovered by
+any tool that walks the tree.
+
+### `buf breaking` could never have passed on a pull request
+
+Found by the new coverage, not by inspection. `--against '.git#branch=main'`
+needs `refs/heads/main`. A `pull_request` checkout is a detached merge commit:
+`refs/heads/main` does not exist there, only `refs/remotes/origin/main`.
+
+```
+buf breaking --against '.git#branch=main'
+Failure: could not clone file://…/.git: exit status 128
+fatal: couldn't find remote ref main
+```
+
+It never surfaced because the only green run was a **push** to main, where
+`refs/heads/main` does exist — the check passed on push and was structurally
+incapable of passing on a PR. Two related facts: the gate is the same check that
+was broken, so fixes needed `enforce_admins: false` to land and then the flag
+back; and `container image` had never once run, because its `if:` condition had
+only ever been reached after a step that always failed.
+
+Fixing it needed the actual buf binary, not the docs. Every candidate syntax was
+run against a real PR-shaped checkout (detached HEAD, local `main` deleted):
+
+| `--against` | result |
+|---|---|
+| `.git#branch=main` | FAIL — the original bug |
+| `.git#branch=origin/main` | pass |
+| `.git#ref=refs/remotes/origin/main` | pass |
+| `.git#ref=<sha>` | pass |
+| `<sha>` bare | FAIL — read as a module path: *"Module … had no .proto files"* |
+
+The base is resolved to a SHA and passed as `.git#ref=<sha>`, which behaves
+identically on push and PR and pins the comparison to one commit. `make
+buf-breaking` was then run in that same PR-shaped checkout both ways: clean tree
+exits 0, and deleting `string description = 3;` without reserving it exits
+non-zero naming the field and the number.
+
+### 39 `BUILD.bazel` files
+
+No `WORKSPACE`, no `MODULE.bazel`, no bazel in the Makefile or CI, and the
+`go list` import-graph derivation replaced the only reader when its coverage had
+rotted to 43 of 119 packages. Deleted.
+
+---
+
+## 9. Corrections to this log
+
+| Claim | Outcome |
+|---|---|
+| "CI is green on main" | green on `push` only. On `pull_request` it failed at `buf breaking`, so no PR could ever have passed |
+| "`make check` is everything CI cares about" | 97 of 172 packages |
+| "39 orphan `BUILD.bazel` files" | 44 existed; the count was taken after 5 had already been deleted in this work |
+| "the aggregator tripwire is a rule we can add" | it now runs, and passes. It had never executed before |
