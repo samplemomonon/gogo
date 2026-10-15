@@ -173,8 +173,14 @@ arch-graph:
 #     local main at all; only refs/remotes/origin/main
 #
 # `--against '.git#branch=main'` therefore fails on every pull request with
-# "couldn't find remote ref main" — which is what CI did until this was resolved
-# by name and then by ref, in that order.
+# "couldn't find remote ref main". That is exactly what CI did: its one green run
+# was a push to main, where refs/heads/main does exist, so the check passed there
+# and could never have passed on a pull request.
+#
+# The resolved SHA is passed as `.git#ref=<sha>` — a bare SHA is not accepted,
+# buf reads it as a module path and answers "Module ... had no .proto files".
+# `.git#ref=` works identically on push and pull request, and naming the commit
+# makes the comparison reproducible rather than dependent on what main points at.
 #
 # If neither ref exists — a repository whose first push has no base yet — the
 # check reports that and passes, because there is genuinely nothing to compare
@@ -192,7 +198,7 @@ buf-breaking:
 		exit 0; \
 	fi; \
 	echo "buf breaking --against $$base"; \
-	buf breaking --against "$$base"
+	buf breaking --against ".git#ref=$$base"
 
 # Lint the proto contract schemas (buf STANDARD) — no generation.
 buf-lint:
