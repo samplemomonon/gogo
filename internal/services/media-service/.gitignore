@@ -1,0 +1,23 @@
+# Build artifacts
+/<service-name>
+/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Local environment
+.env
+.env.local
+.direnv/
+
+# Editors and OS
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

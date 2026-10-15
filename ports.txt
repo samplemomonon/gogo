@@ -61,6 +61,10 @@
 # product-listing and product-search sit beside Prometheus's Alertmanager;
 # product-service sits on Kafka's broker port.
 gateway                 http     PORT      8080 8080 gogo
+category-service        http     APP_PORT  8086 8086 gogo
+category-service        grpc     GRPC_PORT 9090 9090 PROMETHEUS
+media-service           http     APP_PORT  8081 8081 gogo
+media-service           grpc     GRPC_PORT 9091 9091 PUSHGATEWAY
 product-service         http     APP_PORT  8082 8082 gogo
 product-service         grpc     GRPC_PORT 9092 9092 KAFKA
 product-listing-service http     APP_PORT  8083 8083 gogo
@@ -71,15 +75,16 @@ aggregator-service      http     APP_PORT  8085 8085 gogo
 postgres                postgres DB_PORT   5432 5432 POSTGRESQL
 
 [notes]
-# category-service and media-service have no module in this repository, yet the
-# aggregator's default targets point at 9090 and 9091 — Prometheus and its
-# Pushgateway. Run the aggregator with defaults beside a running Prometheus and
-# it sends gRPC to Prometheus's HTTP port, failing with a message that points
-# nowhere useful.
+# category-service and media-service now exist and are registered above. Note the
+# collision their gRPC ports carry: 9090 is Prometheus and 9091 is its
+# Pushgateway, so a developer running the aggregator with defaults beside a live
+# Prometheus reaches Prometheus's HTTP port rather than the service they meant.
+# Both rows record their owner rather than claiming the ports as ours, which is
+# what makes the conflict visible instead of silent.
 #
-# They are described here rather than listed as rows because the gate walks the
-# code of services that exist; a row it cannot verify is a row that will rot
-# silently. When either lands, add it above and delete this note.
+# category-service originally defaulted its HTTP port to 8080, which the gateway
+# also takes. It is 8086 now. That is the first collision this registry caught
+# outside the 9090-9094 range, which is the point of having it.
 #
 # The dev Postgres is 5432, PostgreSQL's own default, because it is a dependency
 # of the whole stack rather than of one project. The per-service projects avoid

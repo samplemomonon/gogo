@@ -1,0 +1,30 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck      # unchecked error returns
+    - govet         # go vet rules
+    - ineffassign   # assignments that are never used
+    - staticcheck   # correctness and bug detection
+    - unused        # dead code
+    - bodyclose     # unclosed response bodies
+    - misspell      # common typos
+    - errorlint     # comparisons that should use errors.Is
+  settings:
+    errorlint:
+      errorf: true    # require %w in fmt.Errorf
+      asserts: true
+      comparison: true
+  exclusions:
+    rules:
+      # Test helpers intentionally discard errors from cleanup and stubs.
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
