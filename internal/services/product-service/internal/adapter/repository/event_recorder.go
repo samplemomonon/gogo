@@ -137,4 +137,3 @@ func (d *DomainEventRecorder) VariantDeleted(productID, variantID int64) ([]*pro
 	}
 	return []*product.DomainEvent{event}, nil
 }
-

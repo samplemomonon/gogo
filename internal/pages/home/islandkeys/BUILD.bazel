@@ -1,8 +1,0 @@
-load("@rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "islandkeys",
-    srcs = ["islandkeys.go"],
-    importpath = "gogo/internal/pages/home/islandkeys",
-    visibility = ["//gogo:__subpackages__"],
-)

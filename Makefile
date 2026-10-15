@@ -5,6 +5,22 @@ IMAGE        ?= gogo
 IMAGE_TAG    ?= latest
 K8S_DIR      := deploy/k8s
 
+# The platform services. Each is a separate Go module with its own go.mod,
+# deployed on its own release train, so each is built and tested on its own
+# module graph rather than on the gateway's.
+#
+# GOWORK=off is load-bearing, not hygiene. This repository ships a go.work, and
+# a directory that is not listed in it but lives inside the workspace tree does
+# not resolve to itself: a `go list ./...` run inside internal/services/… for
+# an unlisted service silently enumerates the *gateway's* packages. Measured:
+# aggregator, product and product-search all returned an identical package list
+# under workspace mode — the gateway's — which is how three services can look
+# covered by a check that never touched them.
+SERVICES     := aggregator-service product-listing-service product-search-service product-service
+SERVICES_DIR := internal/services
+
+.PHONY: services-vet services-test gofmt-check
+
 # Build-time identity, injected into internal/shared/version and surfaced in
 # the module registry and /metrics.
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -43,9 +59,32 @@ test: assets
 vet: assets
 	go vet ./...
 
-# Everything CI cares about in one shot: gofmt cleanliness, generated templ
-# and proto contracts up to date, static analysis and the full (race-enabled)
-# test suite.
+# Static analysis for the platform services, on their own module graphs.
+services-vet:
+	@set -e; for svc in $(SERVICES); do \
+		echo "==> vet $$svc"; \
+		(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go vet ./...); \
+	done
+
+# The platform test suites, including each service's own architecture tests.
+# aggregator-service carries the tripwire that keeps it a composition layer, and
+# this target is the only thing that ever runs it.
+services-test:
+	@set -e; for svc in $(SERVICES); do \
+		echo "==> test $$svc"; \
+		(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go test ./... -race); \
+	done
+
+# Everything CI cares about in one shot, across every module in the repository:
+# gofmt cleanliness, generated templ and proto contracts up to date, static
+# analysis, and the race-enabled test suite.
+#
+# "Every module" is the part this comment used to get wrong. It said "the full
+# test suite" while depending on `go test ./...`, which resolves within the root
+# module only — 97 of the repository's 172 packages. The four platform services
+# were never built and never tested, so a green CI run said nothing about them
+# and the aggregator's composition-layer tripwire never executed. services-vet
+# and services-test are now prerequisites for the same reason.
 #
 # The gofmt check asks `go list` for the directories that actually build, rather
 # than walking ./cmd and ./internal. Two reasons: a stray directory holding Go
@@ -53,10 +92,16 @@ vet: assets
 # the compiler, and a directory walk descends into tooling state that lives in
 # the tree — two devenv environments were 675 MB of Go module cache each, and
 # `gofmt -l ./internal` walked all of it on every run.
-check: vet test
+gofmt-check:
 	@dirs="$$(go list -f '{{.Dir}}' ./... | sort -u)"; \
+	for svc in $(SERVICES); do \
+		dirs="$$dirs $$(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go list -f '{{.Dir}}' ./... | sort -u)"; \
+	done; \
 	test -z "$$(gofmt -l $$dirs)" || \
 		(echo "gofmt needed on:"; gofmt -l $$dirs; exit 1)
+
+check: vet test services-vet services-test gofmt-check
+	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
 	@before="$$(git status --porcelain -- internal cmd)"; \
 	templ generate >/dev/null 2>&1; \
 	after="$$(git status --porcelain -- internal cmd)"; \
@@ -116,11 +161,44 @@ arch-graph:
 
 # ---- Contract (buf/protobuf) ----------------------------------------------
 
-# Fail on an incompatible contract change against main (the base branch). A
-# field may be deleted only when its number and name are reserved; every other
-# FILE-level break fails. Needs the base ref present, so CI checks out fully.
+# Fail on an incompatible contract change against the base branch. A field may be
+# deleted only when its number and name are reserved; every other FILE-level
+# break fails.
+#
+# The base is resolved to a commit SHA rather than named as `.git#branch=main`,
+# because "main" only exists locally in some of the places this runs:
+#
+#   - a push to main: refs/heads/main exists
+#   - a pull_request checkout: HEAD is a detached merge commit and there is no
+#     local main at all; only refs/remotes/origin/main
+#
+# `--against '.git#branch=main'` therefore fails on every pull request with
+# "couldn't find remote ref main". That is exactly what CI did: its one green run
+# was a push to main, where refs/heads/main does exist, so the check passed there
+# and could never have passed on a pull request.
+#
+# The resolved SHA is passed as `.git#ref=<sha>` — a bare SHA is not accepted,
+# buf reads it as a module path and answers "Module ... had no .proto files".
+# `.git#ref=` works identically on push and pull request, and naming the commit
+# makes the comparison reproducible rather than dependent on what main points at.
+#
+# If neither ref exists — a repository whose first push has no base yet — the
+# check reports that and passes, because there is genuinely nothing to compare
+# against. It says so on stdout rather than going quiet.
 buf-breaking:
-	buf breaking --against '.git#branch=main'
+	@base=""; \
+	for ref in refs/remotes/origin/main refs/heads/main; do \
+		if sha="$$(git rev-parse --verify --quiet "$$ref" 2>/dev/null)"; then \
+			base="$$sha"; break; \
+		fi; \
+	done; \
+	if [ -z "$$base" ]; then \
+		echo "buf-breaking: no base ref found (tried refs/remotes/origin/main, refs/heads/main)"; \
+		echo "buf-breaking: nothing to compare against — skipping"; \
+		exit 0; \
+	fi; \
+	echo "buf breaking --against $$base"; \
+	buf breaking --against ".git#ref=$$base"
 
 # Lint the proto contract schemas (buf STANDARD) — no generation.
 buf-lint:
