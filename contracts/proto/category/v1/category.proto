@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+// category.v1 is category-service's contract, vendored into Gogo's contracts
+// module so the seller console can read the category hierarchy. It exposes the
+// READ side only: writes stay on the owning service's REST API, so only the
+// owner mutates categories.
+//
+// The schema is a copy of category-service's own proto with only go_package
+// rewritten — see the note on product.v1 for why the duplication is deliberate.
+// Re-copy from category-service/proto/category/v1/category.proto when the owner
+// changes it.
+package category.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gogo/contracts/category/v1;categoryv1";
+
+// CategoryService exposes the read side of the category hierarchy. Writes stay
+// on the REST API: only the owning service should mutate categories.
+service CategoryService {
+  // GetCategory returns one category.
+  rpc GetCategory(GetCategoryRequest) returns (GetCategoryResponse);
+
+  // ListCategories returns a flat, name-ordered listing.
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+
+  // GetCategoryTree returns the whole hierarchy as nested nodes.
+  rpc GetCategoryTree(GetCategoryTreeRequest) returns (GetCategoryTreeResponse);
+
+  // CategoryExists answers a batch existence check. Callers that only need to
+  // validate a foreign key should prefer this over N GetCategory calls.
+  rpc CategoryExists(CategoryExistsRequest) returns (CategoryExistsResponse);
+}
+
+// Category mirrors model.Category. parent_id is 0 when the category is a root,
+// because proto3 has no nullable scalar; -1 is never a valid id.
+message Category {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  int64 parent_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// CategoryNode is a category with its immediate children.
+message CategoryNode {
+  Category category = 1;
+  repeated CategoryNode children = 2;
+}
+
+message GetCategoryRequest {
+  int64 id = 1;
+}
+
+message GetCategoryResponse {
+  Category category = 1;
+}
+
+message ListCategoriesRequest {
+  // Limit caps the number of categories returned; 0 means the server default.
+  int32 limit = 1;
+  // Offset skips categories for pagination.
+  int32 offset = 2;
+}
+
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+  // Total is the number of categories matching the request, ignoring paging.
+  int64 total = 2;
+}
+
+message GetCategoryTreeRequest {}
+
+message GetCategoryTreeResponse {
+  repeated CategoryNode roots = 1;
+}
+
+message CategoryExistsRequest {
+  repeated int64 ids = 1;
+}
+
+message CategoryExistsResponse {
+  // Exists holds the subset of requested ids that exist, de-duplicated.
+  repeated int64 exists = 1;
+  // Missing holds the requested ids that do not exist.
+  repeated int64 missing = 2;
+}

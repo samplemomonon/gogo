@@ -1,0 +1,96 @@
+package ui
+
+// SearchFormOptions is the presentation-ready input for SearchForm. The caller
+// states the GET target and the current term; the primitive owns the box chrome
+// (search landmark, leading icon, submit, clear) so every surface offers the
+// same control instead of restating the markup.
+type SearchFormOptions struct {
+	// Action is the GET target the term is submitted to. Required.
+	Action string
+
+	// Name is the query parameter the term is sent under. Empty uses "q".
+	Name string
+
+	// Value is the current term, rendered into the input so a filtered page
+	// keeps what the reader typed.
+	Value string
+
+	// Placeholder is the input's hint text.
+	Placeholder string
+
+	// Label is the accessible name of the search field.
+	Label string
+
+	// ClearLabel names the control that returns to the unfiltered target. It
+	// is an icon with no text, so without a name it would be an unlabelled
+	// link inside a search landmark; an empty value falls back to a generic
+	// one, as Label does not.
+	ClearLabel string
+
+	// Class carries extra classes on the form element (e.g. width at a
+	// breakpoint) so the caller fits the box into its own bar.
+	Class string
+
+	// Compact trims the control for the header bar (input-sm, no submit
+	// label); a page-level search leaves it false for the larger box.
+	Compact bool
+}
+
+// SearchForm renders a GET search box: a search landmark with a leading icon,
+// the input, a submit and — when a term is present — a clear link back to the
+// unfiltered target. It is one primitive so the header bar and any page that
+// embeds search share the same accessible chrome.
+templ SearchForm(spec SearchFormOptions) {
+	<form
+		method="get"
+		action={ templ.URL(spec.Action) }
+		role="search"
+		class={ joinClasses("relative flex items-center", spec.Class) }
+	>
+		<span class="pointer-events-none absolute inset-y-0 start-3 flex items-center text-base-content/40" aria-hidden="true">
+			@IconSearch("size-4")
+		</span>
+		<input
+			type="search"
+			name={ searchName(spec) }
+			value={ spec.Value }
+			placeholder={ spec.Placeholder }
+			class={ searchInputClass(spec) }
+			aria-label={ spec.Label }
+		/>
+		if spec.Value != "" {
+			<a
+				href={ templ.URL(spec.Action) }
+				class={ "absolute inset-y-0 end-2 my-auto flex items-center text-base-content/50 hover:text-base-content " + TapTargetClass }
+				aria-label={ clearLabel(spec) }
+			>
+				@IconClose("size-4")
+			</a>
+		}
+	</form>
+}
+
+func clearLabel(spec SearchFormOptions) string {
+	if spec.ClearLabel == "" {
+		return "Hapus pencarian"
+	}
+	return spec.ClearLabel
+}
+
+func searchName(spec SearchFormOptions) string {
+	if spec.Name == "" {
+		return "q"
+	}
+	return spec.Name
+}
+
+func searchInputClass(spec SearchFormOptions) string {
+	base := InputClass + " " + TapTargetClass + " ps-9"
+	if spec.Value != "" {
+		base += " pe-10"
+	}
+	if spec.Compact {
+		return base + " input-sm"
+	}
+	return base
+}

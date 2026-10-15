@@ -1,0 +1,63 @@
+package partials
+
+import (
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/ui"
+)
+
+// Header is the shell top bar: brand, the federated navigation and — on the
+// storefront — the global search. It is sticky, so the search and the account
+// entry stay reachable while a long listing scrolls.
+//
+// term is the current storefront search term (`?q=`); it is threaded through so
+// the header's search box keeps what the reader typed. A non-storefront surface
+// passes "".
+//
+// The bar is opaque with no backdrop-filter, though it is sticky and translucent
+// enough to have wanted one. A backdrop-filter re-rasterizes its entire region
+// whenever anything inside it repaints, and the search box is inside it: with a
+// blur on the header, every keystroke re-blurred the full width of the bar. That
+// lag is the cost of the effect, paid on the one control a reader uses most.
+templ Header(nav []navigation.Item, path string, term string) {
+	<header class="navbar sticky top-0 z-40 min-h-16 border-b border-base-300/60 bg-base-100/90 shadow-sm">
+		<div class="container mx-auto flex w-full items-center gap-2 px-4">
+			@ui.BrandLink("/", "Gogo", "Gogo — home")
+
+			<div class="hidden flex-1 items-center md:flex">
+				@Navbar(nav, path)
+			</div>
+
+			@HeaderSearch(term)
+
+			<div class="flex shrink-0 items-center gap-1">
+				@ui.ButtonLink(
+					navigation.Profile.Path,
+					ui.IconTriggerClass+" md:hidden",
+					templ.Attributes{"aria-label": "Profil"},
+				) {
+					@ui.IconUser("size-5")
+				}
+				@ThemeToggle()
+			</div>
+		</div>
+	</header>
+}
+
+// HeaderSearch is the global storefront search, in the top bar beside the
+// brand. It is the same SearchForm primitive a page would embed, compacted for
+// the bar. min-w-0 lets it shrink below its content width, which is what stops
+// the wordmark and the box squeezing each other into unreadable slivers at
+// 320px; the box itself is capped so it does not dominate a desktop bar.
+templ HeaderSearch(term string) {
+	<div class="flex min-w-0 flex-1 justify-end md:mx-2 md:justify-center">
+		@ui.SearchForm(ui.SearchFormOptions{
+			Action:      "/",
+			Value:       term,
+			Placeholder: "Cari produk…",
+			Label:       "Cari produk",
+			ClearLabel:  "Bersihkan pencarian",
+			Compact:     true,
+			Class:       "w-full max-w-sm min-w-0",
+		})
+	</div>
+}

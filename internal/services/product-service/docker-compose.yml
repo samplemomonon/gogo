@@ -1,0 +1,71 @@
+# Orchestration for the product service.
+#
+# Build options:
+#   1. Nix-built image (preferred): `nix build .#dockerImage && docker load < result`
+#   2. Docker build with Nix binary: `nix build .#product-service && docker compose build`
+#   3. Pure Docker build: `docker compose build` (fallback, no Nix required)
+#
+# category-service and media-service are expected to be running already; their
+# gRPC targets are configured below. This service dials them lazily, so it starts
+# even when they are not up yet, and returns 503 for requests that need them.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Pass the Nix-built binary if available (from `nix build .#product-service`)
+      # The binary will be at ./result/bin/product-service after nix build
+      args:
+        NIX_BINARY: ${NIX_BINARY:-./result/bin/product-service}
+        VERSION: ${VERSION:-0.0.0-dev}
+        COMMIT: ${COMMIT:-unknown}
+        DATE: ${DATE:-unknown}
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: product_user
+      DB_PASSWORD: product_pass
+      DB_NAME: product_db
+      DB_SSLMODE: disable
+      # Inside compose the dependencies are reachable by service name on the
+      # default network. Outside it, use host.docker.internal.
+      CATEGORY_GRPC_TARGET: category-service:9090
+      MEDIA_GRPC_TARGET: media-service:9091
+      DEPENDENCY_TIMEOUT: 3s
+      DEFAULT_CURRENCY: IDR
+      APP_PORT: "8082"
+      GRPC_PORT: "9092"
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/product-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_pass
+      POSTGRES_DB: product_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

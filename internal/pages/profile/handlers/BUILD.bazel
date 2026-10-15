@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "handlers",
+    srcs = ["handler.go"],
+    importpath = "gogo/internal/pages/profile/handlers",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/internal/pages/profile/application/ports",
+        "//gogo/internal/pages/profile/views/pages",
+        "//gogo/internal/shared/web/render",
+        "//gogo/internal/shared/web/session",
+    ],
+)

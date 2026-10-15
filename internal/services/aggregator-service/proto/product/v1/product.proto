@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+// Internal service-to-service contract for the product service. This is the
+// write side only: reading products is product-listing-service's job, and its
+// gRPC surface is what a peer should call for that.
+//
+// The public HTTP API in internal/handler is the same half; this exists so
+// another service can issue commands without going through JSON.
+package product.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "aggregator-service/gen/productpb;productpb";
+
+service ProductService {
+  // CreateProduct validates the category and media references against the
+  // owning services over gRPC, then stores the product. The response is the
+  // committed row; the change also becomes a domain event that the listing
+  // service projects into its read model.
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+
+  // UpdateProduct applies a partial update. Declared as optional fields so an
+  // unset field leaves its column alone.
+  rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
+
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+}
+
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  PRODUCT_STATUS_DRAFT = 1;
+  PRODUCT_STATUS_ACTIVE = 2;
+  PRODUCT_STATUS_ARCHIVED = 3;
+}
+
+// Product mirrors model.Product. Money is carried as minor units in an int64
+// because binary floating point cannot represent decimal currency exactly.
+// primary_media_id is 0 when unset: it references media-service, so there is no
+// foreign key to enforce it.
+message Product {
+  int64 id = 1;
+  int64 category_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string brand = 6;
+  int64 price_cents = 7;
+  string currency = 8;
+  int32 stock = 9;
+  ProductStatus status = 10;
+  int64 primary_media_id = 11;
+  repeated Variant variants = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+// Variant is a purchasable size or colour of a product.
+message Variant {
+  int64 id = 1;
+  int64 product_id = 2;
+  string sku = 3;
+  string name = 4;
+  int64 price_cents = 5;
+  string currency = 6;
+  int32 stock = 7;
+  int64 media_id = 8;
+}
+
+message CreateProductRequest {
+  int64 category_id = 1;
+  string name = 2;
+  // Slug is generated from the name when left empty.
+  string slug = 3;
+  string description = 4;
+  string brand = 5;
+  int64 price_cents = 6;
+  // Currency defaults to the service default when left empty.
+  string currency = 7;
+  int32 stock = 8;
+  ProductStatus status = 9;
+  int64 primary_media_id = 10;
+  repeated VariantSpec variants = 11;
+}
+
+// VariantSpec describes a variant to create alongside the product. It has no id
+// because the database assigns one.
+message VariantSpec {
+  string sku = 1;
+  string name = 2;
+  int64 price_cents = 3;
+  string currency = 4;
+  int32 stock = 5;
+  int64 media_id = 6;
+}
+
+message CreateProductResponse {
+  Product product = 1;
+}
+
+message UpdateProductRequest {
+  int64 id = 1;
+  // Every field is optional: an unset field is left alone, which is why they
+  // are declared with the proto3 `optional` label rather than as defaults.
+  optional int64 category_id = 2;
+  optional string name = 3;
+  optional string slug = 4;
+  optional string description = 5;
+  optional string brand = 6;
+  optional int64 price_cents = 7;
+  optional string currency = 8;
+  optional int32 stock = 9;
+  optional ProductStatus status = 10;
+  optional int64 primary_media_id = 11;
+}
+
+message UpdateProductResponse {
+  Product product = 1;
+}
+
+message DeleteProductRequest {
+  int64 id = 1;
+}
+
+message DeleteProductResponse {
+  bool deleted = 1;
+}

@@ -1,0 +1,99 @@
+// The sales contract: the strict, versioned wire surface of the sales service.
+// It owns completed point-of-sale transactions and their line items, and
+// composes the inventory service's AdjustStock for the stock effect of a sale.
+syntax = "proto3";
+
+package sales.v1;
+
+option go_package = "gogo/contracts/sales/v1;salesv1";
+
+import "google/protobuf/timestamp.proto";
+
+// TransactionItem is one line of a checked-out transaction. Money is in minor
+// units; quantity is never negative.
+message TransactionItem {
+  string id = 1;
+  string product_id = 2;
+  string name = 3;
+  int32 quantity = 4;
+  int64 price = 5;
+  int64 discount = 6;
+  int64 subtotal = 7;
+}
+
+// Transaction is one completed sale. change is paid minus total. A voided
+// transaction keeps its items and records who voided it, when and why.
+message Transaction {
+  string id = 1;
+  string number = 2;
+  int64 total = 3;
+  int64 discount = 4;
+  int64 paid = 5;
+  int64 change = 6;
+  string payment_method = 7;
+  string cashier = 8;
+  string employee_id = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp voided_at = 11;
+  string voided_by = 12;
+  string void_reason = 13;
+  repeated TransactionItem items = 14;
+}
+
+// CheckoutItem is a requested line. The server recomputes subtotal and total,
+// so a client-supplied subtotal is advisory only.
+message CheckoutItem {
+  string product_id = 1;
+  string name = 2;
+  int32 quantity = 3;
+  int64 price = 4;
+  int64 discount = 5;
+}
+
+message CheckoutRequest {
+  repeated CheckoutItem items = 1;
+  int64 discount = 2;
+  int64 paid = 3;
+  string payment_method = 4;
+  string cashier = 5;
+  string employee_id = 6;
+}
+
+message CheckoutResponse {
+  Transaction transaction = 1;
+}
+
+message GetTransactionRequest {
+  string id = 1;
+}
+
+message GetTransactionResponse {
+  Transaction transaction = 1;
+}
+
+message ListTransactionsRequest {
+  int32 page_size = 1;
+}
+
+message ListTransactionsResponse {
+  repeated Transaction transactions = 1;
+}
+
+message VoidTransactionRequest {
+  string id = 1;
+  string voided_by = 2;
+  string reason = 3;
+}
+
+message VoidTransactionResponse {
+  Transaction transaction = 1;
+}
+
+// SalesService is the sales application surface. Errors are returned as gRPC
+// status codes (NotFound, InvalidArgument, FailedPrecondition, Internal).
+service SalesService {
+  rpc Checkout(CheckoutRequest) returns (CheckoutResponse);
+  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
+  rpc VoidTransaction(VoidTransactionRequest) returns (VoidTransactionResponse);
+}

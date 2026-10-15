@@ -1,0 +1,51 @@
+package partials
+
+import (
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/ui"
+)
+
+// Navbar renders the aggregated shell navigation injected by the gateway: the
+// top bar knows nothing about a module except what its manifest or a page
+// declares. The item whose route covers the current path is highlighted.
+templ Navbar(items []navigation.Item, path string) {
+	<nav class="flex items-center gap-1" aria-label="Navigasi utama">
+		@ui.NavLinks(ui.NavLinksOptions{
+			Items:  navItems(items),
+			Path:   path,
+			Chrome: ui.NavChromeButton,
+			Class:  "btn-sm font-medium",
+		})
+	</nav>
+}
+
+// navItems adapts the shell's navigation model to the design system's nav item,
+// so the shell keeps its federated Item type while the primitive stays free of
+// a dependency on navigation.
+func navItems(items []navigation.Item) []ui.NavItem {
+	out := make([]ui.NavItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, ui.NavItem{Href: item.Path, Label: item.Label, Icon: item.Icon})
+	}
+	return out
+}
+
+// BottomNav is the mobile tab bar: the federated items that carry an icon (the
+// primary destinations — home, seller, profile), as icon + label tabs. Text-only
+// items (billing, a module's secondary entry) stay in the top bar, so the tab
+// bar never overflows as modules register. The adapter keeps the design system
+// free of a dependency on navigation, like navItems.
+templ BottomNav(items []navigation.Item, path string) {
+	@ui.BottomNav(ui.BottomNavOptions{Items: bottomNavItems(items), Path: path})
+}
+
+func bottomNavItems(items []navigation.Item) []ui.BottomNavItem {
+	out := make([]ui.BottomNavItem, 0, len(items))
+	for _, item := range items {
+		if item.Icon == nil {
+			continue
+		}
+		out = append(out, ui.BottomNavItem{Href: item.Path, Label: item.Label, Icon: item.Icon})
+	}
+	return out
+}

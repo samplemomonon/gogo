@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+// Internal service-to-service contract for the media service. Object bytes live
+// in MinIO; this service owns the metadata and hands out presigned URLs so
+// callers never proxy file contents.
+package media.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "aggregator-service/gen/mediapb;mediapb";
+
+service MediaService {
+  // RegisterMedia creates a PENDING record and returns an upload URL.
+  rpc RegisterMedia(RegisterMediaRequest) returns (RegisterMediaResponse);
+
+  // GetMedia returns stored metadata. It does not touch MinIO.
+  rpc GetMedia(GetMediaRequest) returns (GetMediaResponse);
+
+  // ListMedia pages through a owner's media, newest first.
+  rpc ListMedia(ListMediaRequest) returns (ListMediaResponse);
+
+  // GetUploadURL issues a fresh presigned PUT URL for an unfinished upload.
+  rpc GetUploadURL(GetUploadURLRequest) returns (GetUploadURLResponse);
+
+  // CompleteUpload verifies the object landed in MinIO and marks it READY.
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+
+  // GetDownloadURL issues a presigned GET URL for a READY object.
+  rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse);
+
+  // BatchGetDownloadURLs resolves several ids at once, which is what a product
+  // listing needs to avoid one round trip per image.
+  rpc BatchGetDownloadURLs(BatchGetDownloadURLsRequest) returns (BatchGetDownloadURLsResponse);
+
+  // DeleteMedia removes the object from MinIO and the metadata row.
+  rpc DeleteMedia(DeleteMediaRequest) returns (DeleteMediaResponse);
+}
+
+// MediaKind is the broad category of a stored object.
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_IMAGE = 1;
+  MEDIA_KIND_VIDEO = 2;
+  MEDIA_KIND_AUDIO = 3;
+  MEDIA_KIND_DOCUMENT = 4;
+  MEDIA_KIND_OTHER = 5;
+}
+
+// MediaStatus tracks the upload lifecycle.
+enum MediaStatus {
+  MEDIA_STATUS_UNSPECIFIED = 0;
+  // Record exists, bytes not uploaded yet.
+  MEDIA_STATUS_PENDING = 1;
+  // Object verified in MinIO and downloadable.
+  MEDIA_STATUS_READY = 2;
+}
+
+// Media mirrors model.Media.
+message Media {
+  int64 id = 1;
+  // Owner_id scopes the media to whoever uploaded it.
+  string owner_id = 2;
+  string filename = 3;
+  string content_type = 4;
+  int64 size_bytes = 5;
+  // ETag is the object version marker MinIO reports; used for cache busting.
+  string etag = 6;
+  // Object_key is the path inside the bucket. Callers must not construct it;
+  // they use the presigned URLs instead.
+  string object_key = 7;
+  MediaKind kind = 8;
+  MediaStatus status = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message RegisterMediaRequest {
+  string owner_id = 1;
+  string filename = 2;
+  string content_type = 3;
+  MediaKind kind = 4;
+  // Size_bytes is advisory; the value confirmed by CompleteUpload wins.
+  int64 size_bytes = 5;
+}
+
+message RegisterMediaResponse {
+  Media media = 1;
+  UploadURL upload = 2;
+}
+
+// UploadURL is a presigned PUT target plus the headers the client must send.
+// The signature covers the headers, so changing one invalidates the URL.
+message UploadURL {
+  string url = 1;
+  string method = 2;
+  map<string, string> headers = 3;
+  // Expires_at is when the URL stops working.
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message GetMediaRequest {
+  int64 id = 1;
+}
+
+message GetMediaResponse {
+  Media media = 1;
+}
+
+message ListMediaRequest {
+  string owner_id = 1;
+  MediaStatus status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListMediaResponse {
+  repeated Media media = 1;
+  int64 total = 2;
+}
+
+message GetUploadURLRequest {
+  int64 id = 1;
+}
+
+message GetUploadURLResponse {
+  UploadURL upload = 1;
+}
+
+message CompleteUploadRequest {
+  int64 id = 1;
+}
+
+message CompleteUploadResponse {
+  Media media = 1;
+}
+
+message GetDownloadURLRequest {
+  int64 id = 1;
+  // Presign_ttl_seconds overrides the configured default; 0 uses the default.
+  int64 presign_ttl_seconds = 2;
+}
+
+message GetDownloadURLResponse {
+  string url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message BatchGetDownloadURLsRequest {
+  repeated int64 ids = 1;
+  int64 presign_ttl_seconds = 2;
+}
+
+message BatchGetDownloadURLsResponse {
+  // Download maps media id to its presigned URL. Ids without a READY object are
+  // absent rather than mapped to an empty string.
+  map<int64, string> download_urls = 1;
+}
+
+message DeleteMediaRequest {
+  int64 id = 1;
+}
+
+message DeleteMediaResponse {
+  bool deleted = 1;
+}

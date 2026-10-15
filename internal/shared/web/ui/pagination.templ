@@ -1,0 +1,109 @@
+package ui
+
+import "strconv"
+
+// PageLink is one numbered control in a pagination bar. Href is a real path,
+// never empty, so a control is always a link the browser and a crawler can
+// follow.
+type PageLink struct {
+	Number int
+	Href   string
+
+	// Current marks the page the listing is rendered for. Exactly one link in
+	// a bar is current; it renders as a non-navigating element so the active
+	// page is not a link back to itself.
+	Current bool
+}
+
+// PaginationOptions is the presentation-ready input for Pagination. The caller
+// owns the mechanics — which pages exist, what the window is, and what each
+// href is — and hands over only what the chrome needs; pagekit.Pagination is
+// the usual source of that decision.
+type PaginationOptions struct {
+	// Label names the nav landmark ("Halaman produk"). An empty label falls
+	// back to a generic name.
+	Label string
+
+	// PrevHref and NextHref are empty when there is no such page, which is how
+	// the primitive decides to omit those controls.
+	PrevHref string
+	NextHref string
+
+	// PrevLabel and NextLabel name the step controls, and name them the same
+	// way twice on purpose: the same string is the visible text and the
+	// accessible name, so a screen reader announces the words the reader can
+	// actually see (WCAG label-in-name). An arrow-only control would be
+	// unnameable, so an empty label falls back to a generic name rather than
+	// rendering an icon with no text at all.
+	PrevLabel string
+	NextLabel string
+
+	Links []PageLink
+}
+
+// Pagination renders crawlable pagination controls. The bar renders nothing
+// when it has no numbered links, so a caller can pass a single-page listing's
+// metadata unconditionally.
+templ Pagination(m PaginationOptions) {
+	if len(m.Links) > 0 {
+		<nav class={ PaginationClass } aria-label={ paginationLabel(m) }>
+			if m.PrevHref != "" {
+				<a
+					href={ templ.URL(m.PrevHref) }
+					class={ PaginationLinkClass }
+					rel="prev"
+					aria-label={ prevLabel(m) }
+				>
+					@IconChevronLeft("size-4")
+					{ prevLabel(m) }
+				</a>
+			}
+			for _, link := range m.Links {
+				if link.Current {
+					<span class={ PaginationCurrentClass } aria-current="page">
+						{ strconv.Itoa(link.Number) }
+					</span>
+				} else {
+					<a href={ templ.URL(link.Href) } class={ PaginationLinkClass }>
+						{ strconv.Itoa(link.Number) }
+					</a>
+				}
+			}
+			if m.NextHref != "" {
+				<a
+					href={ templ.URL(m.NextHref) }
+					class={ PaginationLinkClass }
+					rel="next"
+					aria-label={ nextLabel(m) }
+				>
+					{ nextLabel(m) }
+					@IconChevronRight("size-4")
+				</a>
+			}
+		</nav>
+	}
+}
+
+// The fallbacks are Indonesian because that is the only language this app
+// ships in: a caller who forgets the option gets the app's language rather
+// than a lone English word in an otherwise Indonesian control.
+func prevLabel(m PaginationOptions) string {
+	if m.PrevLabel == "" {
+		return "Sebelumnya"
+	}
+	return m.PrevLabel
+}
+
+func nextLabel(m PaginationOptions) string {
+	if m.NextLabel == "" {
+		return "Berikutnya"
+	}
+	return m.NextLabel
+}
+
+func paginationLabel(m PaginationOptions) string {
+	if m.Label == "" {
+		return "Penomoran halaman"
+	}
+	return m.Label
+}

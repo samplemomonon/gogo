@@ -1,0 +1,90 @@
+// The inventory contract: the strict, versioned wire surface of the
+// inventory service. It owns the sellable stock level of every product and
+// the append-only movement ledger behind it. Nothing else writes stock.
+syntax = "proto3";
+
+package inventory.v1;
+
+option go_package = "gogo/contracts/inventory/v1;inventoryv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Stock is the current sellable quantity of one product. quantity is never
+// negative; a caller may not observe or drive it below zero.
+message Stock {
+  string product_id = 1;
+  int32 quantity = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+// StockMovement is one append-only ledger entry. kind is a free-form label
+// (adjustment | restock | opname | sale | void | receive); reference is an
+// optional idempotency key tying the movement to its cause.
+message StockMovement {
+  string id = 1;
+  string product_id = 2;
+  string kind = 3;
+  int32 quantity_delta = 4;
+  int32 quantity_before = 5;
+  int32 quantity_after = 6;
+  string note = 7;
+  string actor = 8;
+  string reference = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message GetStockRequest {
+  string product_id = 1;
+}
+
+message GetStockResponse {
+  Stock stock = 1;
+}
+
+message ListStocksRequest {
+  // product_ids scopes the listing; empty lists every stock row for the tenant.
+  repeated string product_ids = 1;
+}
+
+message ListStocksResponse {
+  repeated Stock stocks = 1;
+}
+
+// AdjustStock applies a signed delta to a product's stock and records a
+// movement in one atomic operation. It fails with FailedPrecondition when the
+// delta would drive stock below zero, so a caller can never oversell. When
+// reference is non-empty the adjustment is idempotent: replaying the same
+// reference returns the already-applied movement instead of applying twice.
+message AdjustStockRequest {
+  string product_id = 1;
+  int32 delta = 2;
+  string kind = 3;
+  string note = 4;
+  string actor = 5;
+  string reference = 6;
+}
+
+message AdjustStockResponse {
+  Stock stock = 1;
+  StockMovement movement = 2;
+}
+
+message ListStockMovementsRequest {
+  // product_id scopes the ledger to one product; empty lists every movement.
+  string product_id = 1;
+  int32 page_size = 2;
+}
+
+message ListStockMovementsResponse {
+  repeated StockMovement movements = 1;
+}
+
+// InventoryService is the inventory application surface: stock lookup and the
+// atomic adjustment ledger. Errors are returned as gRPC status codes
+// (NotFound, InvalidArgument, FailedPrecondition, Internal).
+service InventoryService {
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  rpc ListStocks(ListStocksRequest) returns (ListStocksResponse);
+  rpc AdjustStock(AdjustStockRequest) returns (AdjustStockResponse);
+  rpc ListStockMovements(ListStockMovementsRequest) returns (ListStockMovementsResponse);
+}

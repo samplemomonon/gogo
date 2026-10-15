@@ -1,0 +1,36 @@
+# Public entrypoint. Route gogo.your-domain to the gateway; TLS is terminated here
+# (cert-manager example below). Replace the host, cluster issuer and ingressClassName for
+# your environment.
+#
+# The gateway is the only origin: it serves the storefront, the seller console and the
+# account pages itself, and it renders product data by calling the platform's read models
+# over gRPC. There is no second origin to route to — the browsable product-detail page
+# that used to be split out went with the catalog.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gogo-gateway
+  namespace: gogo
+  labels:
+    app.kubernetes.io/name: gogo-gateway
+    app.kubernetes.io/part-of: gogo
+  annotations:
+    # cert-manager: adjust to your cluster issuer (see README).
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - gogo.example.com
+      secretName: gogo-tls
+  rules:
+    - host: gogo.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gogo-gateway
+                port:
+                  name: http

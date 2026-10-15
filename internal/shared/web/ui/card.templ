@@ -1,0 +1,77 @@
+package ui
+
+// Card is the standard two-level panel chrome every surface repeats: the outer
+// card (CardClass) and its card-body. attrs carries the panel's own id / hx-*
+// attributes; bodyClass carries the body's spacing ("gap-4", "p-0"). For a
+// hover card or a panel whose outer element is not a div, compose CardBody
+// directly instead.
+templ Card(bodyClass string, attrs templ.Attributes) {
+	<div class={ CardClass } { attrs... }>
+		<div class={ joinClasses("card-body", bodyClass) }>
+			{ children... }
+		</div>
+	</div>
+}
+
+// CardBody is a card's content row. Compose it directly when the panel's outer
+// element is something other than a div — a form, a section, or the hover card
+// — so the body chrome still lives in one place.
+templ CardBody(class string) {
+	<div class={ joinClasses("card-body", class) }>
+		{ children... }
+	</div>
+}
+
+// CardHeader is a panel's title row: an icon chip tinted by tone beside a card
+// title. The caller supplies the icon (with its own size and colour), so the
+// header owns the chrome and the caller owns the meaning. icon may be nil.
+templ CardHeader(tone string, title string, icon templ.Component) {
+	<div class="flex items-center gap-2">
+		if icon != nil {
+			<div class={ cardHeaderChipClass(tone) }>
+				@icon
+			</div>
+		}
+		<h2 class="card-title text-base">{ title }</h2>
+	</div>
+}
+
+// CardActions is a card's trailing action row. class carries the layout
+// ("justify-end pt-1").
+templ CardActions(class string) {
+	<div class={ joinClasses("card-actions", class) }>
+		{ children... }
+	</div>
+}
+
+// MediaTile is a card's decorative visual header: the gradient tile that sits
+// above a product card's body. The caller supplies the centered glyph; the
+// primitive owns the height ratio, gradient and the clip its decorative blur
+// needs. class appends page-specific chrome (e.g. "overflow-hidden").
+templ MediaTile(class string) {
+	<div class={ joinClasses(MediaTileClass, class) }>
+		<div
+			class="pointer-events-none absolute -right-6 -bottom-6 size-24 rounded-full bg-primary/15 blur-xl group-hover:scale-150 transition-transform duration-500"
+			aria-hidden="true"
+		></div>
+		{ children... }
+	</div>
+}
+
+// IconTile is the large rounded icon badge beside a panel title (the detail
+// page's product mark). Colors stay with the caller via class.
+templ IconTile(class string) {
+	<div class={ joinClasses(IconTileClass, class) }>
+		{ children... }
+	</div>
+}
+
+// Toolbar lays a page's leading chrome (a breadcrumb trail) against its own
+// actions (a back link) on one row. It exists as a component so a caller's
+// terminal ButtonLink renders as a component child rather than the last HTML
+// element child, which templ's parser handles.
+templ Toolbar() {
+	<div class={ ToolbarClass }>
+		{ children... }
+	</div>
+}

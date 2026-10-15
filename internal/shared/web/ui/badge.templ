@@ -1,0 +1,107 @@
+package ui
+
+import "strconv"
+
+// Badge is a daisyUI badge. kind and size are daisyUI modifiers ("ghost",
+// "success", "sm", "lg", ...); extra classes are appended.
+templ Badge(kind string, size string, class string) {
+	<span class={ joinClasses(BadgeClass(kind, size), class) }>
+		{ children... }
+	</span>
+}
+
+// CountBadgeOptions describes a count rendered as an availability badge.
+type CountBadgeOptions struct {
+	// Count is the value being reported.
+	Count int
+
+	// Suffix is appended to a positive count, e.g. "in stock".
+	Suffix string
+
+	// ZeroLabel replaces the text at zero, e.g. "Out of stock". When it is
+	// empty a zero count renders as a bare number, for a table that shows the
+	// figure itself.
+	ZeroLabel string
+
+	// Class carries extra classes, e.g. "shrink-0".
+	Class string
+}
+
+// CountBadge reports a count as a badge: a positive count in the success tone,
+// zero in the error tone. The two rules live here so a surface showing a count
+// does not have to restate them — a card that spells out "Out of stock" and a
+// table that shows a plain zero stay consistent by construction.
+templ CountBadge(spec CountBadgeOptions) {
+	if spec.Count > 0 {
+		@StatusBadge(StatusBadgeOptions{Tone: "success", Label: countBadgeText(spec), Size: "sm", Pulse: true, Class: spec.Class})
+	} else {
+		@StatusBadge(StatusBadgeOptions{Tone: "error", Label: countBadgeText(spec), Size: "sm", Class: spec.Class})
+	}
+}
+
+// StatusBadgeOptions describes a status pill: a soft badge with a leading tone
+// dot. It is presentation input, so the caller decides the tone and label.
+type StatusBadgeOptions struct {
+	// Tone is a daisyUI tone: "success", "error", "warning", "info", or "".
+	Tone string
+
+	// Label is the text beside the dot.
+	Label string
+
+	// Size is a daisyUI badge size: "sm", "lg", or "" for the default.
+	Size string
+
+	// Pulse animates the dot, for a live/active state.
+	Pulse bool
+
+	// Class carries extra classes, e.g. "px-3".
+	Class string
+}
+
+// StatusBadge renders a tone dot beside a label — the availability / state pill
+// shared by availability counts and stock reporting, so the dot markup lives
+// once instead of in every view that reports a state.
+templ StatusBadge(m StatusBadgeOptions) {
+	@Badge(m.Tone+" badge-soft font-medium", m.Size, joinClasses("gap-1.5", m.Class)) {
+		<span class={ statusDotClass(m) } aria-hidden="true"></span>
+		{ m.Label }
+	}
+}
+
+func statusDotClass(m StatusBadgeOptions) string {
+	dot := "rounded-full shrink-0 "
+	if m.Size == "lg" {
+		dot += "size-2 "
+	} else {
+		dot += "size-1.5 "
+	}
+	switch m.Tone {
+	case "success":
+		dot += "bg-success"
+	case "error":
+		dot += "bg-error"
+	case "warning":
+		dot += "bg-warning"
+	case "info":
+		dot += "bg-info"
+	default:
+		dot += "bg-base-content/40"
+	}
+	if m.Pulse {
+		dot += " status-pulse"
+	}
+	return dot
+}
+
+func countBadgeText(spec CountBadgeOptions) string {
+	if spec.Count > 0 {
+		if spec.Suffix == "" {
+			return strconv.Itoa(spec.Count)
+		}
+		return strconv.Itoa(spec.Count) + " " + spec.Suffix
+	}
+	if spec.ZeroLabel == "" {
+		return strconv.Itoa(spec.Count)
+	}
+	return spec.ZeroLabel
+}

@@ -1,0 +1,62 @@
+package partials
+
+import (
+	"fmt"
+	"net/url"
+
+	"gogo/internal/shared/web/pagekit"
+	"gogo/internal/shared/web/ui"
+)
+
+// pageLink builds the storefront URL for a page, preserving the active search
+// term so paging stays within the filter.
+func pageLink(page int, term string) string {
+	u := fmt.Sprintf("/?page=%d", page)
+	if term != "" {
+		u += "&q=" + url.QueryEscape(term)
+	}
+	return u
+}
+
+// PaginationNav renders crawlable pagination controls for the storefront.
+// Every link is a real href (/?page=N, and &q=term within a search), so search
+// engines can follow the whole listing and the controls work without
+// JavaScript. Which pages to show and what each href is stays here; the control
+// chrome belongs to the design system.
+templ PaginationNav(nav pagekit.Pagination) {
+	@ui.Pagination(ui.PaginationOptions{
+		Label:     "Halaman produk",
+		PrevHref:  prevHref(nav),
+		NextHref:  nextHref(nav),
+		PrevLabel: "Sebelumnya",
+		NextLabel: "Berikutnya",
+		Links:     pageLinks(nav),
+	})
+}
+
+func pageLinks(nav pagekit.Pagination) []ui.PageLink {
+	window := nav.Pages(5, 2)
+	links := make([]ui.PageLink, 0, len(window))
+	for _, n := range window {
+		links = append(links, ui.PageLink{
+			Number:  n,
+			Href:    pageLink(n, nav.Term),
+			Current: n == nav.Page,
+		})
+	}
+	return links
+}
+
+func prevHref(nav pagekit.Pagination) string {
+	if !nav.HasPrev {
+		return ""
+	}
+	return pageLink(nav.Page-1, nav.Term)
+}
+
+func nextHref(nav pagekit.Pagination) string {
+	if !nav.HasNext {
+		return ""
+	}
+	return pageLink(nav.Page+1, nav.Term)
+}

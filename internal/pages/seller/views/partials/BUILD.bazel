@@ -1,0 +1,24 @@
+# gazelle:map_kind go_library templ_go_library //tools/bazel:templ.bzl
+load("@rules_go//go:def.bzl", "go_test")
+load("//tools/bazel:templ.bzl", "templ_go_library")
+
+go_test(
+    name = "partials_test",
+    size = "small",
+    srcs = ["seller_test.go"],
+    deps = [":partials"],
+)
+
+templ_go_library(
+    name = "partials",
+    srcs = ["seller_templ.go"],
+    importpath = "gogo/internal/pages/seller/views/partials",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/internal/pages/seller/application/results",
+        "//gogo/internal/shared/money",
+        "//gogo/internal/shared/web/ui",
+        "@com_github_a_h_templ//:templ",
+        "@com_github_a_h_templ//runtime",
+    ],
+)

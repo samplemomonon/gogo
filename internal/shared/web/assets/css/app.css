@@ -1,0 +1,534 @@
+@import "tailwindcss";
+/* Class sources, relative to this file: modules and pages carry the feature
+   templates, shared/web the shell. Explicit paths keep the build independent
+   of the working directory (the Docker assets stage runs from /src). */
+@source "../../../../modules";
+@source "../../../../pages";
+@source "../../../web";
+@plugin "daisyui" {
+  themes: false;
+}
+
+/* ---------------------------------------------------------------------------
+   Brand themes.
+
+   Two hand-tuned themes replace the stock daisyUI light/dark pair, and they are
+   the *only* themes: the shell no longer hardcodes `data-theme="light"` on
+   <html>, so `:root` carries `gogo` and daisyUI's `:root:not([data-theme])`
+   media-query fallback supplies `gogo-dark` to viewers whose OS asks for dark.
+   A reader who picks a theme gets `data-theme` on <html> from the shell's
+   inline bootstrap script, which outranks the media query.
+
+   Every accent token is chosen to work in THREE roles, because this codebase
+   uses each one all three ways:
+
+     1. as text on a surface   (`text-primary`, `text-error`, badge-soft)
+     2. as a solid background   (`btn-primary`, `alert-error`, badge-*)
+     3. as a tinted 10% chip   (`bg-primary/10` + `text-primary`)
+
+   That means the token itself is dark enough to read as text (WCAG AA against
+   --color-base-100) and its paired `-content` is light enough to read on top of
+   it. Lightness sits in the 50-58% band rather than daisyUI's stock 71-83%
+   pastels, which are unreadable as text and were the reason `text-error` in
+   the admin table failed contrast in the first place.
+--------------------------------------------------------------------------- */
+
+@plugin "daisyui/theme" {
+  name: "gogo";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: oklch(99.5% 0.002 280);
+  --color-base-200: oklch(96.8% 0.005 280);
+  --color-base-300: oklch(91.5% 0.01 280);
+  --color-base-content: oklch(21% 0.02 280);
+
+  /* Indigo-violet: the storefront's brand voice (prices, primary CTAs). */
+  --color-primary: oklch(51% 0.22 283);
+  --color-primary-content: oklch(98% 0.012 283);
+
+  /* Deep teal: the admin console's voice, so the two surfaces stay legible
+     as distinct places without changing layout. */
+  --color-secondary: oklch(48% 0.115 196);
+  --color-secondary-content: oklch(98% 0.01 196);
+
+  --color-accent: oklch(58% 0.17 42);
+  --color-accent-content: oklch(98% 0.012 42);
+
+  --color-neutral: oklch(25% 0.02 280);
+  --color-neutral-content: oklch(97% 0.005 280);
+
+  --color-info: oklch(52% 0.16 244);
+  --color-info-content: oklch(98% 0.01 244);
+  --color-success: oklch(52% 0.14 155);
+  --color-success-content: oklch(98% 0.01 155);
+  --color-warning: oklch(54% 0.14 70);
+  --color-warning-content: oklch(98% 0.012 70);
+  --color-error: oklch(53% 0.21 26);
+  --color-error-content: oklch(98% 0.01 26);
+
+  /* Slightly softer corners than stock daisyUI: the cards, fields and panels
+     all read as one system instead of stock squares next to round badges. */
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "gogo-dark";
+  prefersdark: true;
+  color-scheme: dark;
+
+  /* Elevation layering: base-200 (canvas) < base-100 (surfaces) < base-300 (borders/elevations) */
+  --color-base-100: oklch(21% 0.016 280);
+  --color-base-200: oklch(16% 0.012 280);
+  --color-base-300: oklch(28% 0.022 280);
+  --color-base-content: oklch(95% 0.008 280);
+
+  /* Accents lighten in dark mode so they clear AA against the dark surfaces */
+  --color-primary: oklch(74% 0.17 283);
+  --color-primary-content: oklch(16% 0.05 283);
+  --color-secondary: oklch(76% 0.115 196);
+  --color-secondary-content: oklch(16% 0.035 196);
+  --color-accent: oklch(76% 0.15 42);
+  --color-accent-content: oklch(18% 0.05 42);
+
+  --color-neutral: oklch(28% 0.02 280);
+  --color-neutral-content: oklch(94% 0.008 280);
+
+  --color-info: oklch(74% 0.14 244);
+  --color-info-content: oklch(18% 0.04 244);
+  --color-success: oklch(76% 0.15 155);
+  --color-success-content: oklch(18% 0.045 155);
+  --color-warning: oklch(80% 0.14 75);
+  --color-warning-content: oklch(20% 0.05 75);
+  --color-error: oklch(72% 0.18 26);
+  --color-error-content: oklch(18% 0.05 26);
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Tailwind v4 reads @theme to mint its utility scale, so these become
+   `font-sans`, `rounded-card`, `shadow-panel`, `text-balance` and friends
+   rather than being one-off values sprinkled through the views.
+--------------------------------------------------------------------------- */
+@theme {
+  --font-sans:
+    "Inter var", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Panel chrome. Elevation scale with ambient tone bleed. */
+  --shadow-panel: 0 1px 3px 0 oklch(0% 0 0 / 0.04), 0 1px 2px -1px oklch(0% 0 0 / 0.04);
+  --shadow-raised: 0 4px 6px -1px oklch(0% 0 0 / 0.07), 0 2px 4px -2px oklch(0% 0 0 / 0.05);
+  --shadow-float: 0 10px 15px -3px oklch(0% 0 0 / 0.08), 0 4px 6px -4px oklch(0% 0 0 / 0.04);
+  --shadow-card: 0 1px 2px 0 oklch(0% 0 0 / 0.03), 0 1px 3px 0 oklch(0% 0 0 / 0.05);
+  --shadow-card-hover: 0 12px 28px -6px oklch(0% 0 0 / 0.12), 0 6px 12px -3px oklch(0% 0 0 / 0.06);
+
+  --radius-card: 0.875rem;
+
+  --animate-swap-in: swap-in 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-rise: rise 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  --animate-pulse-subtle: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes swap-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.55;
+      transform: scale(0.92);
+    }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* The shell header is sticky, so an in-page anchor target would otherwise
+       land underneath it. */
+    scroll-padding-top: 5rem;
+  }
+
+  /* Opt-in surface transition. This used to be a bare
+     `transition-property` on `*`, which animated every property change on
+     every element — including layout-affecting ones — and made the whole app
+     feel laggy on theme switch. Only the surfaces that ask for it move. */
+  .theme-transition,
+  .theme-transition * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* A theme change is not an interaction to animate, it is a repaint of every
+     colour token in the document at once. With transitions live, each token
+     change starts its own transition: on a dense page every button, card, input
+     and border runs a 150ms colour transition simultaneously, so the swap takes
+     visibly longer than the click that asked for it and the controls arrive at
+     their new colours out of step with each other.
+
+     The shell sets data-theme-switching around the swap and clears it a frame
+     later (see ThemeBootstrapJS). Suppressing transitions while it is set means
+     the new theme lands in one frame; because the colours changed while
+     transitions were off, nothing interpolates afterwards either. Transitions
+     stay on for ordinary interaction, which is where the motion belongs. */
+  html[data-theme-switching],
+  html[data-theme-switching] *,
+  html[data-theme-switching] *::before,
+  html[data-theme-switching] *::after {
+    transition: none !important;
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  /* One focus treatment for the whole app, including the elements daisyUI
+     leaves unstyled (links, table cells, form controls inside labels). */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-primary) 24%, transparent);
+  }
+
+  /* Standards-based scrollbar, so Firefox honours it too; the webkit rules in
+     the utilities layer below cover Chromium and Safari. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-base-content) 22%, transparent)
+      transparent;
+  }
+}
+
+@layer utilities {
+  /* daisyUI's `.menu` sets --menu-active-bg/-fg on the menu element itself, so
+     a value on the theme root is shadowed and the active item stayed a
+     near-black neutral pill. Re-declaring the tokens on `.menu` here — in the
+     utilities layer, which outranks daisyUI's components layer — makes the
+     selected item primary in every sidebar (profile and seller alike). */
+  .menu {
+    --menu-active-bg: var(--color-primary);
+    --menu-active-fg: var(--color-primary-content);
+  }
+
+  /* Controls daisyUI styles (buttons, fields, menu items, links) draw their own
+     dark focus ring, and daisyUI's rule lives in a higher layer than the base
+     `:focus-visible`, so it won without this. Re-assert the brand ring here, at
+     the same layer, so the whole app shows one focus colour — including the
+     shell's icon controls like the mobile sidebar trigger and theme toggle. */
+  .btn:focus-visible,
+  .input:focus-visible,
+  .select:focus-visible,
+  .textarea:focus-visible,
+  .checkbox:focus-visible,
+  .radio:focus-visible,
+  .toggle:focus-visible,
+  .tab:focus-visible,
+  .menu li > *:focus-visible,
+  .link:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Page hero gradient. Derived from the live primary token so it follows the
+     brand in both themes, elevated with layered radial depth. */
+  .bg-hero-gradient {
+    background-image:
+      radial-gradient(120% 140% at 90% 0%, color-mix(in oklab, var(--color-primary) 12%, transparent) 0%, transparent 60%),
+      linear-gradient(
+        135deg,
+        color-mix(in oklab, var(--color-primary) 8%, transparent) 0%,
+        color-mix(in oklab, var(--color-base-100) 85%, transparent) 50%,
+        var(--color-base-100) 100%
+      );
+  }
+
+  /* Subtle depth for a hero, so it does not read as a flat tinted block. */
+  .bg-hero-veil {
+    background-image: radial-gradient(
+      120% 140% at 100% 0%,
+      color-mix(in oklab, var(--color-primary) 18%, transparent) 0%,
+      transparent 60%
+    );
+  }
+
+  /* Subtle card sheen edge for premium surface delineation */
+  .card-sheen {
+    box-shadow: inset 0 1px 0 0 color-mix(in oklab, var(--color-base-content) 5%, transparent);
+  }
+
+  /* Button tactile interaction */
+  .btn {
+    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* A submit button while its form is in flight (see partials.FormGuardJS).
+     pointer-events rather than `disabled`: disabling the form's default submit
+     control also disables *implicit* submission, so pressing Enter in a text
+     field would stop submitting the form altogether. The keyboard path is
+     covered by the form-level guard instead. */
+  .btn-pending {
+    pointer-events: none;
+    cursor: progress;
+    opacity: 0.7;
+  }
+
+  /* Status indicator pulse dot */
+  .status-pulse {
+    animation: var(--animate-pulse-subtle);
+  }
+
+  /* --- htmx feedback -------------------------------------------------------
+     daisyUI ships no htmx integration, so these were missing entirely: the
+     submit spinners in the admin forms carried `htmx-indicator` with nothing
+     behind it and sat permanently visible next to the button label. htmx adds
+     `htmx-request` to the requesting element and `htmx-swapping` to the
+     target for the duration of the exchange, which is what drives them. */
+  .htmx-indicator {
+    opacity: 0;
+    transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    opacity: 1;
+  }
+  /* A request that outlives 100ms is worth a visible cue on the swapped
+     region; htmx also adds these to <body> during a swap. */
+  .htmx-swapping {
+    opacity: 0.6;
+    transition: opacity 150ms ease-out;
+  }
+
+  /* Fade-in for HTMX-swapped regions. Scoped to htmx's own settling class
+     rather than firing on first paint. */
+  .htmx-settling .animate-swap {
+    animation: var(--animate-swap-in);
+  }
+  .animate-rise {
+    animation: var(--animate-rise);
+  }
+
+  /* --- shell chrome --------------------------------------------------------
+     These back the shell partials. They live in the token layer because they
+     are part of the shared document frame rather than any one surface. */
+
+  /* A keyboard user's first stop: hidden until focused, then pinned below the
+     sticky header. Not `sr-only`, because that would also hide it from the
+     reader's eye once focused. */
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 100;
+    transform: translateY(-200%);
+    border-radius: var(--radius-field);
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-float);
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .skip-link:focus-visible {
+    transform: translateY(0);
+    outline-offset: 3px;
+  }
+
+  /* The brand tile behind the wordmark with radiant brand glow. */
+  .brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.625rem;
+    background-image: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      color-mix(in oklab, var(--color-primary) 65%, var(--color-accent)) 100%
+    );
+    color: var(--color-primary-content);
+    box-shadow: 0 4px 12px -2px color-mix(in oklab, var(--color-primary) 40%, transparent);
+    transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms ease;
+  }
+  .brand-link:hover .brand-mark {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px -2px color-mix(in oklab, var(--color-primary) 55%, transparent);
+  }
+
+  /* htmx failure announcements. The element is empty at rest and collapses
+     completely; the shell's htmx config writes a message into it only when a
+     request actually fails. */
+  .shell-status {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 1rem;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    padding-inline: 1rem;
+    pointer-events: none;
+  }
+  .shell-status:empty {
+    display: none;
+  }
+  .shell-status:not(:empty) {
+    max-width: 32rem;
+    border-radius: var(--radius-box);
+    background-color: var(--color-error);
+    color: var(--color-error-content);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: var(--shadow-float);
+    animation: var(--animate-rise);
+  }
+
+  /* A neutral placeholder for a region that is about to be swapped, so a lazy
+     island reserves its space instead of collapsing the layout. */
+  .skeleton-line {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-base-200) 0%,
+      color-mix(in oklab, var(--color-base-300) 70%, transparent) 50%,
+      var(--color-base-200) 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 0.375rem;
+    animation: skeleton-pan 1.4s ease-in-out infinite;
+  }
+  @keyframes skeleton-pan {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  /* Chromium / Safari scrollbar. `scrollbar-width` above covers Firefox. */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion.
+
+   Applies when the reader asks the OS for less motion: no smooth scrolling, no
+   transitions, no animations, and the htmx swap cue becomes an instant change
+   rather than a cross-fade. Scrolling to an anchor still works — it just
+   arrives without the animation.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .htmx-indicator {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print.
+
+   A product listing or a product is plausibly printed; the shell chrome, nav,
+   theme toggle and lazy-load affordances are not.
+--------------------------------------------------------------------------- */
+@media print {
+  header,
+  footer,
+  nav,
+  .htmx-indicator,
+  [hx-get],
+  [hx-post],
+  [hx-put],
+  [hx-delete] {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  main {
+    padding: 0;
+  }
+  /* Keep a card from being sliced across a page break. */
+  .card,
+  .stat {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    color: #555;
+  }
+}

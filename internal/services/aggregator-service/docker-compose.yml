@@ -1,0 +1,54 @@
+# Standalone stack for developing the aggregator in isolation.
+#
+# The aggregator owns no data, so there is no database here and no volume to manage.
+# It dials the five services by their compose service names, which only resolve on the
+# root stack's network -- so this file is for running the aggregator against an
+# already-running root stack, not for replacing it.
+#
+#   docker compose up -d                      start the root stack
+#   docker compose -f docker-compose.yml up  add the aggregator to it
+#
+# Run from the repository root so the network is shared:
+#   docker compose -f docker-compose.yml up --build
+
+services:
+  aggregator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      # The internal gRPC ports, not the public REST ones. An aggregator is an internal
+      # client, so it should not depend on another service's public surface.
+      CATEGORY_GRPC_TARGET: category-app:9090
+      MEDIA_GRPC_TARGET: media-app:9091
+      PRODUCT_GRPC_TARGET: product-app:9092
+      LISTING_GRPC_TARGET: product-listing-app:9093
+      SEARCH_GRPC_TARGET: product-search-app:9094
+
+      # The two read services expose their projection status over REST only, so the
+      # aggregator speaks HTTP for exactly these two endpoints.
+      LISTING_HTTP_BASE: http://product-listing-app:8083
+      SEARCH_HTTP_BASE: http://product-search-app:8084
+
+      REQUEST_TIMEOUT: 10s
+      DEPENDENCY_TIMEOUT: 3s
+
+      # Relaxed for local development: introspection and the playground are what make
+      # the composed schema explorable. Both default off in the image.
+      ENABLE_INTROSPECTION: "true"
+      ENABLE_PLAYGROUND: "true"
+      ALLOWED_ORIGINS: "*"
+
+      APP_PORT: "8085"
+      LOG_FORMAT: text
+      LOG_LEVEL: debug
+    restart: unless-stopped
+    healthcheck:
+      # Readiness, not liveness: it checks every dependency, so a partial outage removes
+      # this instance from the load balancer instead of restarting it.
+      test: ["CMD", "/bin/aggregator-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

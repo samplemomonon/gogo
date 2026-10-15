@@ -1,0 +1,16 @@
+package ui
+
+// Button is a daisyUI button. class carries the modifiers ("btn-sm btn-ghost
+// gap-1.5"); attrs carries any extra attributes (type, hx-*, disabled, ...).
+templ Button(class string, attrs templ.Attributes) {
+	<button class={ joinClasses("btn", class) } { attrs... }>
+		{ children... }
+	</button>
+}
+
+// ButtonLink is a Button rendered as an anchor, for navigation actions.
+templ ButtonLink(href string, class string, attrs templ.Attributes) {
+	<a href={ templ.URL(href) } class={ joinClasses("btn", class) } { attrs... }>
+		{ children... }
+	</a>
+}

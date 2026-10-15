@@ -1,0 +1,63 @@
+package ui
+
+// Panel is a titled card: the standard panel chrome with a single card-title
+// heading above the caller's body. Use it wherever a surface renders "a card
+// with a title" instead of repeating Card + heading markup — the console alone
+// repeated that pair a dozen times.
+templ Panel(title string) {
+	@Card("gap-3", nil) {
+		<h2 class="card-title text-base">{ title }</h2>
+		{ children... }
+	}
+}
+
+// TablePanelOptions is the presentation-ready input for TablePanel.
+type TablePanelOptions struct {
+	// Title is the panel's heading.
+	Title string
+
+	// Columns are the table's header cells.
+	Columns []Column
+
+	// Count is how many body rows the caller is about to render. It is stated
+	// explicitly because a templ slot cannot be inspected: the primitive needs
+	// it to decide between the caller's rows and the empty state, and the
+	// caller is the only side that knows. Pass the length of the slice it is
+	// looping over.
+	Count int
+
+	// MinWidth floors the table's width for horizontal scrolling on a narrow
+	// viewport. A literal utility class ("min-w-[40rem]"); empty for a table
+	// that fits a phone unaided.
+	MinWidth string
+
+	// EmptyTitle and EmptyDescription are shown instead of the rows when Count
+	// is zero. EmptyTitle is required for that branch to fire — an unnamed
+	// empty state is not one.
+	EmptyTitle       string
+	EmptyDescription string
+}
+
+// TablePanel is a titled panel wrapping a data table, including what the table
+// shows when it has no rows.
+//
+// Every record table in the app is this pair, and before this primitive existed
+// the eight of them shared the same two blind spots: none passed an accessible
+// name to its unnamed action column, and none handled being empty — a console
+// with no products rendered a bare header row above nothing, which reads as a
+// broken table rather than as an answer.
+templ TablePanel(spec TablePanelOptions) {
+	@Panel(spec.Title) {
+		@DataTable(DataTableOptions{
+			Columns:  spec.Columns,
+			MinWidth: spec.MinWidth,
+			Caption:  spec.Title,
+		}) {
+			if spec.Count == 0 && spec.EmptyTitle != "" {
+				@TableEmpty(len(spec.Columns), spec.EmptyTitle, spec.EmptyDescription)
+			} else {
+				{ children... }
+			}
+		}
+	}
+}

@@ -1,0 +1,12 @@
+package ui
+
+// MetaPill is a small metadata chip: an optional icon beside a short label,
+// used for the timestamp / fact pills on a detail panel. icon may be nil.
+templ MetaPill(icon templ.Component, text string) {
+	<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-base-200/70 border border-base-300/40">
+		if icon != nil {
+			@icon
+		}
+		<span>{ text }</span>
+	</div>
+}

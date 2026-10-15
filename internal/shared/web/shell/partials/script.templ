@@ -1,0 +1,13 @@
+package partials
+
+// InlineScript emits a complete <script> element around a trusted JS string.
+//
+// templ cannot interpolate a Go string into a <script> body: it parses script
+// contents as either raw text (where no expression is evaluated at all) or as
+// JavaScript (where the only expression form, {{ }}, runs the value through
+// json.Marshal and emits a quoted string). Both spellings render as literal
+// text, which is a silent failure — templ generate and go build both pass while
+// the browser only sees a SyntaxError. So the element is emitted whole.
+templ InlineScript(code string) {
+	@templ.Raw(`<script type="text/javascript">` + code + `</script>`)
+}

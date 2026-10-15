@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+// Internal service-to-service contract for the product listing service. This is
+// the read side of the product domain: it answers reads from its own projection,
+// which is built from the events product-service publishes.
+//
+// The public HTTP API in internal/handler is the same half; this exists so
+// another service can query the catalogue without going through JSON.
+package productlisting.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "product-listing-service/gen/listingpb;listingpb";
+
+service ProductListingService {
+  // GetProduct returns one product. The result is served from this service's own
+  // read model, so it reflects the last event it consumed rather than a
+  // synchronous read of product-service.
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+
+  // ListVariants returns the variants of one product.
+  rpc ListVariants(ListVariantsRequest) returns (ListVariantsResponse);
+}
+
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  PRODUCT_STATUS_DRAFT = 1;
+  PRODUCT_STATUS_ACTIVE = 2;
+  PRODUCT_STATUS_ARCHIVED = 3;
+}
+
+// Product mirrors model.Product. Money is carried as minor units in an int64
+// because binary floating point cannot represent decimal currency exactly.
+// category_id and primary_media_id are references to other services, so they
+// carry no foreign key here either.
+message Product {
+  int64 id = 1;
+  int64 category_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string brand = 6;
+  int64 price_cents = 7;
+  string currency = 8;
+  int32 stock = 9;
+  ProductStatus status = 10;
+  int64 primary_media_id = 11;
+  repeated Variant variants = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  // Projected_at is when this read model last wrote the row. It is not the same
+  // as updated_at: an event can republish a product without changing it.
+  google.protobuf.Timestamp projected_at = 15;
+}
+
+// Variant is a purchasable size or colour of a product.
+message Variant {
+  int64 id = 1;
+  int64 product_id = 2;
+  string sku = 3;
+  string name = 4;
+  int64 price_cents = 5;
+  string currency = 6;
+  int32 stock = 7;
+  int64 media_id = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetProductRequest {
+  int64 id = 1;
+  // Include_variants controls whether the response embeds the variant list.
+  bool include_variants = 2;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+message ListProductsRequest {
+  int64 category_id = 1;
+  ProductStatus status = 2;
+  // Query used to match against name, slug and brand. Free-text search now lives
+  // in productsearch.v1.ProductSearchService, which owns a trigram-indexed read
+  // model and relevance ranking.
+  //
+  // The field is kept rather than reserved so an older client that still sets it
+  // gets an explicit InvalidArgument naming the replacement, instead of a
+  // silently unfiltered result set. Browsing cannot be ranked, so ignoring the
+  // term would answer a different question than the one that was asked.
+  string query = 3 [deprecated = true];
+  int64 min_price_cents = 4;
+  int64 max_price_cents = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+  bool include_variants = 8;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+  // Total counts the products matching the filters, ignoring paging.
+  int64 total = 2;
+}
+
+message ListVariantsRequest {
+  int64 product_id = 1;
+}
+
+message ListVariantsResponse {
+  repeated Variant variants = 1;
+}

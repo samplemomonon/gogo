@@ -1,0 +1,19 @@
+# buf-generate: emit Go code from the contract protos into the contracts
+# module. Generated files are committed (reviewed in PRs like any source)
+# and verified fresh by `make check`.
+version: v2
+
+inputs:
+  - directory: contracts/proto
+
+plugins:
+  - local: protoc-gen-go
+    out: contracts
+    opt:
+      - paths=import
+      - module=gogo/contracts
+  - local: protoc-gen-go-grpc
+    out: contracts
+    opt:
+      - paths=import
+      - module=gogo/contracts

@@ -1,0 +1,71 @@
+package ui
+
+// BottomNavItem is one tab of the mobile bottom bar: an icon over a label,
+// linked to a route. It is its own descriptor rather than NavItem because a
+// tab is icon-led and never renders bare text.
+type BottomNavItem struct {
+	Href  string
+	Label string
+	Icon  templ.Component
+}
+
+// BottomNavOptions is the presentation-ready input for BottomNav.
+type BottomNavOptions struct {
+	// Items are the tabs, in order. Keep it to the few primary destinations
+	// (home, seller, profile) so each hits a comfortable thumb target.
+	Items []BottomNavItem
+
+	// Path is the current request path, used to mark the active tab.
+	Path string
+}
+
+// BottomNav is the fixed bottom tab bar for narrow viewports: the primary
+// destinations as icon + label tabs, hidden from md up where the top bar's
+// links take over. It reuses the shell's active rule (IsActiveNav) so the tab
+// bar and the top bar never disagree on which destination is current.
+//
+// The bar is opaque with no backdrop-filter, as the header is. A backdrop-filter
+// re-rasterizes its whole region whenever anything inside it repaints, and at
+// 95% opacity the blur it produces is not visible anyway.
+templ BottomNav(spec BottomNavOptions) {
+	if len(spec.Items) > 0 {
+		<nav
+			class="fixed inset-x-0 bottom-0 z-40 border-t border-base-300/60 bg-base-100 md:hidden pb-[env(safe-area-inset-bottom)]"
+			aria-label="Navigasi bawah"
+		>
+			<ul class="mx-auto flex max-w-md items-stretch justify-around px-2">
+				for _, item := range spec.Items {
+					@bottomNavTab(item, spec.Path)
+				}
+			</ul>
+		</nav>
+	}
+}
+
+templ bottomNavTab(item BottomNavItem, path string) {
+	<li class="flex-1">
+		if IsActiveNav(item.Href, path) {
+			<a
+				href={ templ.URL(item.Href) }
+				class="flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-primary"
+				aria-current="page"
+			>
+				@bottomNavTabContent(item)
+			</a>
+		} else {
+			<a
+				href={ templ.URL(item.Href) }
+				class="flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-base-content/60 hover:text-base-content transition-colors"
+			>
+				@bottomNavTabContent(item)
+			</a>
+		}
+	</li>
+}
+
+templ bottomNavTabContent(item BottomNavItem) {
+	if item.Icon != nil {
+		@item.Icon
+	}
+	<span>{ item.Label }</span>
+}

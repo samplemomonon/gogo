@@ -1,0 +1,37 @@
+package ui
+
+// SidebarGroup is a labelled region of the sidebar's content, grouping related
+// menu items under one heading with an optional trailing action.
+templ SidebarGroup() {
+	<div class={ SidebarGroupClass }>
+		{ children... }
+	</div>
+}
+
+// SidebarGroupLabel is the small heading above a group's items. The caller
+// supplies the label; the chrome lives here.
+templ SidebarGroupLabel(label string) {
+	<div class={ SidebarGroupLabelClass }>
+		{ label }
+	</div>
+}
+
+// SidebarGroupAction is a small control at the group's trailing edge, beside
+// its label (an "add" button). It renders as a button; the caller wires hx-*.
+templ SidebarGroupAction(attrs templ.Attributes) {
+	<button
+		type="button"
+		class={ "btn btn-ghost btn-xs btn-circle " + TapTargetClass }
+		{ attrs... }
+	>
+		{ children... }
+	</button>
+}
+
+// SidebarGroupContent wraps the group's menu so the group's spacing is kept
+// separate from the menu's own.
+templ SidebarGroupContent() {
+	<div class={ SidebarGroupContentClass }>
+		{ children... }
+	</div>
+}

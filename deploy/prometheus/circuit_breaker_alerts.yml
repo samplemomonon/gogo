@@ -1,0 +1,117 @@
+groups:
+  - name: circuit_breaker_alerts
+    interval: 30s
+    rules:
+      # The gateway holds one breaker per upstream, so these alerts are written against
+      # the platform's service names rather than a single "catalog". Each series carries an
+      # `upstream` label; the runbook text is the same because the response to any of them
+      # is the same: the dependency is unreachable, and the gateway has already stopped
+      # calling it.
+      #
+      # Metric names come from internal/shared/httpserver/metrics.go, which emits
+      # gogo_<upstream>_breaker_* per breaker.
+
+      # CRITICAL: a product-platform service is unreachable. The gateway has stopped
+      # calling it and left the load balancer (its readiness probe aggregates every
+      # breaker), so users are being served by other instances or not at all.
+      - alert: ProductPlatformCircuitBreakerOpen
+        expr: |
+          gogo_product_breaker_state == 1
+          or gogo_product-listing_breaker_state == 1
+          or gogo_product-search_breaker_state == 1
+          or gogo_category_breaker_state == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: product-platform
+          impact: availability
+        annotations:
+          summary: "Product platform circuit breaker OPEN ({{ $labels.upstream }})"
+          description: >-
+            The gateway has been unable to reach a product-platform service for a minute.
+            Browse reads and product writes are failing; the gateway is out of rotation.
+          action: |
+            1. Identify which service: check the `upstream` label on this alert.
+            2. Check the platform's health: kubectl get pods -n product
+            3. Check its logs for the last few minutes of failures.
+            4. Confirm the gateway's addresses still resolve (PRODUCT_ADDRESS and friends).
+            5. The breaker closes by itself after a successful probe; no restart needed.
+
+      # CRITICAL: several instances are out at once, which means the dependency itself is
+      # down rather than one pod's connection.
+      - alert: ProductPlatformCircuitBreakerOpenClusterWide
+        expr: |
+          count(
+            (gogo_product_breaker_state == 1)
+            or (gogo_product-listing_breaker_state == 1)
+            or (gogo_product-search_breaker_state == 1)
+            or (gogo_category_breaker_state == 1)
+          ) > 2
+        for: 1m
+        labels:
+          severity: critical
+          component: product-platform
+          impact: availability
+        annotations:
+          summary: "Most gateway instances report an open product-platform breaker"
+          description: >-
+            This is a platform outage rather than a single instance's connection, so no
+            gateway replica can currently serve the storefront.
+          action: |
+            1. Page the platform on-call.
+            2. Check the platform's own dashboards and recent deploys.
+            3. Verify the network policy still permits the gateway's egress to the
+               platform namespace.
+
+      # WARNING: failures are accumulating but the breaker has not tripped. This is the
+      # window in which the dependency is degraded but still answering some calls.
+      - alert: ProductPlatformHighFailureRate
+        expr: |
+          rate(gogo_product-listing_breaker_failures_total[5m]) > 0.5
+          or rate(gogo_product_breaker_failures_total[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: product-platform
+          impact: reliability
+        annotations:
+          summary: "High product-platform failure rate ({{ $labels.upstream }})"
+          description: >-
+            Transport failures are arriving faster than the breaker threshold, so an
+            outage is likely within a minute.
+          action: "Check the upstream service's own health before the breaker trips."
+
+      # WARNING: the breaker is actively refusing calls, which means the upstream is
+      # already down and the gateway is failing fast rather than waiting on timeouts.
+      - alert: ProductPlatformBreakerRejectingCalls
+        expr: |
+          rate(gogo_product-listing_breaker_rejects_total[1m]) > 0
+          or rate(gogo_product_breaker_rejects_total[1m]) > 0
+        for: 30s
+        labels:
+          severity: warning
+          component: product-platform
+          impact: availability
+        annotations:
+          summary: "Gateway rejecting product-platform calls ({{ $labels.upstream }})"
+          description: >-
+            The breaker is refusing calls without attempting them. User requests against
+            this dependency are failing immediately rather than timing out.
+          action: "Investigate the upstream outage; the breaker recovers by itself."
+
+      # INFO: a trip happened recently. Worth keeping as a trend even when it recovered —
+      # repeated trips mean a flapping dependency rather than a clean failure.
+      - alert: ProductPlatformBreakerTripped
+        expr: |
+          increase(gogo_product-listing_breaker_trips_total[5m]) > 0
+          or increase(gogo_product_breaker_trips_total[5m]) > 0
+        labels:
+          severity: info
+        component: product-platform
+        impact: reliability
+        annotations:
+          summary: "Product-platform breaker tripped {{ $value }} times in 5 minutes"
+          description: >-
+            The breaker opened on consecutive transport failures. If this alert repeats,
+            the dependency is flapping rather than steadily down.
+          action: "Review the upstream's logs and metrics for the corresponding window."

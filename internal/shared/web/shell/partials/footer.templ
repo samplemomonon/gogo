@@ -1,0 +1,23 @@
+package partials
+
+import "gogo/internal/shared/web/ui"
+
+templ Footer() {
+	<footer class="border-t border-base-300/60 bg-base-100/70 py-6 backdrop-blur-sm">
+		<div class="container mx-auto flex flex-col items-center justify-between gap-3 px-4 sm:flex-row">
+			<p class={ ui.SmallMutedClass + " font-medium" }>
+				Gogo — Product Catalog
+			</p>
+
+			<ul class="flex flex-wrap items-center justify-center gap-1.5" aria-label="Dibangun dengan">
+				for _, tech := range []string{"Go", "Chi", "Templ", "HTMX", "Tailwind", "DaisyUI"} {
+					<li>
+						@ui.Badge("neutral badge-soft", "sm", "font-medium text-xs") {
+							{ tech }
+						}
+					</li>
+				}
+			</ul>
+		</div>
+	</footer>
+}

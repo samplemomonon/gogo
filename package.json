@@ -1,0 +1,16 @@
+{
+  "name": "gogo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "css:build": "bunx @tailwindcss/cli -i ./internal/shared/web/assets/css/app.css -o ./internal/shared/web/assets/css/output.css",
+    "css:watch": "bunx @tailwindcss/cli -i ./internal/shared/web/assets/css/app.css -o ./internal/shared/web/assets/css/output.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3"
+  },
+  "dependencies": {
+    "daisyui": "^5.7.42",
+    "tailwindcss": "^4.3.3"
+  }
+}

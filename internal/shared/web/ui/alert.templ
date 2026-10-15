@@ -1,0 +1,20 @@
+package ui
+
+// Alert renders an inline status or error message. It renders nothing for an
+// empty message, so a caller can pass a value unconditionally. kind is
+// "success" or "error".
+templ Alert(kind string, message string) {
+	if message != "" {
+		if kind == "error" {
+			<div role="alert" class={ AlertClass(kind) }>
+				@IconXCircle("size-5 shrink-0")
+				<span>{ message }</span>
+			</div>
+		} else {
+			<div role="status" class={ AlertClass(kind) }>
+				@IconCheckCircle("size-5 shrink-0")
+				<span>{ message }</span>
+			</div>
+		}
+	}
+}

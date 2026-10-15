@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "postgres",
+    srcs = [
+        "postgres.go",
+        "repository.go",
+    ],
+    embedsrcs = ["migrations/0001_auth.sql"],
+    importpath = "gogo/internal/modules/auth/infrastructure/postgres",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/internal/modules/auth/application/ports",
+        "//gogo/internal/modules/auth/domain",
+        "//gogo/internal/shared/pgxkit",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
+    ],
+)

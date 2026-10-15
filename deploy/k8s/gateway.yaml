@@ -1,0 +1,161 @@
+# The gateway: the default entrypoint of the image. It serves the storefront, the seller
+# console, billing, the module registry and the health endpoints, and it owns the
+# inventory and sales stores.
+#
+# It stores no product data. Product writes go to product-service, reads come from the
+# product-listing and product-search read models, and the category hierarchy comes from
+# category-service — all four over their versioned gRPC contracts, all in another process
+# (see ARCHITECTURE.md D-018). Every one of those addresses is required: the gateway
+# refuses to start without them rather than serve an empty storefront that looks like a
+# real answer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gogo-gateway
+  namespace: gogo
+  labels:
+    app.kubernetes.io/name: gogo-gateway
+    app.kubernetes.io/part-of: gogo
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: gogo-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gogo-gateway
+  namespace: gogo
+  labels:
+    app.kubernetes.io/name: gogo-gateway
+    app.kubernetes.io/part-of: gogo
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gogo-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gogo-gateway
+        app.kubernetes.io/part-of: gogo
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: gogo:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/local/bin/gogo"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SERVICE_NAME
+              value: gogo
+            # The product platform. FQDNs, not short names: a short name would
+            # resolve inside this namespace only.
+            - name: PRODUCT_ADDRESS
+              value: "dns:///product.product.svc.cluster.local:9092"
+            - name: PRODUCT_LISTING_ADDRESS
+              value: "dns:///product-listing.product.svc.cluster.local:9093"
+            - name: PRODUCT_SEARCH_ADDRESS
+              value: "dns:///product-search.product.svc.cluster.local:9094"
+            - name: CATEGORY_ADDRESS
+              value: "dns:///category.category.svc.cluster.local:9090"
+          envFrom:
+            - configMapRef:
+                name: gogo-config
+            - secretRef:
+                name: gogo-secrets
+                # Missing keys (e.g. in dev with an empty secret) must not
+                # block the pod from starting.
+                optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Readiness is the product platform's verdict as well as this process's:
+          # ops aggregates every upstream breaker, so a gateway that cannot reach its
+          # browse read model leaves the load balancer instead of serving a blank grid.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gogo-gateway
+  namespace: gogo
+  labels:
+    app.kubernetes.io/name: gogo-gateway
+    app.kubernetes.io/part-of: gogo
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gogo-gateway
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gogo-gateway
+  namespace: gogo
+  labels:
+    app.kubernetes.io/name: gogo-gateway
+    app.kubernetes.io/part-of: gogo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gogo-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

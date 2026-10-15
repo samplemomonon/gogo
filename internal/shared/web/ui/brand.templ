@@ -1,0 +1,15 @@
+package ui
+
+// BrandLink is the wordmark lockup: the glowing brand tile plus a product or
+// console name. It was assembled by hand in three places a reader navigates
+// from — the shell header and both console sidebars — which is how the tile and
+// the name's tracking came to differ between the shell and the surfaces it
+// contains.
+templ BrandLink(href string, label string, ariaLabel string) {
+	<a href={ templ.URL(href) } class={ BrandLinkClass } aria-label={ ariaLabel }>
+		<span class={ BrandMarkClass } aria-hidden="true">
+			@IconLogo("size-4")
+		</span>
+		<span class="text-base font-bold tracking-tight">{ label }</span>
+	</a>
+}

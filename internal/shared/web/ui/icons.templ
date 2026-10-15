@@ -1,0 +1,181 @@
+package ui
+
+// Icon set. Each icon is an inline currentColor SVG; the caller supplies the
+// size/colour classes (e.g. "size-4 text-primary"). Paths are the exact ones
+// previously inlined across the views.
+
+templ IconPlus(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/>
+	</svg>
+}
+
+templ IconCart(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class={ class }>
+		<path d="M2.25 2.25a.75.75 0 0 0 0 1.5h1.386c.17 0 .318.114.362.278l2.558 9.592a3.752 3.752 0 0 0-2.806 3.63c0 .414.336.75.75.75h15.75a.75.75 0 0 0 0-1.5H5.378A2.25 2.25 0 0 1 7.5 15h11.218a.75.75 0 0 0 .674-.421 60.358 60.358 0 0 0 2.96-7.228.75.75 0 0 0-.525-.965A60.864 60.864 0 0 0 5.68 4.509l-.232-.867A1.875 1.875 0 0 0 3.636 2.25H2.25ZM3.75 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM16.5 20.25a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Z"/>
+	</svg>
+}
+
+templ IconEye(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+		<path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconPencil(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="currentColor" class={ class }>
+		<path d="M7 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm-1.5 2.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM11.985 3.77a.75.75 0 0 0-1.24-.846l-3.3 4.156-1.2-1.2a.75.75 0 0 0-1.061 1.06l1.75 1.75a.75.75 0 0 0 1.1-.05l3.95-4.87Z"/>
+	</svg>
+}
+
+templ IconTrash(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M5.25 1.25a.75.75 0 0 1 .75-.75h2a.75.75 0 0 1 .75.75V2h2.75A.75.75 0 0 1 12 2v.25H2V2a.75.75 0 0 1 .75-.75H5.25V1.25ZM3.25 3.75h7.5l-.621 7.448A1.25 1.25 0 0 1 8.882 12.5H5.118a1.25 1.25 0 0 1-1.247-1.302L3.25 3.75ZM5.75 6a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 1.5 0V6Zm2.25 0a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0V6Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconPencilSquare(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path d="M13.488 2.513a1.75 1.75 0 0 0-2.475 0L6.75 6.774a2.75 2.75 0 0 0-.596.892l-.848 2.047a.75.75 0 0 0 .98.98l2.047-.848a2.75 2.75 0 0 0 .892-.596l4.261-4.262a1.75 1.75 0 0 0 0-2.474ZM4.75 4.5A2.25 2.25 0 0 0 2.5 6.75v4.5A2.25 2.25 0 0 0 4.75 13.5h4.5a2.25 2.25 0 0 0 2.25-2.25v-2a.75.75 0 0 0-1.5 0v2a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 1 .75-.75h2a.75.75 0 0 0 0-1.5h-2Z"/>
+	</svg>
+}
+
+templ IconSave(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M4 2a1.5 1.5 0 0 0-1.5 1.5v9A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V6.621a1.5 1.5 0 0 0-.44-1.06L9.94 2.439A1.5 1.5 0 0 0 8.878 2H4Zm4 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 4.5A.5.5 0 0 1 6.5 4h2a.5.5 0 0 1 0 1h-2A.5.5 0 0 1 6 4.5Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconCheckCircle(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconXCircle(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconCheckBadge(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.646-1.646a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.124-.078l4.22-5.458Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconArrowLeft(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 0 1-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 0 1 0 10.75H10.75a.75.75 0 0 1 0-1.5h2.875a3.875 3.875 0 0 0 0-7.75H3.622l4.146 3.957a.75.75 0 0 1-1.036 1.085l-5.5-5.25a.75.75 0 0 1 0-1.085l5.5-5.25a.75.75 0 0 1 1.06.025Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconSearch(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconCalendar(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M4 1.75a.75.75 0 0 1 1.5 0V3h5V1.75a.75.75 0 0 1 1.5 0V3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2V1.75ZM4.5 6a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconTag(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M4 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.414A2 2 0 0 0 13.414 6L10 2.586A2 2 0 0 0 8.586 2H4Zm4 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm-2.5-5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconLayers(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class={ class }>
+		<path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3ZM2 8a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8ZM11 7a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-2Z"/>
+	</svg>
+}
+
+templ IconDocument(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconDocuments(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z"/>
+		<path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z"/>
+	</svg>
+}
+
+templ IconSun(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class={ class }>
+		<circle cx="12" cy="12" r="4"/>
+		<path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+	</svg>
+}
+
+templ IconMoon(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class={ class }>
+		<path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z"/>
+	</svg>
+}
+
+templ IconMenu(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class={ class }>
+		<path d="M4 6h16M4 12h16M4 18h16"/>
+	</svg>
+}
+
+templ IconClose(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class={ class }>
+		<path d="M6 6l12 12M18 6L6 18"/>
+	</svg>
+}
+
+// IconHome, IconStore and IconUser are the shell's destination glyphs: they
+// label the canonical nav items in the mobile tab bar and dropdown.
+templ IconHome(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class={ class }>
+		<path d="M3 10.5 12 3l9 7.5"/>
+		<path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/>
+		<path d="M9.5 21v-6h5v6"/>
+	</svg>
+}
+
+templ IconStore(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class={ class }>
+		<path d="M3.5 9.5 5 4h14l1.5 5.5"/>
+		<path d="M4 9.5h16V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/>
+		<path d="M3.5 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/>
+	</svg>
+}
+
+templ IconUser(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class={ class }>
+		<circle cx="12" cy="8" r="3.5"/>
+		<path d="M5.5 20a6.5 6.5 0 0 1 13 0"/>
+	</svg>
+}
+
+templ IconChevronLeft(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 0 1-.02 1.06L8.83 10l3.94 3.71a.75.75 0 1 1-1.04 1.08l-4.5-4.24a.75.75 0 0 1 0-1.08l4.5-4.24a.75.75 0 0 1 1.06.02Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+templ IconChevronRight(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.17 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.24a.75.75 0 0 1 0 1.08l-4.5 4.24a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd"/>
+	</svg>
+}
+
+// IconLogo is the brand mark: the "g" tile behind the wordmark in the shell
+// header. It inherits currentColor so it follows the link's own hover and focus
+// colour rather than carrying a second palette.
+templ IconLogo(class string) {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class={ class }>
+		<path d="M10 2a8 8 0 1 0 0 16h1.25a.625.625 0 0 0 0-1.25H10a6.75 6.75 0 1 1 6.75-6.75v1.5A2.75 2.75 0 0 1 14 11.5H9.5a.625.625 0 0 0-.47.21l-2.9 3.33a.625.625 0 0 0 .1.92A6.76 6.76 0 0 0 10 16.75c-.28 0-.55-.02-.82-.05l-.3 1.4A8.2 8.2 0 0 0 10 18.25 8.25 8.25 0 0 0 18.25 10 8.25 8.25 0 0 0 10 2Z"/>
+	</svg>
+}
+

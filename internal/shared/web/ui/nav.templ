@@ -1,0 +1,113 @@
+package ui
+
+import "strings"
+
+// NavItem is one link of a navigation list. Icon is optional; the caller keeps
+// its meaning (which glyph, what it points at), the list owns the chrome.
+type NavItem struct {
+	Href  string
+	Label string
+	Icon  templ.Component
+}
+
+// NavChrome selects the visual chrome a top-bar nav link is rendered with. The
+// active rule and aria-current are identical across both — only the layout
+// differs — so the rule lives once and the caller picks the chrome.
+type NavChrome int
+
+const (
+	// NavChromeButton is a top-bar anchor with `btn` chrome, `btn-active
+	// btn-primary` when current.
+	NavChromeButton NavChrome = iota
+
+	// NavChromeButtonBlock is NavChromeButton laid out full width, for a
+	// vertical dropdown of the same top-bar items.
+	NavChromeButtonBlock
+)
+
+// NavLinksOptions is the presentation-ready input for NavLinks. The caller
+// hands over the items, the current path and the chrome; the primitive owns the
+// active rule and the aria-current state, so no surface restates them.
+type NavLinksOptions struct {
+	// Items are the links, in order.
+	Items []NavItem
+
+	// Path is the current request path, used to mark the active item.
+	Path string
+
+	// Chrome selects the visual treatment. Empty uses NavChromeButton.
+	Chrome NavChrome
+
+	// Class appends chrome to each link (e.g. "btn-sm font-medium"), for the
+	// layout the caller's container imposes.
+	Class string
+}
+
+// NavLinks renders a list of top-bar navigation links with the current item
+// marked by the caller's path. It is the one place the "is this link active"
+// branching, the aria-current state and the link chrome live; the shell top bar
+// and its mobile dropdown both render through it. The sidebar's richer menu is
+// the SidebarMenu hierarchy. When several items' paths cover the request (a
+// parent and a nested page), only the most specific one is marked active.
+templ NavLinks(spec NavLinksOptions) {
+	for _, item := range spec.Items {
+		@navButton(item, spec)
+	}
+}
+
+templ navButton(item NavItem, spec NavLinksOptions) {
+	if spec.Chrome == NavChromeButtonBlock {
+		<li>
+			@navButtonLink(item, spec, "btn-block justify-start")
+		</li>
+	} else {
+		@navButtonLink(item, spec, "")
+	}
+}
+
+templ navButtonLink(item NavItem, spec NavLinksOptions, layout string) {
+	if spec.Path != "" && item.Href == ActiveNavHref(spec.Items, spec.Path) {
+		@ButtonLink(item.Href, joinClasses(layout, spec.Class, "btn-active btn-primary"), templ.Attributes{"aria-current": "page"}) {
+			@navItemContent(item)
+		}
+	} else {
+		@ButtonLink(item.Href, joinClasses(layout, spec.Class, "btn-ghost"), nil) {
+			@navItemContent(item)
+		}
+	}
+}
+
+templ navItemContent(item NavItem) {
+	if item.Icon != nil {
+		@item.Icon
+	}
+	{ item.Label }
+}
+
+// ActiveNavHref returns the href of the most specific item covering path, or ""
+// when none does. It is the rule NavLinks marks with, exposed so a caller that
+// needs the active item's identity (a page title, an open menu) uses the same
+// answer instead of re-deriving it.
+func ActiveNavHref(items []NavItem, path string) string {
+	best := ""
+	for _, item := range items {
+		if !IsActiveNav(item.Href, path) {
+			continue
+		}
+		if len(item.Href) > len(best) {
+			best = item.Href
+		}
+	}
+	return best
+}
+
+// IsActiveNav reports whether the nav item's href covers the current request
+// path. The root item ("/") is active only on the root itself; everything else
+// matches its exact path or a path nested beneath it. The rule lives here — not
+// in the shell and the console separately — so every nav surface agrees.
+func IsActiveNav(href, path string) bool {
+	if href == "/" {
+		return path == "/"
+	}
+	return path == href || strings.HasPrefix(path, strings.TrimSuffix(href, "/")+"/")
+}

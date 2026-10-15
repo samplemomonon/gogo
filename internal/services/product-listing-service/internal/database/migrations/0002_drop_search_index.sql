@@ -1,0 +1,16 @@
+-- 0002_drop_search_index: free-text search moved to product-search-service.
+--
+-- The listing read model no longer answers text queries. GET /api/v1/products
+-- rejects q with a 400 pointing at the new service, so the index that backed it
+-- is now dead weight: it would still be maintained on every product insert and
+-- update, in a table written by the consumer, to serve a query that can no
+-- longer arrive.
+--
+-- This is the cost side of the split made explicit. An index on the write-side
+-- projection is a standing cost paid on every event; the search service pays for
+-- its trigram indexes in its own read model, and can afford to add more of them
+-- than a general browse table should carry.
+--
+-- Dropped with IF EXISTS so the migration is safe on a database that never had
+-- the index, for instance one created from a later schema.
+DROP INDEX IF EXISTS idx_product_listings_name_lower;

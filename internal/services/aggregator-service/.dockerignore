@@ -1,0 +1,10 @@
+# Everything not needed to build the binary. The generated code under graph/ and gen/
+# IS needed, so it is deliberately not ignored.
+.git
+.gitignore
+README.md
+docker-compose.yml
+Dockerfile
+hack/
+docs/
+*.md

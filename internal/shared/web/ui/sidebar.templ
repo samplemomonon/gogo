@@ -1,0 +1,177 @@
+package ui
+
+// SidebarMode selects how the sidebar behaves across breakpoints.
+type SidebarMode string
+
+const (
+	// SidebarStatic always shows the sidebar beside the content, for a surface
+	// that has the width (an inset panel or a desktop-only console).
+	SidebarStatic SidebarMode = "static"
+
+	// SidebarDrawer collapses the sidebar behind a trigger below lg and keeps
+	// it open from lg up (daisyUI `.drawer lg:drawer-open`), for a console that
+	// needs the width back on a phone. The default.
+	SidebarDrawer SidebarMode = "drawer"
+)
+
+// SidebarProviderOptions is the presentation-ready input for SidebarProvider,
+// the layout context that owns the sidebar and the inset beside it.
+type SidebarProviderOptions struct {
+	// ID identifies the drawer's checkbox so the trigger and overlay can target
+	// it. Required for SidebarDrawer.
+	ID string
+
+	// Mode selects the responsive behaviour. Empty uses SidebarDrawer.
+	Mode SidebarMode
+
+	// Sidebar is the navigation column (a Sidebar).
+	Sidebar templ.Component
+
+	// Inset is the content area beside the column (a SidebarInset).
+	Inset templ.Component
+}
+
+// SidebarProvider is the sidebar's layout context: it places a Sidebar beside a
+// SidebarInset and, in drawer mode, owns the state that toggles it. The two
+// regions are slots, so a caller composes the sidebar exactly as it composes
+// any other layout.
+templ SidebarProvider(spec SidebarProviderOptions) {
+	if spec.Mode == SidebarStatic {
+		<div class="flex min-h-dvh w-full">
+			@spec.Sidebar
+			@spec.Inset
+		</div>
+	} else {
+		<div class="drawer lg:drawer-open">
+			<input id={ spec.ID } type="checkbox" class="drawer-toggle"/>
+			@spec.Inset
+			// This is the console column, and it has to clear the shell's top
+			// bar rather than fight it for the top of the viewport.
+			//
+			// daisyUI leaves the base `top: 0` in place when `lg:drawer-open`
+			// turns the panel into a sticky in-flow column, so the sidebar and
+			// the header both pin to top: 0. They also both sat at z-40, and
+			// the drawer lives inside <main>, after the header in the document,
+			// so equal z-index put the sidebar on top: scrolling parked a
+			// full-height nav over the bar. `lg:top-16` parks it directly under
+			// the header (which is min-h-16) and `lg:h-...` bounds it to what
+			// is left of the viewport, which is also what makes the sidebar's
+			// own `flex-1 min-h-0 overflow-y-auto` content scroll inside the
+			// column instead of growing the page.
+			//
+			// `lg:z-30` is belt and braces for the desktop breakpoint only. The
+			// base z-40 is left alone so the mobile drawer still covers the
+			// header, as a full-screen panel should.
+			<div class="drawer-side z-40 lg:z-30 lg:top-16 lg:h-[calc(100dvh-4rem)]">
+				<label for={ spec.ID } aria-label="Tutup menu" class="drawer-overlay"></label>
+				@spec.Sidebar
+			</div>
+		</div>
+	}
+}
+
+// SidebarOptions configures the Sidebar column.
+type SidebarOptions struct {
+	// Class appends chrome to the column.
+	Class string
+
+	// Header, Content and Footer are the column's three regions.
+	Header  templ.Component
+	Content templ.Component
+	Footer  templ.Component
+
+	// Rail renders the resize affordance when true.
+	Rail bool
+}
+
+// Sidebar is the navigation column: a header, scrolling content and a footer
+// around the caller's groups, with an optional rail. It renders as a plain
+// column; the SidebarProvider places it (drawer side panel or static column).
+templ Sidebar(spec SidebarOptions) {
+	<aside class={ joinClasses(SidebarPanelClass, "relative", spec.Class) }>
+		if spec.Header != nil {
+			@spec.Header
+		}
+		<div class={ SidebarContentClass }>
+			@spec.Content
+		</div>
+		if spec.Footer != nil {
+			@spec.Footer
+		}
+		if spec.Rail {
+			@SidebarRail()
+		}
+	</aside>
+}
+
+// SidebarHeader is the column's top region: a brand, a switcher or a title.
+templ SidebarHeader() {
+	<div class={ SidebarHeaderClass }>
+		{ children... }
+	</div>
+}
+
+// SidebarFooter is the column's trailing region: account, help or version.
+templ SidebarFooter() {
+	<div class={ SidebarFooterClass }>
+		{ children... }
+	</div>
+}
+
+// SidebarRail is the thin drag affordance on the column's edge.
+templ SidebarRail() {
+	<div class={ SidebarRailClass } aria-hidden="true"></div>
+}
+
+// SidebarInsetOptions configures the inset area.
+type SidebarInsetOptions struct {
+	// ID and Mode must match the SidebarProvider's.
+	ID   string
+	Mode SidebarMode
+
+	// Class appends chrome to the inset.
+	Class string
+}
+
+// SidebarInset is the content area beside the sidebar. It carries the trigger
+// on narrow viewports so the sidebar can be opened without a separate toolbar.
+templ SidebarInset(spec SidebarInsetOptions) {
+	<div class={ insetClass(spec) }>
+		if spec.Mode == SidebarDrawer {
+			@DrawerTrigger(spec.ID, "drawer-button lg:hidden m-3 self-start")
+		}
+		{ children... }
+	</div>
+}
+
+// SidebarTrigger is a standalone sidebar toggle, for a toolbar that wants the
+// control outside the inset.
+templ SidebarTrigger(id string) {
+	@DrawerTrigger(id, "drawer-button")
+}
+
+// DrawerTrigger is the drawer's toggle. It is a <label> so a click natively
+// toggles the drawer checkbox, but a bare label is not keyboard-focusable and
+// the drawer would be unreachable by keyboard. tabindex + role="button" put it
+// in the tab order and the accessibility tree; DrawerTriggerJS forwards
+// Enter/Space (a label does not activate on a keypress the way a button does),
+// so the control is operable without a pointer.
+templ DrawerTrigger(id string, class string) {
+	<label
+		for={ id }
+		tabindex="0"
+		role="button"
+		class={ joinClasses(SidebarTriggerClass, class) }
+		aria-label="Alihkan bilah sisi"
+	>
+		@IconMenu("size-4")
+	</label>
+}
+
+func insetClass(spec SidebarInsetOptions) string {
+	base := "flex-1 min-w-0 flex flex-col"
+	if spec.Mode == SidebarDrawer {
+		return joinClasses(base, "drawer-content", spec.Class)
+	}
+	return joinClasses(base, spec.Class)
+}

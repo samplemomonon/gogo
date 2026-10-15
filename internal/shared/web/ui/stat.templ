@@ -1,0 +1,36 @@
+package ui
+
+// StatTile is a single headline number for a page hero's action slot: a
+// compact stat card showing one label above one value.
+templ StatTile(label string, value string) {
+	<div class={ StatTileClass }>
+		<div class={ StatTileLabelClass }>{ label }</div>
+		<div class={ StatTileValueClass }>{ value }</div>
+	</div>
+}
+
+// StatCardLink is the navigable counterpart: a headline number that leads
+// somewhere. The seller dashboard hand-rolled this card while StatTile and
+// StatPanel sat unused in the same layer, so "a count you can click" had a
+// third type treatment — a text-3xl figure where the tiles use text-2xl.
+templ StatCardLink(href string, label string, value string, tone string) {
+	<a href={ templ.URL(href) } class={ StatCardLinkClass }>
+		<p class={ EyebrowClass(tone) }>{ label }</p>
+		<p class={ StatCardValueClass }>{ value }</p>
+	</a>
+}
+
+// StatPanel is the detail-page counterpart to StatTile: a card whose header is
+// an optional icon beside an eyebrow label, above the caller's value body. The
+// caller owns the body (the figure and its tone); the panel owns the chrome.
+templ StatPanel(label string, icon templ.Component) {
+	@Card("gap-3", nil) {
+		<div class="flex items-center gap-1.5">
+			if icon != nil {
+				@icon
+			}
+			<p class={ EyebrowClass("") }>{ label }</p>
+		</div>
+		{ children... }
+	}
+}

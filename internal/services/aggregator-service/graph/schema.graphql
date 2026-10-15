@@ -1,0 +1,434 @@
+# The composition schema for the ecommerce platform.
+#
+# This is not a copy of any one service's data model. Each field below is served
+# by a different service, and the interesting part of this file is which one:
+#
+#   category-service          categories, the hierarchy
+#   media-service             media metadata and presigned object URLs
+#   product-service           product writes (command side only)
+#   product-listing-service   browse reads (listing read model)
+#   product-search-service    free-text search (search read model)
+#
+# Two consequences of that split are visible in the schema and worth stating
+# before reading the fields.
+#
+# Reads come from projections, not from the write side. A product created a
+# moment ago may not be readable yet, because the event still has to travel
+# through Kafka and be projected. WriteProductResult and ProjectedProduct carry
+# that distinction explicitly instead of pretending the write side can read.
+#
+# Cross-service edges are nullable. If category-service is unreachable, Product
+# .category is null and the errors array explains why, rather than the whole
+# response failing. That is the reason to put a composition layer here at all:
+# one slow dependency degrades one field instead of one page.
+#
+# Every type is bound to a Go type with @goModel rather than left to autobind.
+# Autobind resolves imports by shelling out to the Go toolchain, which does not
+# work inside the Bazel sandbox, so codegen runs as a host step against committed
+# output. Explicit binding makes the generation independent of that.
+
+# gqlgen's codegen directives, declared here rather than injected. gqlgen reads the
+# schema with a plain GraphQL parser before any of its own machinery runs, so an
+# undeclared directive is a parse error rather than something recognised later.
+directive @goModel(model: String, models: [String!]) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
+
+"RFC 3339 timestamp. Every service carries timestamps as protobuf Timestamp, so the wire format is identical across all five; this scalar only renders it."
+scalar Time @goModel(model: "aggregator-service/internal/graph/model.Time")
+
+"A broad category of stored object."
+enum MediaKind @goModel(model: "aggregator-service/internal/graph/model.MediaKind") {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  OTHER
+}
+
+"Where an upload is in its lifecycle. Only READY media has a download URL."
+enum MediaStatus @goModel(model: "aggregator-service/internal/graph/model.MediaStatus") {
+  "Record exists, bytes not uploaded yet."
+  PENDING
+  "Object verified in the store and downloadable."
+  READY
+}
+
+"Lifecycle of a product. Mirrors product.v1.ProductStatus."
+enum ProductStatus @goModel(model: "aggregator-service/internal/graph/model.Status") {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+"""
+A node in the category hierarchy.
+
+parentId is the empty string at the root: proto3 has no nullable scalar, and 0 is
+never a valid id, so the contract uses 0 for "root" and this schema renders that
+as an empty string rather than "0".
+"""
+type Category @goModel(model: "aggregator-service/internal/graph/model.Category") {
+  id: ID!
+  name: String!
+  description: String!
+  "Empty when this is a root category."
+  parentId: ID!
+  createdAt: Time!
+  updatedAt: Time!
+  "Path from the root to this category, inclusive."
+  ancestors: [Category!]!
+  "Immediate children."
+  children: [Category!]!
+  "Products in this category and below it, from the listing read model. Null if the listing service is unreachable."
+  productCount: Int
+}
+
+"Stored object metadata. The bytes live in object storage; only URLs cross here."
+type Media @goModel(model: "aggregator-service/internal/graph/model.Media") {
+  id: ID!
+  ownerId: String!
+  filename: String!
+  contentType: String!
+  sizeBytes: Int!
+  etag: String!
+  kind: MediaKind!
+  status: MediaStatus!
+  createdAt: Time!
+  updatedAt: Time!
+
+  """
+  Presigned GET URL, or null when the object is not READY.
+
+  Signed URLs are generated per request and never cached by this service, so this
+  field always reflects a fresh signature. Expiry is the media service's concern.
+  """
+  downloadUrl: String
+}
+
+"A presigned PUT target plus the headers the client must send. The signature covers the headers, so changing one invalidates the URL."
+type UploadTarget @goModel(model: "aggregator-service/internal/graph/model.UploadTarget") {
+  url: String!
+  method: String!
+  "Headers that must be sent verbatim with the upload."
+  headers: [Header!]!
+  expiresAt: Time!
+}
+
+"An HTTP header to send with an upload."
+type Header @goModel(model: "aggregator-service/internal/graph/model.Header") {
+  name: String!
+  value: String!
+}
+
+"A purchasable size or colour of a product."
+type Variant @goModel(model: "aggregator-service/internal/graph/model.Variant") {
+  id: ID!
+  productId: ID!
+  sku: String!
+  name: String!
+  "Minor units, as a string. GraphQL Int is 32-bit and would truncate a price above ~21 million minor units."
+  priceCents: String!
+  currency: String!
+  stock: Int!
+  "Empty when the variant has no image."
+  mediaId: ID!
+}
+
+"""
+A product from the listing read model.
+
+projectedAt is when this projection last wrote the row. It is not updatedAt: an
+event can republish a product without changing it, and comparing the two is how a
+client tells a stale read from a genuinely unchanged product.
+"""
+type Product @goModel(model: "aggregator-service/internal/graph/model.Product") {
+  id: ID!
+  "References category-service; no foreign key exists across the databases."
+  categoryId: ID!
+  name: String!
+  slug: String!
+  description: String!
+  brand: String!
+  "Minor units, as a string. See Variant.priceCents."
+  priceCents: String!
+  currency: String!
+  stock: Int!
+  status: ProductStatus!
+  "References media-service; empty when unset."
+  primaryMediaId: ID!
+  createdAt: Time!
+  updatedAt: Time!
+  "When the read model last wrote this row. Null for a product returned by a write, which has not been projected yet."
+  projectedAt: Time
+
+  "Resolved from category-service. Null if unset or that service is unreachable."
+  category: Category
+  "Resolved from media-service. Null if unset or that service is unreachable."
+  primaryMedia: Media
+  "Variants, present when the read model was asked for them."
+  variants: [Variant!]!
+}
+
+"""
+One search hit.
+
+score is the relevance of this hit to the query and is comparable across hits in
+one response only. It is an engine-specific number, so a client must not compare
+scores across different queries.
+"""
+type SearchHit @goModel(model: "aggregator-service/internal/graph/model.SearchHit") {
+  id: ID!
+  categoryId: ID!
+  name: String!
+  slug: String!
+  description: String!
+  brand: String!
+  priceCents: String!
+  currency: String!
+  stock: Int!
+  status: ProductStatus!
+  primaryMediaId: ID!
+  score: Float!
+  createdAt: Time!
+  updatedAt: Time!
+  projectedAt: Time
+  category: Category
+  primaryMedia: Media
+}
+
+"A page of browsed products. total ignores paging."
+type ProductPage @goModel(model: "aggregator-service/internal/graph/model.ProductPage") {
+  products: [Product!]!
+  total: Int!
+  limit: Int!
+  offset: Int!
+}
+
+"A page of search hits. tookMs is reported because a search slow enough to matter is the signal that this read model has outgrown PostgreSQL."
+type SearchResult @goModel(model: "aggregator-service/internal/graph/model.SearchResult") {
+  hits: [SearchHit!]!
+  total: Int!
+  limit: Int!
+  offset: Int!
+  tookMs: Int!
+}
+
+"A page of media records."
+type MediaPage @goModel(model: "aggregator-service/internal/graph/model.MediaPage") {
+  media: [Media!]!
+  total: Int!
+}
+
+"A page of categories."
+type CategoryPage @goModel(model: "aggregator-service/internal/graph/model.CategoryPage") {
+  categories: [Category!]!
+  total: Int!
+}
+
+"""
+The result of a product write.
+
+The write is committed when this returns. What the read models do next is a separate
+question, and the answer here is deliberately conservative: projected is false
+immediately after a successful create, because the event has to travel through Kafka
+before either read model sees it.
+
+It is false, and stays false, even once a read model is healthy. The listing projection
+reports how many events it has consumed rather than where this write sits in the stream,
+and product-service does not return the position its write produced, so "is my row
+visible yet" cannot be answered from here. A true value would be a guess, and a client
+that trusted it, then found nothing on its next read, would conclude the write was lost
+and retry it into a duplicate: product-service has no idempotency key. appliedEvents is
+returned alongside so a client can watch the projection itself and decide on evidence.
+"""
+type WriteProductResult @goModel(model: "aggregator-service/internal/graph/model.WriteProductResult") {
+  product: Product!
+  """
+  Whether this write is visible to the read models.
+
+  Always false with the current read and write contracts, for the reason above. It is
+  the right shape for the answer and is kept because removing it would break clients
+  reading it; filling it in needs a sequence number from product-service or a per-event
+  position from a read model.
+  """
+  projected: Boolean!
+  "Events applied by the listing projection, when it could be read."
+  appliedEvents: Int
+}
+
+"Progress of one read model's projection."
+type ProjectionStatus @goModel(model: "aggregator-service/internal/graph/model.ProjectionStatus") {
+  "Products or documents currently in the read model."
+  records: Int!
+  "Events applied since the projection started. A plateau means it is stuck."
+  appliedEvents: Int!
+  healthy: Boolean!
+  "Which service this describes."
+  source: String!
+}
+
+"""
+Projection progress for both read models.
+
+They are separate projections with separate rates, so they are reported
+separately. One lagging does not mean the other has lost data.
+"""
+type ProjectionHealth @goModel(model: "aggregator-service/internal/graph/model.ProjectionHealth") {
+  "Null when the listing service is unreachable, not when it reported nothing."
+  listing: ProjectionStatus
+  "Null when the search service is unreachable, not when it reported nothing."
+  search: ProjectionStatus
+}
+
+"Filter for browsing the catalogue. Browse and search are different fields rather than one filter with an optional text term: browse is an indexed scan over structured columns, search needs a trigram index and relevance ranking, and one table carrying both paid for indexes neither query used."
+input ProductFilter {
+  categoryId: ID
+  status: ProductStatus
+  minPriceCents: Int
+  maxPriceCents: Int
+  limit: Int
+  offset: Int
+  includeVariants: Boolean
+}
+
+"Filter for free-text search."
+input SearchFilter {
+  "Free-text term, matched case-insensitively against name, brand and slug. Must be at least three characters: trigram indexes cannot accelerate a shorter pattern, so a one or two character term falls back to a sequential scan of the whole index on every request. It is rejected rather than accepted and ignored, because browse answers a different question."
+  query: String!
+  categoryId: ID
+  status: ProductStatus
+  minPriceCents: Int
+  maxPriceCents: Int
+  limit: Int
+  offset: Int
+}
+
+"A variant to create alongside its product."
+input VariantInput {
+  sku: String!
+  name: String!
+  priceCents: Int!
+  currency: String
+  stock: Int
+  mediaId: ID
+}
+
+"Fields for creating a product."
+input CreateProductInput {
+  categoryId: ID!
+  name: String!
+  "Generated from the name when omitted."
+  slug: String
+  description: String
+  brand: String
+  priceCents: Int!
+  "Defaults to the product service's configured currency when omitted."
+  currency: String
+  stock: Int
+  status: ProductStatus
+  "References media-service; validated over gRPC before the product is stored."
+  primaryMediaId: ID
+  variants: [VariantInput!]
+}
+
+"Fields for updating a product. Every field is optional and an omitted field is left alone."
+input UpdateProductInput {
+  categoryId: ID
+  name: String
+  slug: String
+  description: String
+  brand: String
+  priceCents: Int
+  currency: String
+  stock: Int
+  status: ProductStatus
+  primaryMediaId: ID
+}
+
+"Fields for creating a category. Omit parentId for a root category."
+input CreateCategoryInput {
+  name: String!
+  description: String
+  parentId: ID
+}
+
+"Fields for updating a category. Omitted fields are left alone."
+input UpdateCategoryInput {
+  name: String
+  description: String
+  "Changing a parent is rejected if it would create a cycle."
+  parentId: ID
+}
+
+"Fields for registering an upload. Returns a presigned target to PUT to."
+input RegisterMediaInput {
+  ownerId: String!
+  filename: String!
+  contentType: String!
+  kind: MediaKind
+  "Advisory; the value confirmed by completeMediaUpload wins."
+  sizeBytes: Int
+}
+
+"A freshly registered media record plus the target to upload to. This is the only path that hands a client an object-storage URL: the bytes go directly to storage and never pass through this service."
+type MediaUpload @goModel(model: "aggregator-service/internal/graph/model.MediaUpload") {
+  media: Media!
+  upload: UploadTarget!
+}
+
+type Query {
+  "Fetch one product from the listing read model."
+  product(id: ID!, includeVariants: Boolean = true): Product
+
+  "Browse the catalogue through the listing read model."
+  products(filter: ProductFilter): ProductPage!
+
+  "Free-text search through the search read model."
+  searchProducts(filter: SearchFilter!): SearchResult!
+
+  "Fetch one category."
+  category(id: ID!): Category
+
+  "Flat, name-ordered category listing."
+  categories(limit: Int, offset: Int): CategoryPage!
+
+  "The whole category hierarchy as nested nodes."
+  categoryTree: [Category!]!
+
+  "Fetch one media record."
+  media(id: ID!): Media
+
+  "Page an owner's media, newest first."
+  mediaList(ownerId: String!, status: MediaStatus, limit: Int, offset: Int): MediaPage!
+
+  "Progress of both read-model projections. Null fields mean that service is unreachable, not that it reported nothing."
+  projectionHealth: ProjectionHealth!
+}
+
+type Mutation {
+  "Create a product. The category and media references are validated against their owning services before the product is stored."
+  createProduct(input: CreateProductInput!): WriteProductResult!
+
+  "Apply a partial product update. Omitted fields are left alone."
+  updateProduct(id: ID!, input: UpdateProductInput!): WriteProductResult!
+
+  "Delete a product. The read models converge on the absence asynchronously."
+  deleteProduct(id: ID!): Boolean!
+
+  "Create a category."
+  createCategory(input: CreateCategoryInput!): Category!
+
+  "Rename a category, or move it. A move that would create a cycle is rejected."
+  updateCategory(id: ID!, input: UpdateCategoryInput!): Category!
+
+  "Delete a category."
+  deleteCategory(id: ID!): Boolean!
+
+  "Register an upload and return a presigned target to PUT the bytes to."
+  registerMedia(input: RegisterMediaInput!): MediaUpload!
+
+  "Confirm an upload landed in storage and mark the record READY."
+  completeMediaUpload(id: ID!): Media!
+
+  "Remove the object from storage and the metadata row."
+  deleteMedia(id: ID!): Boolean!
+}

@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "domain",
+    srcs = [
+        "employee.go",
+        "errors.go",
+        "session.go",
+    ],
+    importpath = "gogo/internal/modules/auth/domain",
+    visibility = ["//gogo:__subpackages__"],
+)
+
+go_test(
+    name = "domain_test",
+    size = "small",
+    srcs = ["employee_test.go"],
+    deps = [":domain"],
+)

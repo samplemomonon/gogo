@@ -1,0 +1,88 @@
+package ui
+
+// HeroOptions is the presentation-ready input for HeroBanner. Every field is
+// optional except Title, so a caller states only the chrome it actually has.
+type HeroOptions struct {
+	// Eyebrow is the small uppercase label above the title. Empty omits it.
+	Eyebrow string
+
+	// Tone drives the eyebrow and the icon chip's colour: "primary",
+	// "secondary", or "" for the neutral treatment.
+	Tone string
+
+	// Icon is the glyph inside the chip. Nil omits the chip and leaves the
+	// eyebrow flush left.
+	Icon templ.Component
+
+	// Title is the panel's h1 — the one field every banner has.
+	Title string
+
+	// Description is the supporting line under the title. Empty omits it.
+	Description string
+
+	// FooterText is an optional line of tertiary chrome below the description,
+	// such as a live status count. Empty omits it.
+	FooterText string
+}
+
+// PageHero is the page header for a surface that puts actions beside its title:
+// an icon chip plus eyebrow, the title, an optional description, and a trailing
+// slot (children) that sits alongside them from the sm breakpoint up and stacks
+// beneath on narrow viewports.
+templ PageHero(eyebrow string, tone string, title string, description string, icon templ.Component) {
+	<div class={ HeroClass + " " + HeroPadClass + " flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative" }>
+		<div class="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/10 blur-3xl" aria-hidden="true"></div>
+		<div class={ HeroStackClass + " relative z-10" }>
+			<div class="flex items-center gap-2">
+				if icon != nil {
+					<div class={ ChipToneClass(tone) }>
+						@icon
+					</div>
+				}
+				<span class={ EyebrowClass(tone) }>{ eyebrow }</span>
+			</div>
+			<h1 class={ TitleClass }>{ title }</h1>
+			if description != "" {
+				<p class={ HeroDescriptionClass }>{ description }</p>
+			}
+		</div>
+		// The slot lays its children out as a wrapping row so a surface can
+		// offer more than one action (a stat tile plus a link) without the pair
+		// overflowing a 320px viewport. It used to be a bare block, so the
+		// seller console's two stat tiles sat side by side and ran off-screen,
+		// and the storefront had to hand-roll this exact row inside the slot.
+		<div class="relative z-10 flex w-full flex-wrap items-center gap-3 sm:w-auto sm:flex-nowrap">
+			{ children... }
+		</div>	</div>
+}
+
+// HeroBanner is the page header for a surface that stacks its whole text block:
+// an optional eyebrow with icon chip, the title, an optional description, and an
+// optional footer line. It exists because the billing landing and the shell
+// registry both hand-rolled this same stacked gradient panel, which is how the
+// two drifted apart on padding and copy contrast.
+templ HeroBanner(m HeroOptions) {
+	<div class={ HeroClass + " " + HeroPadClass + " " + HeroStackClass + " relative" }>
+		<div class="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/10 blur-3xl" aria-hidden="true"></div>
+		<div class="relative z-10 space-y-2">
+			if m.Eyebrow != "" {
+				<div class="flex items-center gap-2">
+					if m.Icon != nil {
+						<div class={ ChipToneClass(m.Tone) }>
+							@m.Icon
+						</div>
+					}
+					<span class={ EyebrowClass(m.Tone) }>{ m.Eyebrow }</span>
+				</div>
+			}
+			<h1 class={ TitleClass }>{ m.Title }</h1>
+			if m.Description != "" {
+				<p class={ HeroDescriptionClass }>{ m.Description }</p>
+			}
+			if m.FooterText != "" {
+				<p class={ MetaClass }>{ m.FooterText }</p>
+			}
+			{ children... }
+		</div>
+	</div>
+}

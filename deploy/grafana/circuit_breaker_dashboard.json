@@ -1,0 +1,126 @@
+{
+  "dashboard": {
+    "title": "Circuit Breaker - Upstreams",
+    "tags": [
+      "circuit-breaker",
+      "upstreams",
+      "reliability"
+    ],
+    "timezone": "browser",
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Circuit Breaker State (per upstream)",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 8,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "gogo_product_breaker_state or gogo_product_listing_breaker_state or gogo_product_search_breaker_state or gogo_category_breaker_state or gogo_inventory_breaker_state or gogo_sales_breaker_state or gogo_auth_breaker_state",
+            "legendFormat": "{{ instance }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "type": "value",
+                "value": "0",
+                "text": "CLOSED",
+                "color": "green"
+              },
+              {
+                "type": "value",
+                "value": "1",
+                "text": "OPEN",
+                "color": "red"
+              },
+              {
+                "type": "value",
+                "value": "2",
+                "text": "HALF-OPEN",
+                "color": "yellow"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Call Outcomes (per upstream)",
+        "type": "graph",
+        "gridPos": {
+          "x": 8,
+          "y": 0,
+          "w": 16,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "(rate(gogo_product_breaker_successes_total[1m]) or rate(gogo_product_listing_breaker_successes_total[1m]) or rate(gogo_product_search_breaker_successes_total[1m]) or rate(gogo_category_breaker_successes_total[1m]) or rate(gogo_inventory_breaker_successes_total[1m]) or rate(gogo_sales_breaker_successes_total[1m]) or rate(gogo_auth_breaker_successes_total[1m]))",
+            "legendFormat": "successes"
+          },
+          {
+            "expr": "(rate(gogo_product_breaker_failures_total[1m]) or rate(gogo_product_listing_breaker_failures_total[1m]) or rate(gogo_product_search_breaker_failures_total[1m]) or rate(gogo_category_breaker_failures_total[1m]) or rate(gogo_inventory_breaker_failures_total[1m]) or rate(gogo_sales_breaker_failures_total[1m]) or rate(gogo_auth_breaker_failures_total[1m]))",
+            "legendFormat": "failures"
+          },
+          {
+            "expr": "(rate(gogo_product_breaker_rejects_total[1m]) or rate(gogo_product_listing_breaker_rejects_total[1m]) or rate(gogo_product_search_breaker_rejects_total[1m]) or rate(gogo_category_breaker_rejects_total[1m]) or rate(gogo_inventory_breaker_rejects_total[1m]) or rate(gogo_sales_breaker_rejects_total[1m]) or rate(gogo_auth_breaker_rejects_total[1m]))",
+            "legendFormat": "rejects (open circuit)"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Success Rate (SLA: 95%) (per upstream)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "(rate(gogo_product_breaker_successes_total[5m]) or rate(gogo_product_listing_breaker_successes_total[5m]) or rate(gogo_product_search_breaker_successes_total[5m]) or rate(gogo_category_breaker_successes_total[5m]) or rate(gogo_inventory_breaker_successes_total[5m]) or rate(gogo_sales_breaker_successes_total[5m]) or rate(gogo_auth_breaker_successes_total[5m])) / (rate(gogo_product_breaker_successes_total[5m]) or rate(gogo_product_listing_breaker_successes_total[5m]) or rate(gogo_product_search_breaker_successes_total[5m]) or rate(gogo_category_breaker_successes_total[5m]) or rate(gogo_inventory_breaker_successes_total[5m]) or rate(gogo_sales_breaker_successes_total[5m]) or rate(gogo_auth_breaker_successes_total[5m]) + rate(gogo_product_breaker_failures_total[5m]) or rate(gogo_product_listing_breaker_failures_total[5m]) or rate(gogo_product_search_breaker_failures_total[5m]) or rate(gogo_category_breaker_failures_total[5m]) or rate(gogo_inventory_breaker_failures_total[5m]) or rate(gogo_sales_breaker_failures_total[5m]) or rate(gogo_auth_breaker_failures_total[5m]))",
+            "legendFormat": "{{ instance }}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Circuit Breaker Trips (5m) (per upstream)",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "(increase(gogo_product_breaker_trips_total[5m]) or increase(gogo_product_listing_breaker_trips_total[5m]) or increase(gogo_product_search_breaker_trips_total[5m]) or increase(gogo_category_breaker_trips_total[5m]) or increase(gogo_inventory_breaker_trips_total[5m]) or increase(gogo_sales_breaker_trips_total[5m]) or increase(gogo_auth_breaker_trips_total[5m]))",
+            "legendFormat": "{{ instance }}"
+          }
+        ]
+      }
+    ],
+    "description": "One panel per signal across every upstream the gateway calls: the four product-platform services (product, product-listing, product-search, category) and the three modules it composes in-process (inventory, sales, auth). A legend entry names the dependency, so an open circuit is attributable without reading the metric name."
+  }
+}

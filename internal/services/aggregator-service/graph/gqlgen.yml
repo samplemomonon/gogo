@@ -1,0 +1,74 @@
+# gqlgen configuration.
+#
+# Three decisions in this file are load-bearing, and each one exists to work
+# around a specific problem:
+#
+# 1. skip_validation and skip_mod_tidy are on because gqlgen loads the package
+#    graph through go/packages, which shells out to the Go toolchain. Under Bazel
+#    there is no toolchain in the sandbox, so generation runs as a host step (see
+#    hack/gen.sh) and the result is committed. Turning validation off is not
+#    ideal in isolation; it is acceptable because `go build ./...` and
+#    `bazel build //...` both still compile the generated code, so a broken
+#    generation fails the build rather than shipping.
+#
+# 2. models are bound explicitly with @goModel rather than autobind, so model
+#    binding does not depend on go/packages resolving imports.
+#
+# 3. resolver.batch is ON. This is the single most important line in the file.
+#    Without it, resolving Product.category across a page of 20 products issues 20
+#    gRPC calls. With it, gqlgen groups the resolution by list and hands the
+#    resolver all 20 parents at once, so the same query costs 1 call. That is the
+#    difference between a composition layer that scales and one that multiplies
+#    load on every service it fronts.
+
+schema:
+  - graph/schema.graphql
+
+exec:
+  filename: graph/generated/generated.go
+  package: generated
+
+model:
+  filename: graph/model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: graph
+  package: graph
+  filename_template: "{name}.resolvers.go"
+
+  # Turn every field that needs a resolver into a batch resolver. Query and
+  # Mutation are excluded automatically: they have no parent list to batch over.
+  batch: true
+
+# Model binding is declared in the schema with @goModel directives, so gqlgen does
+# not need to walk the package to discover types.
+autobind: []
+
+# No federation. This is a composition layer, not a subgraph: it owns no data and
+# has no entities to resolve, so the federation machinery would add codegen paths
+# with nothing behind them.
+federation: {}
+
+# The generated code is committed, so gqlgen must not try to rewrite go.mod. It
+# still needs the deps recorded for `go build`, which hack/gen.sh handles with an
+# explicit `go mod tidy`.
+skip_validation: true
+skip_mod_tidy: true
+
+omit_gqlgen_file_notice: false
+omit_panic_handler: false
+omit_slice_element_pointers: false
+
+# Cost model: every object and list costs one, scalars cost zero. Charging for
+# scalars would make the budget depend on how many fields a client happens to
+# select rather than on how much work the server does, and the work is driven by
+# object resolution.
+models:
+  Int64:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int64
+      - github.com/99designs/gqlgen/graphql.Int
+      - github.com/99designs/gqlgen/graphql.Int32
+      - int64

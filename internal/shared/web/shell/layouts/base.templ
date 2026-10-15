@@ -1,0 +1,82 @@
+package layouts
+
+import (
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/partials"
+)
+
+// Base is the shared document shell: head, header, the main landmark, the
+// status region, the footer and the mobile bottom tab bar.
+//
+// term is the current storefront search term, threaded to the header's search
+// box; a surface without search passes "".
+//
+// Two details are load-bearing rather than cosmetic:
+//
+//   - <html> carries NO `data-theme`. That absence is what lets the stylesheet's
+//     `@media (prefers-color-scheme: dark) { :root:not([data-theme]) }` rule
+//     apply dark mode to a viewer whose OS asks for it. The inline bootstrap
+//     below adds the attribute only once a reader states a preference.
+//   - The bootstrap script is inline and first, so the resolved theme is on the
+//     element before the first paint. An external script would flash light.
+templ Base(title string, nav []navigation.Item, path string, term string) {
+	<!DOCTYPE html>
+	// lang="id" because the interface is Indonesian: it drives the screen
+	// reader's pronunciation rules and the browser's own hyphenation and
+	// spellcheck. The surrounding prose (README, code comments) being English
+	// is a different matter from the words a reader actually sees.
+	<html lang="id">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+			<title>{ title }</title>
+			<meta
+				name="description"
+				content="Gogo — a federated modular-monolith product catalog built with Go, Chi, Templ and HTMX."
+			/>
+			<!-- Tells the browser to render native controls, scrollbars and
+			     form widgets in the resolved theme instead of forcing light. -->
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)"/>
+			<meta name="theme-color" content="#1c1b22" media="(prefers-color-scheme: dark)"/>
+
+			@partials.InlineScript(ThemeBootstrapJS)
+
+			<link
+				rel="stylesheet"
+				href="/assets/css/output.css"
+			/>
+		</head>
+
+		<body class="min-h-dvh bg-base-200 text-base-content flex flex-col antialiased">
+			<!-- Keyboard users land here first and can jump past the nav
+			     straight to the page content. -->
+			<a href="#main" class="skip-link">Lompat ke konten</a>
+
+			@partials.Header(nav, path, term)
+
+			<main id="main" class="flex-1 w-full pb-20 md:pb-0">
+				<div class="container mx-auto px-4 py-8">
+					{ children... }
+				</div>
+			</main>
+
+			@partials.Footer()
+
+			<!-- The primary destinations as a thumb-reachable tab bar on narrow
+			     viewports; hidden from md up where the top-bar links take over. -->
+			@partials.BottomNav(nav, path)
+
+			<!-- htmx failures are announced here. It renders nothing at rest
+			     (see .shell-status:empty) and only becomes visible when the
+			     shell's htmx config writes a message into it. -->
+			<div id="page-status" class="shell-status" role="status" aria-live="polite"></div>
+
+			<script src="/assets/js/htmx.min.js"></script>
+			@partials.InlineScript(partials.HtmxConfigJS)
+			@partials.InlineScript(partials.FormGuardJS)
+			@partials.InlineScript(partials.DrawerTriggerJS)
+		</body>
+	</html>
+}

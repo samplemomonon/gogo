@@ -1,0 +1,108 @@
+{
+  "name": "gogo-contracts",
+  "$schema": "{NX_ROOT}/node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "apps/gogo/contracts",
+  "tags": [
+    "tier:foundation",
+    "type:lib",
+    "lang:go",
+    "scope:gateway"
+  ],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "go build ./..."
+          }
+        ]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "go test ./..."
+          }
+        ],
+        "env": {
+          "CGO_ENABLED": "0"
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
+          },
+          {
+            "command": "go vet ./..."
+          }
+        ],
+        "env": {}
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "gofmt -w ."
+          }
+        ],
+        "env": {}
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
+          }
+        ],
+        "env": {}
+      }
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/gogo/contracts",
+        "commands": [
+          {
+            "command": "go mod tidy"
+          }
+        ],
+        "env": {}
+      }
+    },
+    "generate": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "buf",
+        "command": "buf generate",
+        "cwd": "apps/gogo",
+        "label": "buf generate"
+      }
+    },
+    "lint:contracts": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "buf",
+        "command": "buf lint",
+        "cwd": "apps/gogo",
+        "label": "buf lint"
+      }
+    }
+  }
+}

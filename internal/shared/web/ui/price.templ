@@ -1,0 +1,40 @@
+package ui
+
+// PriceBlock renders a monetary figure the way money reads everywhere in the
+// app: a de-emphasised currency prefix beside an emphasised, digit-aligned
+// number. The product card and the detail price panel each hand-rolled this
+// pair, and each had drifted to a different prefix size, a different figure
+// size and a different gap — so the same price looked like two different
+// prices depending on which screen it was on.
+//
+// The value arrives already formatted: the primitive owns the presentation, not
+// the currency's formatting rules.
+templ PriceBlock(currency string, value string, size PriceSize) {
+	<div class="flex items-baseline gap-1.5">
+		<span class={ joinClasses(PriceCurrencyClass, priceCurrencySizeClass(size)) }>{ currency }</span>
+		<span class={ joinClasses(PriceValueClass, priceValueSizeClass(size)) }>{ value }</span>
+	</div>
+}
+
+// CodePill is an inline identifier chip — a SKU, an order number, a product id.
+// Identifiers are read character by character, so three views rolled their own
+// mono chip with three slightly different padding, radius and border colour.
+templ CodePill(text string) {
+	<span class={ CodePillClass }>{ text }</span>
+}
+
+// FactList is a definition list of label/value pairs for a read-only detail
+// panel, and FactRow is one pair. The account settings page had its own local
+// copy of exactly this, down to the eyebrow styling of each label.
+templ FactList() {
+	<dl class={ FactListClass }>
+		{ children... }
+	</dl>
+}
+
+templ FactRow(label string, value string) {
+	<div class={ FactRowClass }>
+		<dt class={ EyebrowClass("") }>{ label }</dt>
+		<dd class={ FactValueClass }>{ value }</dd>
+	</div>
+}

@@ -1,0 +1,31 @@
+package partials
+
+import "gogo/internal/shared/web/ui"
+
+// ThemeToggle is the light/dark switch. It is a button, not daisyUI's
+// `theme-controller` checkbox: that mechanism works purely through CSS `:has()`
+// and therefore cannot remember a choice across reloads nor show the correct
+// icon for the resolved theme. A button driven by layouts.ThemeBootstrapJS gets
+// both, and keeps working when JavaScript is unavailable — the stylesheet's
+// `prefers-color-scheme` fallback still applies, it just cannot be overridden.
+//
+// Both icons are rendered and one is hidden by the script, so the control is
+// never blank while the script loads or if it fails. `aria-pressed` carries the
+// state for assistive technology.
+templ ThemeToggle() {
+	<button
+		id="theme-toggle"
+		type="button"
+		class={ ui.IconTriggerClass }
+		aria-pressed="false"
+		aria-label="Ganti tema"
+	>
+		<span data-theme-icon="light" hidden aria-hidden="true">
+			@ui.IconSun("size-4")
+		</span>
+		<span data-theme-icon="dark" aria-hidden="true">
+			@ui.IconMoon("size-4")
+		</span>
+	</button>
+	@InlineScript(ThemeApplyJS)
+}

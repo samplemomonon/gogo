@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gogo
+
+# What this overlay deploys: the gateway and the two stores it owns (Postgres for the
+# inventory and sales tables). The product platform — product-service,
+# product-listing-service, product-search-service, category-service — is NOT here; those
+# are deployed by the platform's own manifests, and the gateway reaches them through the
+# four *_ADDRESS values in configmap/deploy (see ARCHITECTURE.md D-018).
+#
+# The catalog, listing, Debezium and OpenSearch manifests that used to live here went
+# with the product domain: the platform's own outbox and Kafka feed replace the local CDC
+# path, and the platform's search read model replaces a locally-maintained index.
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.example.yaml
+  - postgres.yaml
+  - gateway.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+# Set the container image built from the repository root:
+#   kustomize edit set image gogo=<registry>/gogo:<tag>
+images:
+  - name: gogo
+    newName: gogo
+    newTag: latest

@@ -1,0 +1,17 @@
+# gazelle:map_kind go_library templ_go_library //tools/bazel:templ.bzl
+load("//tools/bazel:templ.bzl", "templ_go_library")
+
+templ_go_library(
+    name = "pages",
+    srcs = ["profile_templ.go"],
+    importpath = "gogo/internal/pages/profile/views/pages",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/internal/pages/profile/application/results",
+        "//gogo/internal/shared/web/navigation",
+        "//gogo/internal/shared/web/shell/layouts",
+        "//gogo/internal/shared/web/ui",
+        "@com_github_a_h_templ//:templ",
+        "@com_github_a_h_templ//runtime",
+    ],
+)

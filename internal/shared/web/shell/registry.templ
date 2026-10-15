@@ -1,0 +1,44 @@
+package shell
+
+import "gogo/internal/shared/web/ui"
+
+// RegistryPage renders the human-readable module registry view for browsers.
+// It shares the same shell — and therefore the same federated nav — as every
+// other page. Module data is composition-root input, so all manifest strings
+// are escaped by templ before being written into the document.
+templ RegistryPage(service string, version string, manifests []RegistryView) {
+	@Page(service+" — module registry", RegistryContent(service, version, manifests))
+}
+
+// RegistryContent is the registry region: the hero plus one card per module
+// manifest, in registration order.
+templ RegistryContent(service string, version string, manifests []RegistryView) {
+	<div class={ ui.StackSpaceClass }>
+		@ui.HeroBanner(ui.HeroOptions{
+			Title:       "Module registry",
+			Description: registryTitle(service, version) + " — each module federates HTML fragments through its manifest.",
+		})
+		<div class="space-y-3">
+			for _, manifest := range manifests {
+				@ui.Card("gap-3", nil) {
+					<div class="flex items-center justify-between gap-3">
+						<div class="flex items-center gap-2">
+							@ui.Badge("primary", "", "") {
+								{ manifest.Name }
+							}
+							@ui.Badge("ghost", "sm", "font-mono text-xs") {
+								v{ manifest.Version }
+							}
+						</div>
+						@ui.ButtonLink(manifest.Entry, ui.ActionClass(ui.IntentGhost, "sm"), nil) {
+							{ manifest.Entry }
+						}
+					</div>
+					if manifest.Description != "" {
+						<p class={ ui.SmallMutedClass }>{ manifest.Description }</p>
+					}
+				}
+			}
+		</div>
+	</div>
+}

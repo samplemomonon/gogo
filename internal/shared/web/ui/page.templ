@@ -1,0 +1,49 @@
+package ui
+
+// PageShellOptions is the presentation-ready input for the standard page
+// skeleton. The caller inverts control: it hands over the shell wrapper (a
+// templ.Component that renders the page's layout around its body) and the
+// spacing, and the primitive owns the one container rule between them.
+type PageShellOptions struct {
+	// Layout wraps the body in the page's shell (layouts.Base + page chrome).
+	// Nil renders the body bare, which is what an HTMX fragment wants.
+	Layout templ.Component
+
+	// Class overrides the skeleton's spacing container. Empty uses the
+	// default page rhythm (PageSpaceClass).
+	Class string
+
+	// Narrow centers the content column at a reading width (max-w-4xl),
+	// for a detail page rather than a full-width listing.
+	Narrow bool
+}
+
+// PageShell renders its body inside the injected shell wrapper, owning only the
+// skeleton's spacing container. Every page used to repeat the same
+// "layouts.Base(...) { <div class="space-y-8">…" preamble; it now lives once,
+// so a page states its chrome and its body and nothing else. The body is a
+// slot, so a caller composes it exactly as it composed layouts.Base.
+templ PageShell(spec PageShellOptions) {
+	if spec.Layout != nil {
+		@spec.Layout {
+			<div class={ pageShellClass(spec) }>
+				{ children... }
+			</div>
+		}
+	} else {
+		<div class={ pageShellClass(spec) }>
+			{ children... }
+		</div>
+	}
+}
+
+func pageShellClass(spec PageShellOptions) string {
+	class := spec.Class
+	if class == "" {
+		class = PageSpaceClass
+	}
+	if spec.Narrow {
+		class += " max-w-4xl mx-auto"
+	}
+	return class
+}

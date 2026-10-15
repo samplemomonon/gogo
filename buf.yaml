@@ -1,0 +1,28 @@
+# buf configuration: strict contract policy for gogo's proto schemas. The
+# lint set keeps schemas idiomatic and consistent; the breaking set makes
+# incompatible changes fail CI before they reach consumers. The only
+# deviation from STANDARD is documented below — server-streaming is the
+# deliberate transports for domain events (RPC_NO_SERVER_STREAMING).
+version: v2
+
+modules:
+  - path: contracts/proto
+
+deps:
+  - buf.build/protocolbuffers/wellknowntypes
+
+lint:
+  use:
+    - STANDARD
+  except:
+    - RPC_NO_SERVER_STREAMING # events deliberately stream; see events.proto
+
+breaking:
+  use:
+    - FILE
+    # Field deletion is permitted only when the number and the name are both
+    # reserved (protobuf's safe retirement); every other FILE-level break fails.
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
+  except:
+    - FIELD_NO_DELETE

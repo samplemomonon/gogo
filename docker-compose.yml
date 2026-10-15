@@ -1,0 +1,93 @@
+# Local development for the gateway: the database it owns (the inventory ledger and the
+# sales history) plus the gateway itself, wired against the product platform that runs
+# from the repository root.
+#
+#   # from the repository root — brings up the platform the gateway depends on
+#   docker compose up -d
+#
+#   # from gogo/ — brings up the gateway and its own database
+#   docker compose up -d --build
+#   open http://localhost:8080/
+#
+# The two stacks meet on a shared network (ecommerce_default, created by the root stack)
+# and reach each other by service name over gRPC. That is the same shape as the Kubernetes
+# deployment, where the gateway dials the four product-platform services by address and
+# nothing else crosses the boundary.
+#
+# For just the database — the DB-gated tests and `make run` — start postgres alone:
+#
+#   docker compose up -d postgres
+#   export DATABASE_URL='postgres://gogo:gogo@localhost:5432/gogo?sslmode=disable'
+#
+# The gateway still needs the platform's four gRPC endpoints to start (they are required
+# configuration, not optional): PRODUCT_ADDRESS, PRODUCT_LISTING_ADDRESS,
+# PRODUCT_SEARCH_ADDRESS and CATEGORY_ADDRESS. Running the gateway without the platform up
+# is a valid test of the *failure* path — it refuses to boot rather than serving an empty
+# storefront — but it is not a usable development environment.
+#
+# Credentials and database name match the Kubernetes manifests, and the app runs its
+# embedded migrations on startup, so no init scripts are needed.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: gogo-postgres
+    environment:
+      POSTGRES_USER: gogo
+      POSTGRES_DB: gogo
+      POSTGRES_PASSWORD: gogo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gogo -d gogo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gogo-gateway
+    environment:
+      SERVICE_NAME: gogo
+      PORT: "8080"
+      LOG_FORMAT: text
+      TRUSTED_PROXIES: 172.16.0.0/12
+      DATABASE_URL: postgres://gogo:gogo@postgres:5432/gogo?sslmode=disable
+      # The product platform, by service name over the shared network. The gateway
+      # stores no product data: it writes to product-service and reads from the
+      # product-listing and product-search read models.
+      PRODUCT_ADDRESS: dns:///product-app:9092
+      PRODUCT_LISTING_ADDRESS: dns:///product-listing-app:9093
+      PRODUCT_SEARCH_ADDRESS: dns:///product-search-app:9094
+      CATEGORY_ADDRESS: dns:///category-app:9090
+      # The product change feed. Optional — remove it and the gateway serves on its
+      # island-cache TTLs alone (30s for the storefront grid) instead of dropping caches
+      # the moment a product changes elsewhere.
+      KAFKA_BROKERS: kafka:19092
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - default
+      - ecommerce
+
+networks:
+  # The gateway's own network, for local-only traffic.
+  default:
+  # The product platform's network, created by the repository root's compose stack.
+  ecommerce:
+    external: true
+    name: ecommerce_default
+
+volumes:
+  postgres-data:

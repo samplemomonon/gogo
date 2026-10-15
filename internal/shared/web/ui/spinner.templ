@@ -1,0 +1,7 @@
+package ui
+
+// Spinner is a daisyUI loading spinner. size is "xs" | "sm" | "md"; class
+// carries any extra classes (e.g. "htmx-indicator").
+templ Spinner(size string, class string) {
+	<span class={ spinnerClass(size, class) }></span>
+}

@@ -1,0 +1,176 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "gogo/contracts/auth/v1;authv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Employee represents an employee in the auth system.
+message Employee {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string email = 4;
+  string role = 5;
+  bool active = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+// Session represents an authenticated session.
+message Session {
+  string id = 1;
+  string tenant_id = 2;
+  string employee_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp revoked_at = 6;
+}
+
+// RegisterEmployeeRequest requests employee registration.
+message RegisterEmployeeRequest {
+  string tenant_id = 1;
+  string id = 2;
+  string name = 3;
+  string email = 4;
+  string pin = 5;
+  string role = 6;
+}
+
+// RegisterEmployeeResponse returns the registered employee.
+message RegisterEmployeeResponse {
+  Employee employee = 1;
+}
+
+// GetEmployeeRequest requests an employee by ID.
+message GetEmployeeRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// GetEmployeeResponse returns the employee.
+message GetEmployeeResponse {
+  Employee employee = 1;
+}
+
+// GetEmployeeByEmailRequest requests an employee by email.
+message GetEmployeeByEmailRequest {
+  string tenant_id = 1;
+  string email = 2;
+}
+
+// GetEmployeeByEmailResponse returns the employee.
+message GetEmployeeByEmailResponse {
+  Employee employee = 1;
+}
+
+// UpdateEmployeeRequest requests an employee update.
+message UpdateEmployeeRequest {
+  string tenant_id = 1;
+  string id = 2;
+  string name = 3;
+  string email = 4;
+  string role = 5;
+}
+
+// UpdateEmployeeResponse returns the updated employee.
+message UpdateEmployeeResponse {
+  Employee employee = 1;
+}
+
+// ListEmployeesRequest requests a list of employees.
+message ListEmployeesRequest {
+  string tenant_id = 1;
+  int32 limit = 2;
+}
+
+// ListEmployeesResponse returns a list of employees.
+message ListEmployeesResponse {
+  repeated Employee employees = 1;
+}
+
+// SetEmployeePINRequest requests a PIN change.
+message SetEmployeePINRequest {
+  string tenant_id = 1;
+  string id = 2;
+  string pin = 3;
+}
+
+// SetEmployeePINResponse is empty on success.
+message SetEmployeePINResponse {}
+
+// ActivateEmployeeRequest requests employee activation.
+message ActivateEmployeeRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// ActivateEmployeeResponse is empty on success.
+message ActivateEmployeeResponse {}
+
+// DeactivateEmployeeRequest requests employee deactivation.
+message DeactivateEmployeeRequest {
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// DeactivateEmployeeResponse is empty on success.
+message DeactivateEmployeeResponse {}
+
+// LoginRequest requests authentication.
+message LoginRequest {
+  string tenant_id = 1;
+  string email = 2;
+  string pin = 3;
+}
+
+// LoginResponse returns the session and employee.
+message LoginResponse {
+  Session session = 1;
+  Employee employee = 2;
+}
+
+// LogoutRequest requests logout.
+message LogoutRequest {
+  string session_id = 1;
+}
+
+// LogoutResponse is empty on success.
+message LogoutResponse {}
+
+// ValidateSessionRequest validates a session.
+message ValidateSessionRequest {
+  string session_id = 1;
+}
+
+// ValidateSessionResponse returns the session and employee.
+message ValidateSessionResponse {
+  Session session = 1;
+  Employee employee = 2;
+}
+
+// ExtendSessionRequest extends a session.
+message ExtendSessionRequest {
+  string session_id = 1;
+}
+
+// ExtendSessionResponse returns the extended session.
+message ExtendSessionResponse {
+  Session session = 1;
+}
+
+service AuthService {
+  rpc RegisterEmployee(RegisterEmployeeRequest) returns (RegisterEmployeeResponse);
+  rpc GetEmployee(GetEmployeeRequest) returns (GetEmployeeResponse);
+  rpc GetEmployeeByEmail(GetEmployeeByEmailRequest) returns (GetEmployeeByEmailResponse);
+  rpc UpdateEmployee(UpdateEmployeeRequest) returns (UpdateEmployeeResponse);
+  rpc ListEmployees(ListEmployeesRequest) returns (ListEmployeesResponse);
+  rpc SetEmployeePIN(SetEmployeePINRequest) returns (SetEmployeePINResponse);
+  rpc ActivateEmployee(ActivateEmployeeRequest) returns (ActivateEmployeeResponse);
+  rpc DeactivateEmployee(DeactivateEmployeeRequest) returns (DeactivateEmployeeResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+  rpc ExtendSession(ExtendSessionRequest) returns (ExtendSessionResponse);
+}

@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "inventoryclient",
+    srcs = ["client.go"],
+    importpath = "gogo/internal/pages/seller/infrastructure/inventoryclient",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/contracts/inventory/v1:inventory",
+        "//gogo/internal/pages/seller/application/results",
+        "//gogo/internal/shared/breaker",
+        "//gogo/internal/shared/grpcconsumer",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)

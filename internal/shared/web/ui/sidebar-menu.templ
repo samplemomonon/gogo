@@ -1,0 +1,128 @@
+package ui
+
+// SidebarMenuOptions is the presentation-ready input for SidebarMenu when the
+// caller wants the primitive to own the item list. When only a slot is needed
+// (sub-menus, actions), call SidebarMenu with children instead.
+type SidebarMenuOptions struct {
+	// Items are the menu entries, in order.
+	Items []NavItem
+
+	// Path is the current request path, used to mark the active item. Only the
+	// most specific match is active, so a parent and its child never both
+	// highlight.
+	Path string
+}
+
+// SidebarMenu is the list of menu items in a group. Given a spec it renders the
+// items itself with the shared active rule; with children it renders the given
+// slot. The active rule and aria-current live here, not in each caller.
+templ SidebarMenu(spec SidebarMenuOptions) {
+	<ul class={ SidebarMenuClass }>
+		if spec.Items != nil {
+			for _, item := range spec.Items {
+				<li>
+					@SidebarMenuButton(SidebarMenuButtonOptions{
+						Href:   item.Href,
+						Label:  item.Label,
+						Icon:   item.Icon,
+						Active: boolPtr(item.Href == ActiveNavHref(spec.Items, spec.Path)),
+					})
+				</li>
+			}
+		} else {
+			{ children... }
+		}
+	</ul>
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+// SidebarMenuItem is one entry of a SidebarMenu.
+templ SidebarMenuItem() {
+	<li>
+		{ children... }
+	</li>
+}
+
+// SidebarMenuButtonOptions configures a menu button.
+type SidebarMenuButtonOptions struct {
+	// Href is the link target.
+	Href string
+
+	// Path is the current request path, used to mark the active item.
+	Path string
+
+	// Label is the button's text.
+	Label string
+
+	// Icon is an optional leading glyph.
+	Icon templ.Component
+
+	// Active pins the active state explicitly, for an item whose activity is
+	// not derivable from the path (a mode, a filter). Nil falls back to Path.
+	Active *bool
+}
+
+// SidebarMenuButton is one item's link: an optional icon beside a label, marked
+// active when the current path covers its href (or when Active pins it). It
+// reuses the shared nav active rule, so the sidebar and the top bar agree on
+// what "current" means.
+templ SidebarMenuButton(spec SidebarMenuButtonOptions) {
+	if isSidebarActive(spec) {
+		<a href={ templ.URL(spec.Href) } aria-current="page" class="active">
+			@sidebarMenuButtonContent(spec)
+		</a>
+	} else {
+		<a href={ templ.URL(spec.Href) }>
+			@sidebarMenuButtonContent(spec)
+		</a>
+	}
+}
+
+templ sidebarMenuButtonContent(spec SidebarMenuButtonOptions) {
+	if spec.Icon != nil {
+		@spec.Icon
+	}
+	<span>{ spec.Label }</span>
+}
+
+func isSidebarActive(spec SidebarMenuButtonOptions) bool {
+	if spec.Active != nil {
+		return *spec.Active
+	}
+	if spec.Path == "" {
+		return false
+	}
+	return IsActiveNav(spec.Href, spec.Path)
+}
+
+// SidebarMenuAction is a small control at a menu item's trailing edge, shown
+// beside its button (an inline "edit" or "delete").
+templ SidebarMenuAction(attrs templ.Attributes) {
+	<button
+		type="button"
+		class={ "btn btn-ghost btn-xs btn-circle " + TapTargetClass }
+		{ attrs... }
+	>
+		{ children... }
+	</button>
+}
+
+// SidebarMenuBadge is a count or status pill at a menu item's trailing edge.
+templ SidebarMenuBadge(label string) {
+	<span class={ SidebarMenuBadgeClass }>{ label }</span>
+}
+
+// SidebarMenuSub is a nested list beneath a menu item, for a submenu.
+templ SidebarMenuSub() {
+	<ul class={ SidebarMenuSubClass }>
+		{ children... }
+	</ul>
+}
+
+// SidebarMenuSubItem is one entry of a SidebarMenuSub.
+templ SidebarMenuSubItem() {
+	<li>
+		{ children... }
+	</li>
+}

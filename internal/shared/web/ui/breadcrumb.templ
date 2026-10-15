@@ -1,0 +1,39 @@
+package ui
+
+// Crumb is one entry in a breadcrumb trail. Set Current on the page being
+// displayed: that crumb renders as text rather than a link, and its Href is
+// ignored, so the trail never links to the page the reader is already on.
+type Crumb struct {
+	Label   string
+	Href    string
+	Current bool
+}
+
+// Breadcrumb renders a breadcrumb trail as a nav landmark wrapping an ordered
+// list, so assistive technology can announce the position in the hierarchy. It
+// renders nothing for an empty trail. Separators are decorative and hidden
+// from the accessibility tree, so the list reads as items only.
+templ Breadcrumb(crumbs []Crumb) {
+	if len(crumbs) > 0 {
+		<nav aria-label="Remah roti">
+			<ol class={ BreadcrumbListClass }>
+				for i, crumb := range crumbs {
+					<li class="flex items-center gap-2">
+						if i > 0 {
+							<span class={ BreadcrumbDividerClass } aria-hidden="true">/</span>
+						}
+						if crumb.Current {
+							<span class={ BreadcrumbCurrentClass } aria-current="page">
+								{ crumb.Label }
+							</span>
+						} else {
+							<a href={ templ.URL(crumb.Href) } class={ BreadcrumbLinkClass }>
+								{ crumb.Label }
+							</a>
+						}
+					</li>
+				}
+			</ol>
+		</nav>
+	}
+}

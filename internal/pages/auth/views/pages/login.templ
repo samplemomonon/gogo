@@ -1,0 +1,64 @@
+package pages
+
+import (
+	"gogo/internal/shared/web/ui"
+)
+
+// Login is the seller console's sign-in surface. It composes the design system
+// (Card, Alert, FormField, SubmitAction) instead of re-declaring the daisyUI
+// chrome, so it stays in step with the rest of the app. The parameter order
+// matches the handler's call sites: email first, then the error message.
+templ Login(email string, errMsg string) {
+	// min-h-dvh, not min-h-screen: the shell's body is dvh-based, so the
+	// screen unit left this panel a mobile-viewport-height shorter than the
+	// page around it and pushed the card below the fold on a phone.
+	<div class="flex min-h-dvh items-center justify-center px-4">
+		<div class={ ui.CardClass + " w-full max-w-md shadow-float" }>
+			@ui.CardBody("gap-5") {
+				// The h1, and the only heading on this page. It was an <h2>
+				// before, so a screen reader entered the page with no level-one
+				// heading at all.
+				<h1 class={ ui.TitleClass + " text-center" }>Masuk</h1>
+				@ui.Alert("error", errMsg)
+				@ui.Form(ui.FormOptions{Action: "/login", Layout: ui.FormStack}) {
+					@ui.FormField("Email") {
+						<input
+							type="email"
+							name="email"
+							value={ email }
+							placeholder="admin@toko.com"
+							class={ ui.InputClass }
+							required
+							autocomplete="username"
+							if errMsg != "" {
+								aria-invalid="true"
+							}
+						/>
+					}
+					@ui.FormField("PIN (6 digit)") {
+						<input
+							type="password"
+							name="pin"
+							placeholder="123456"
+							class={ ui.InputClass }
+							required
+							minlength="6"
+							maxlength="6"
+							pattern="[0-9]*"
+							inputmode="numeric"
+							autocomplete="current-password"
+							if errMsg != "" {
+								aria-invalid="true"
+							}
+						/>
+					}
+					@ui.FormActions("-mt-1") {
+						@ui.SubmitAction(ui.IntentPrimary, "", "w-full "+ui.TapTargetClass, ui.SubmitAttrs("")) {
+							Masuk
+						}
+					}
+				}
+			}
+		</div>
+	</div>
+}

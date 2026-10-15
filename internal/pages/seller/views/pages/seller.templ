@@ -1,0 +1,81 @@
+package pages
+
+import (
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo/internal/shared/web/ui"
+)
+
+// sellerNav is the console's sidebar. Every entry must be a route the page actually
+// serves: a link to a surface that was removed is a dead end in the navigation, which is
+// worse than its absence because it looks like the feature is still there.
+//
+// The supplier entry is gone with the supplier aggregate — no service in the platform owns
+// it, so the console cannot offer management of it (see ARCHITECTURE.md D-018).
+var sellerNav = []ui.NavItem{
+	{Href: "/seller", Label: "Dashboard", Icon: ui.IconStore("size-4")},
+	{Href: "/seller/kasir", Label: "Kasir", Icon: ui.IconCart("size-4")},
+	{Href: "/seller/transaksi", Label: "Transaksi", Icon: ui.IconDocument("size-4")},
+	{Href: "/seller/produk", Label: "Produk", Icon: ui.IconTag("size-4")},
+	{Href: "/seller/kategori", Label: "Kategori", Icon: ui.IconLayers("size-4")},
+	{Href: "/seller/stok", Label: "Stok", Icon: ui.IconCheckBadge("size-4")},
+}
+
+templ Seller(content templ.Component) {
+	@layouts.Base(pageTitle(navigation.PathFromContext(ctx)), navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), "") {
+		@ui.SidebarProvider(ui.SidebarProviderOptions{
+			ID:      "seller-sidebar",
+			Mode:    ui.SidebarDrawer,
+			Sidebar: sidebar(navigation.PathFromContext(ctx)),
+			Inset:   sidebarInset(content),
+		})
+	}
+}
+
+// SidebarInsetClass sizes the console's content column. It deliberately does
+// NOT restate the shell's `container mx-auto px-4 py-8`: layouts.Base already
+// wraps every page body in one, so repeating it here nested a second
+// max-width container and a second 1rem gutter inside the first. The result
+// was 2rem of padding on all four sides of a console that is supposed to give
+// the tables their full width, and a drawer column capped at the container's
+// max-width on a large screen.
+const SidebarInsetClass = "gap-6"
+
+templ sidebarInset(content templ.Component) {
+	@ui.SidebarInset(ui.SidebarInsetOptions{ID: "seller-sidebar", Mode: ui.SidebarDrawer, Class: SidebarInsetClass}) {
+		@content
+	}
+}
+
+templ sidebar(path string) {
+	@ui.Sidebar(ui.SidebarOptions{
+		Header:  sidebarHeader(),
+		Content: sidebarGroups(path),
+	})
+}
+
+templ sidebarHeader() {
+	@ui.SidebarHeader() {
+		@ui.BrandLink("/seller", "Seller", "Konsol seller")
+	}
+}
+
+templ sidebarGroups(path string) {
+	@ui.SidebarGroup() {
+		@ui.SidebarGroupLabel("Konsol")
+		@ui.SidebarGroupContent() {
+			@ui.SidebarMenu(ui.SidebarMenuOptions{Items: sellerNav, Path: path})
+		}
+	}
+}
+
+func pageTitle(path string) string {
+	label := "Dashboard"
+	active := ui.ActiveNavHref(sellerNav, path)
+	for _, item := range sellerNav {
+		if item.Href == active {
+			label = item.Label
+		}
+	}
+	return "Seller — " + label
+}

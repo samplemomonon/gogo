@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "list",
+    srcs = ["handler.go"],
+    importpath = "gogo/internal/pages/home/handlers/products/list",
+    visibility = ["//gogo:__subpackages__"],
+    deps = [
+        "//gogo/internal/pages/home/application/ports",
+        "//gogo/internal/pages/home/application/results",
+        "//gogo/internal/pages/home/infrastructure/listingclient",
+        "//gogo/internal/pages/home/islandkeys",
+        "//gogo/internal/pages/home/views/pages",
+        "//gogo/internal/pages/home/views/partials",
+        "//gogo/internal/shared/tenant",
+        "//gogo/internal/shared/web/pagekit",
+        "//gogo/internal/shared/web/render",
+        "@com_github_a_h_templ//:templ",
+    ],
+)

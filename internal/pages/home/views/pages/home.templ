@@ -1,0 +1,26 @@
+package pages
+
+import (
+	"strconv"
+
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo/internal/shared/web/ui"
+)
+
+// region templ.Component adalah cara untuk membuat Home menerima component sebagai parameter,
+templ Home(region templ.Component, count int, term string) {
+	@ui.PageShell(ui.PageShellOptions{
+		Layout: layouts.Base("Gogo — Beranda", navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), term),
+	}) {
+		@ui.PageHero("Beranda", "primary", "Jelajahi Produk", "Produk diambil dari modul katalog melalui kontrak gRPC catalog.v1.", ui.IconDocuments("size-4")) {
+			@ui.StatTile("Produk", strconv.Itoa(count))
+			@ui.ButtonLink("/seller/produk", ui.TapActionClass(ui.IntentPrimary, "sm"), nil) {
+				@ui.IconDocument("size-4")
+				Manage
+			}
+		}
+
+		@region
+	}
+}

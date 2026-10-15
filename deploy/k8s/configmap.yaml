@@ -1,0 +1,48 @@
+# Shared, non-secret configuration injected into every gogo pod. Values map 1:1 to
+# internal/shared/config.
+#
+# Per-service overrides live on the Deployments, not here: SERVICE_NAME, and the four
+# product-platform addresses (which differ per environment and so are named explicitly
+# rather than inherited). Nothing credential-bearing belongs in this file — the Postgres
+# DSN stays in gogo-secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gogo-config
+  namespace: gogo
+  labels:
+    app.kubernetes.io/part-of: gogo
+data:
+  APP_ENV: "production"
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  SERVICE_NAME: "gogo"
+  READ_TIMEOUT: "5s"
+  WRITE_TIMEOUT: "15s"
+  IDLE_TIMEOUT: "60s"
+  REQUEST_TIMEOUT: "15s"
+  SHUTDOWN_TIMEOUT: "15s"
+  READ_HEADER_TIMEOUT: "5s"
+  SLOW_REQUEST_MS: "500"
+  # 1 MiB, capped on request bodies (form submissions on the pages).
+  MAX_HEADER_BYTES: "1048576"
+  MAX_BODY_BYTES: "1048576"
+  # Cluster-internal CIDRs that may forward client addresses (ingress
+  # controller + node network). Tune to your cluster's ranges.
+  TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  DB_MAX_CONNS: "10"
+  DB_MIN_CONNS: "1"
+  DB_PING_TIMEOUT: "2s"
+
+  # The product change feed. product-service publishes product.events.v1; the gateway
+  # consumes it under its own consumer group and republishes onto its in-process bus, so
+  # island caches are dropped when a product changes — including one changed through
+  # another service, which this process never sees.
+  #
+  # Removing this key does not break startup: the gateway then serves on its cache TTLs
+  # alone (30s for the storefront grid), which is correct but staler. It is set here
+  # because a production deployment should not serve a grid that can lag behind a write by
+  # a cache interval.
+  KAFKA_BROKERS: "kafka:9092"

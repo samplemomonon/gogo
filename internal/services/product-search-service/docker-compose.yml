@@ -1,0 +1,105 @@
+# Standalone orchestration for the product search service.
+#
+# This service needs two dependencies up: its own PostgreSQL, and the Kafka broker
+# that carries product-service's events. Neither is a hard startup requirement:
+# the consumer connects lazily and a broker that is not up yet only means the index
+# is not advancing yet, so the API still starts and serves whatever it has already
+# indexed.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Stamped into /version so a running container reports the revision it
+      # actually serves. Defaults keep a bare `docker compose up` working.
+      args:
+        VERSION: ${VERSION:-0.0.0-dev}
+        COMMIT: ${COMMIT:-unknown}
+        DATE: ${DATE:-unknown}
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+      - "9094:9094"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: search_user
+      DB_PASSWORD: search_pass
+      DB_NAME: search_db
+      DB_SSLMODE: disable
+      # Inside compose the broker is reachable by service name on the default
+      # network. Outside it, use host.docker.internal.
+      KAFKA_BROKERS: kafka:9092
+      # Must not be the listing service's group: two services in one group split
+      # the partitions, and each would index half the catalogue.
+      KAFKA_CONSUMER_GROUP: product-search-service
+      KAFKA_TOPIC: product.events.v1
+      KAFKA_DEAD_LETTER_TOPIC: product.events.v1.dlq
+      APP_PORT: "8084"
+      GRPC_PORT: "9094"
+      LOG_FORMAT: json
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/product-search-service", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: search_user
+      POSTGRES_PASSWORD: search_pass
+      POSTGRES_DB: search_db
+    # pg_trgm ships in the contrib modules the official image already builds, and
+    # it is a trusted extension, so the migration's CREATE EXTENSION succeeds as
+    # this non-superuser owner without an init script.
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U search_user -d search_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Single-node KRaft broker, for developing the consumer on its own. Run the
+  # full stack from the repository root to use the shared broker instead.
+  kafka:
+    image: apache/kafka:3.9.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # Two listeners so the same broker is reachable from inside the network and
+      # from the host, which need different advertised addresses.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # Single node, so every replication factor must be 1. Left at Kafka's
+      # default of 3 the broker would refuse to start.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_NUM_PARTITIONS: "3"
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  kafka_data:

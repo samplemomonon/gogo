@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+// productsearch.v1 is product-search-service's free-text search contract,
+// vendored into Gogo's contracts module so the storefront can search without
+// going through JSON.
+//
+// Search is split out of product-listing-service because the two workloads have
+// different shapes. Browsing is a bounded indexed scan over structured columns.
+// Search needs trigram indexes, relevance ranking, and an engine that can be
+// swapped for Elasticsearch or OpenSearch without touching the read side. Keeping
+// them in one service would mean the browse table carried indexes it does not use
+// and the search code could not evolve independently.
+//
+// This service projects the same product.events.v1 stream the listing service
+// consumes, into its own read model. It holds no authoritative data.
+//
+// The schema is a copy of product-search-service's own proto with only
+// go_package rewritten — see the note on product.v1 for why the duplication is
+// deliberate. Re-copy from product-search-service/proto/search/v1/search.proto
+// when the owner changes it.
+package productsearch.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gogo/contracts/productsearch/v1;productsearchv1";
+
+service ProductSearchService {
+  // SearchProducts returns the products matching a free-text term, ordered by
+  // relevance. The response is served from this service's own projection, so it
+  // reflects the last event it consumed rather than a synchronous read of
+  // product-service.
+  //
+  // An empty or missing query is rejected rather than treated as "match
+  // everything". Browse is a different question with a different cost, and it is
+  // answered by productlisting.v1.ProductListingService/ListProducts.
+  rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse);
+}
+
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  PRODUCT_STATUS_DRAFT = 1;
+  PRODUCT_STATUS_ACTIVE = 2;
+  PRODUCT_STATUS_ARCHIVED = 3;
+}
+
+// SearchProduct is the denormalised search document.
+//
+// It carries what a result card needs rather than the full product with its
+// variants, because a page of results must not grow with the number of variants
+// per product. This is also the shape a search engine returns: the document is
+// stored in the index and read back whole, so a result costs one lookup rather
+// than a search followed by a fetch per hit.
+message SearchProduct {
+  int64 id = 1;
+  int64 category_id = 2;
+  string name = 3;
+  string slug = 4;
+  string description = 5;
+  string brand = 6;
+  int64 price_cents = 7;
+  string currency = 8;
+  int32 stock = 9;
+  ProductStatus status = 10;
+  int64 primary_media_id = 11;
+  // Score is the relevance of this hit to the query, comparable across hits in
+  // one response. Under pg_trgm it is the greatest word-level similarity between
+  // the term and the product's name, brand or slug. It is an engine-specific
+  // number: a future Elasticsearch implementation returns its own _score here,
+  // and clients must not compare scores across different queries.
+  double score = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  // Projected_at is when this read model last wrote the row. It is not the same
+  // as updated_at: an event can republish a product without changing it.
+  google.protobuf.Timestamp projected_at = 15;
+}
+
+message SearchProductsRequest {
+  // Query is the free-text term, matched case-insensitively as a substring of
+  // the product's name, brand or slug.
+  //
+  // It must be at least three characters. Trigram indexes cannot accelerate a
+  // shorter pattern, so a one or two character term would fall back to a
+  // sequential scan of the whole index on every request.
+  string query = 1;
+  int64 category_id = 2;
+  ProductStatus status = 3;
+  int64 min_price_cents = 4;
+  int64 max_price_cents = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message SearchProductsResponse {
+  repeated SearchProduct products = 1;
+  // Total counts the products matching the filters, ignoring paging.
+  int64 total = 2;
+  // Limit and offset echo the applied page, after defaulting and clamping, so a
+  // client can page without re-deriving them.
+  int32 limit = 3;
+  int32 offset = 4;
+  // Took_ms is how long the query took. It is reported because a search slow
+  // enough to matter is the signal that this read model has outgrown PostgreSQL,
+  // which is the condition for moving to a dedicated engine.
+  int64 took_ms = 5;
+}

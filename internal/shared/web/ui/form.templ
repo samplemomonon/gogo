@@ -1,0 +1,166 @@
+package ui
+
+// FormField wraps its children (a form control) in the standard label chrome.
+templ FormField(label string) {
+	<label class={ FieldClass }>
+		<div class={ LabelClass }>
+			<span class={ LabelTextClass }>{ label }</span>
+		</div>
+		{ children... }
+	</label>
+}
+
+// FormLayout is the layout a Form injects around its fields.
+type FormLayout string
+
+const (
+	// FormFieldset stacks fields in the responsive two-column grid used by a
+	// create/edit panel (product, supplier, stock).
+	FormFieldset FormLayout = FieldsetClass
+
+	// FormInline lays a compact create form out in one row (category).
+	FormInline FormLayout = InlineFormClass
+
+	// FormStack stacks fields with the standard vertical rhythm.
+	FormStack FormLayout = "space-y-4"
+)
+
+// FormOptions is the presentation-ready input for a mutating form. The caller
+// owns the target and the fields; the primitive owns the form element, its
+// method, and the layout it wraps the fields in.
+type FormOptions struct {
+	// Action is the form's target. Required.
+	Action string
+
+	// Method is the HTTP method ("post" for a mutation). Empty defaults to
+	// "post", since every form in the app mutates.
+	Method string
+
+	// Layout is the container the fields sit in. Empty keeps the fields bare,
+	// for a caller that supplies its own grid.
+	Layout FormLayout
+
+	// Class carries extra classes on the form element itself.
+	Class string
+
+	// Search marks a GET search form, so it renders role="search" and a search
+	// landmark for assistive technology.
+	Search bool
+}
+
+// Form renders a mutating form element with the injected field layout. It is
+// the slot-composition counterpart to FormField: the caller supplies label +
+// control children, the primitive supplies the element, its method and layout.
+templ Form(spec FormOptions) {
+	<form
+		method={ formMethod(spec) }
+		action={ templ.URL(spec.Action) }
+		class={ formClass(spec) }
+		if spec.Search {
+			role="search"
+		}
+	>
+		{ children... }
+	</form>
+}
+
+// FormActions is a form's action row: the full-bleed container that holds a
+// form's submit button(s) inside a fieldset grid. Three console forms spelled
+// this as a bare `<div class="sm:col-span-2">`, which left the submit button
+// without any vertical rhythm against the fields above it.
+templ FormActions(class string) {
+	<div class={ joinClasses(FormActionsClass, class) }>
+		{ children... }
+	</div>
+}
+
+// FormCheckbox is a labelled checkbox that matches the text fields around it.
+// The checkbox row used to be hand-written at its single call site with a
+// different label wrapper than FormField's, so the two read as different form
+// systems on the same panel.
+templ FormCheckbox(name string, label string, checked bool) {
+	<label class="label cursor-pointer justify-start gap-2 py-1.5">
+		<input type="checkbox" name={ name } class="checkbox checkbox-primary" if checked {
+			checked
+		}/>
+		<span class={ LabelTextClass }>{ label }</span>
+	</label>
+}
+
+// SubmitButton is a form's primary action: a Button with type="submit" and the
+// btn-primary chrome, so a form's submit intent is one call instead of a
+// Button plus an explicit type attribute. class appends page-specific chrome.
+//
+// The empty child block around `{ children... }` is load-bearing: templ
+// compiles a template that delegates to another without naming a child into a
+// direct .Render() call on a cleared context, which silently drops the slot.
+templ SubmitButton(class string) {
+	@SubmitAction(IntentPrimary, "", class, nil) {
+		{ children... }
+	}
+}
+
+// SubmitAction is SubmitButton for a form that names its intent through the
+// shared button vocabulary, so a form's submit button cannot end up a different
+// size or colour from every other action beside it — and so the icon gap is
+// never re-spelled per call site. It also takes the button's attributes, which
+// is where a destructive or charge-triggering submit declares its confirmation.
+templ SubmitAction(intent Intent, size string, class string, attrs templ.Attributes) {
+	@Button(ActionClass(intent, size, class), joinAttrs(templ.Attributes{"type": "submit"}, attrs)) {
+		{ children... }
+	}
+}
+
+func formMethod(spec FormOptions) string {
+	if spec.Method == "" {
+		return "post"
+	}
+	return spec.Method
+}
+
+func formClass(spec FormOptions) string {
+	return joinClasses(string(spec.Layout), spec.Class)
+}
+
+// joinAttrs merges attribute sets without mutating either argument, letting a
+// primitive add the attributes it owns (a submit type, a required label) to
+// whatever the call site supplied. `extra` wins, so a call site can override a
+// default rather than only supplement it.
+func joinAttrs(base, extra templ.Attributes) templ.Attributes {
+	out := make(templ.Attributes, len(base)+len(extra))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
+}
+
+// SubmitAttrs are the attributes a mutating submit button carries: the submit
+// type, the confirmation when the action is irreversible, and the in-flight
+// marker the shell's script uses to suppress the control while the POST is in
+// the air. Without the last one a reader can submit the same form twice — a
+// double-tapped "Bayar" charges a customer twice.
+//
+// The type is stated rather than left to HTML's default. A bare <button> inside
+// a form does default to submit, so relying on that works today; but Button
+// serves both submitting and in-page roles, and an attribute set called
+// SubmitAttrs that does not make the control a submitter is a trap for the
+// next caller who reads the name and drops the type.
+//
+// The confirmation is a data attribute rather than an inline handler because it
+// is a progressive enhancement: without the shell's script the form still posts,
+// so the action stays available to a reader whose JavaScript did not load.
+//
+// Every destructive action in the app needed this. "Hapus" was a single-tap
+// POST that deleted a product, a category or a supplier with no undo and no
+// second look; "Batal" voided a paid transaction. The shell's script turns the
+// attribute into a window.confirm, so the cost is one attribute per action.
+func SubmitAttrs(confirm string) templ.Attributes {
+	attrs := templ.Attributes{"type": "submit", "data-submitting": "true"}
+	if confirm != "" {
+		attrs["data-confirm"] = confirm
+	}
+	return attrs
+}

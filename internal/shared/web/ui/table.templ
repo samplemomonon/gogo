@@ -1,0 +1,123 @@
+package ui
+
+// Column is one header cell of a DataTable. Align is a semantic alignment
+// ("right" for numeric or action columns, "center" or empty for the rest), so
+// a view states intent instead of a utility class.
+type Column struct {
+	Label string
+	Align string
+
+	// AriaLabel names a column that carries no visible text — the action
+	// column whose header is a decorative empty cell. Without it that header
+	// announces as an unlabeled column and a screen-reader user hears a gap
+	// where the row's actions are.
+	AriaLabel string
+
+	// Numeric marks a column of figures. It tells assistive technology the
+	// cells are numbers rather than prose, which is the difference between
+	// "1200" and "one thousand two hundred" on the way in and out of the cell.
+	Numeric bool
+}
+
+// DataTableOptions is the presentation-ready input for DataTable.
+type DataTableOptions struct {
+	// Columns are the header cells, in order.
+	Columns []Column
+
+	// MinWidth floors the table's width so a narrow viewport scrolls it
+	// horizontally instead of crushing every column until the action cell
+	// overflows the screen. It is a literal utility class written by the
+	// caller ("min-w-[40rem]"); omit it for a two-column table that fits a
+	// phone without help.
+	MinWidth string
+
+	// Caption is the table's accessible name, announced before the header row.
+	// Empty omits it — the enclosing panel's title usually serves, but a table
+	// whose panel title does not describe its scope should say so here.
+	Caption string
+}
+
+// DataTable renders the chrome every data table repeats: the horizontal
+// scroll wrapper for narrow viewports, the zebra table, and the uppercase
+// header row with its per-column alignment. Header cells carry scope="col" so
+// assistive technology can pair a cell with its column.
+// children is the caller's body rows, so a table stays a real table while its
+// chrome lives in one place.
+templ DataTable(spec DataTableOptions) {
+	<div class={ TableScrollClass }>
+		<table class={ joinClasses(TableClass, spec.MinWidth) }>
+			if spec.Caption != "" {
+				<caption class="sr-only">{ spec.Caption }</caption>
+			}
+			<thead>
+				<tr class={ TableHeadClass }>
+					for _, column := range spec.Columns {
+						@tableHeadCell(column)
+					}
+				</tr>
+			</thead>
+			<tbody>
+				{ children... }
+			</tbody>
+		</table>
+	</div>
+}
+
+templ tableHeadCell(column Column) {
+	<th
+		scope="col"
+		class={ columnAlignClass(column.Align) }
+		if column.AriaLabel != "" {
+			aria-label={ column.AriaLabel }
+		}
+		if column.Numeric {
+			aria-sort="none"
+		}
+	>
+		{ column.Label }
+	</th>
+}
+
+// TableRow is a body row with the shared hover affordance.
+templ TableRow() {
+	<tr class={ TableRowClass }>
+		{ children... }
+	</tr>
+}
+
+// TableCell is a body cell. align is the same semantic alignment Column takes;
+// class carries any cell-specific styling.
+templ TableCell(align string, class string) {
+	<td class={ joinClasses(columnAlignClass(align), class) }>
+		{ children... }
+	</td>
+}
+
+// TableRowHeader is the cell that names its row — the leading cell of every row
+// in a record table. It is a <th scope="row">, not a bolded <td>: that is what
+// lets assistive technology carry the row's subject across every value beside
+// it. A console table whose first column is a plain cell reads as eight
+// unrelated columns.
+templ TableRowHeader(class string) {
+	<th scope="row" class={ joinClasses(TableRowHeadClass, class) }>
+		{ children... }
+	</th>
+}
+
+// TableEmpty is the row a table shows when it has no data: the caller renders
+// it as the single row of the table so the columns stay announced, with the
+// message spanning them. It is separate from EmptyState because an empty table
+// is a different situation from an empty page — the reader needs to know which
+// columns came back with nothing.
+templ TableEmpty(colSpan int, title string, description string) {
+	<tr>
+		<td colspan={ colSpan } class="p-0">
+			<div class="flex flex-col items-center gap-1.5 px-4 py-10 text-center">
+				<p class="text-sm font-semibold text-base-content/80">{ title }</p>
+				if description != "" {
+					<p class={ MutedClass + " text-xs leading-relaxed max-w-sm" }>{ description }</p>
+				}
+			</div>
+		</td>
+	</tr>
+}
