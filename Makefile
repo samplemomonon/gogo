@@ -55,7 +55,7 @@ vet: assets
 # `gofmt -l ./internal` walked all of it on every run.
 check: vet test
 	@dirs="$$(go list -f '{{.Dir}}' ./... | sort -u)"; \
-	@test -z "$$(gofmt -l $$dirs)" || \
+	test -z "$$(gofmt -l $$dirs)" || \
 		(echo "gofmt needed on:"; gofmt -l $$dirs; exit 1)
 	@before="$$(git status --porcelain -- internal cmd)"; \
 	templ generate >/dev/null 2>&1; \
