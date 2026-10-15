@@ -513,3 +513,79 @@ the exact failure this repository has been closing all along.
 A fourth assertion was also wrong before it was fixed: the deprecation check
 looked for `reason: "` to be present, which is also true of `@deprecated(reason:
 "")` — the empty reason it existed to catch.
+
+---
+
+## 11. Authentication at the composition layer
+
+**The gap.** Measured before changing anything: zero occurrences of `Authorization`,
+`Bearer`, `JWT` or `OAuth` in any production `.go` file in the repository. The
+service holding ten write mutations — including `registerMedia`, which returns a
+presigned URL letting the caller PUT arbitrary bytes into object storage — was
+publishing port `8085:8085` with no credential of any kind.
+
+This was the highest-priority item available, and not a close call: it is the only
+one that is a security hole rather than an internal improvement.
+
+**Decided** in `docs/ADR_AUTH_AT_THE_COMPOSITION_LAYER.md`: reads public, writes
+require a bearer token, and a configuration with no token does not start.
+
+The last clause is the part worth defending. The natural reading of an absent
+`MUTATION_TOKENS` is "no authentication required", which is how an endpoint with
+ten write mutations becomes public because someone removed an environment variable
+rather than because anyone chose it. `config.Load` refuses instead, and names the
+variable.
+
+**Placed at the operation layer**, via gqlgen's `AroundOperations`. The question
+"is this a write?" cannot be answered from the HTTP method — `POST /query` carries
+both — and re-parsing in middleware would parse every request twice, which is the
+cost Automatic Persisted Queries exists to remove. At that point gqlgen has already
+parsed, resolved persisted queries and selected the operation by name.
+
+This placement also closes a hole a body-inspecting middleware would leave: a client
+cannot register a mutation once as a persisted query and execute it by hash
+forever.
+
+### The tests prove the write did not happen
+
+Every rejection test asserts on a counter in the stub store, not on a status code.
+Removing the registration turns the main test red with:
+
+    the write reached the domain layer 1 time(s); authentication is a control
+    that must stop the write, not merely report on it afterwards
+
+Two more negative checks were run deliberately:
+
+| Sabotage | Caught by |
+|---|---|
+| Remove the `AroundOperations` registration | `TestMutationWithoutATokenIsRefusedAndDoesNotWrite` — write count 1 |
+| Gate every operation instead of only writes | `TestQueriesRemainPublic`, `TestIntrospectionRemainPublic` |
+
+A third sabotage was **not** caught, and is recorded rather than papered over:
+replacing the constant-time comparison with an early-returning one passes every
+test. Timing a comparison loop reliably needs a statistical test or an AST check on
+`auth.go`'s own source, and a timing test that passes by luck teaches a reader the
+property is verified when it is not.
+
+### One test bug worth recording
+
+The persisted-query test initially asserted the right thing for the wrong reason.
+Automatic Persisted Queries only populates its cache when the hash **and** the
+document text arrive together, so the test's "register" step — which sent the text
+alone — cached nothing, and the replay returned `PERSISTED_QUERY_NOT_FOUND` rather
+than `UNAUTHENTICATED`.
+
+A test that passes for the wrong reason is worse than one that fails, because it
+reports the property as covered. Fixed, and the helper now marshals its JSON
+instead of formatting it: the hand-built body had four nested braces and was missing
+one, which surfaced as "unexpected EOF" — an error about the test's transport
+rather than about the rule it was meant to test.
+
+### Blast radius
+
+Making `MUTATION_TOKENS` mandatory at `config.Load` correctly refused to start for
+every existing test harness in the service. Six call sites in `hardening_test.go`,
+one `config.Load` helper in `graph/integration_test.go`, and eleven across the
+config package all now configure a token. Two graph integration tests were genuinely
+performing writes and had to start presenting a credential — which is the rule
+working, not the rule breaking something.

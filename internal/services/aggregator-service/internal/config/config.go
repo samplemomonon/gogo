@@ -20,18 +20,24 @@ import (
 // Config is the fully resolved runtime configuration.
 type Config struct {
 	// Server.
-	AppPort                int
-	ReadHeaderTimeout      time.Duration
-	ReadTimeout            time.Duration
-	WriteTimeout           time.Duration
-	IdleTimeout            time.Duration
-	ShutdownTimeout        time.Duration
-	MaxRequestBodyBytes    int64
-	LogLevel               string
-	LogFormat              string
-	EnableIntrospection    bool
-	PlaygroundEnabled      bool
-	AllowedOrigins         []string
+	AppPort             int
+	ReadHeaderTimeout   time.Duration
+	ReadTimeout         time.Duration
+	WriteTimeout        time.Duration
+	IdleTimeout         time.Duration
+	ShutdownTimeout     time.Duration
+	MaxRequestBodyBytes int64
+	LogLevel            string
+	LogFormat           string
+	EnableIntrospection bool
+	PlaygroundEnabled   bool
+	AllowedOrigins      []string
+	// MutationTokens are the bearer tokens permitted to execute mutations and
+	// subscriptions. Reads are deliberately public.
+	//
+	// An empty slice does NOT mean "no authentication required" — it means every
+	// mutation is refused. See Validate.
+	MutationTokens         []string
 	RequestTimeout         time.Duration
 	DependencyTimeout      time.Duration
 	MaxQueryComplexity     int
@@ -103,6 +109,7 @@ func Load() (*Config, error) {
 		// services, so it defaults off and belongs only in a local dev stack.
 		PlaygroundEnabled: getEnvBool("ENABLE_PLAYGROUND", false),
 		AllowedOrigins:    getEnvList("ALLOWED_ORIGINS", nil),
+		MutationTokens:    getEnvList("MUTATION_TOKENS", nil),
 
 		// The whole-request budget. It must exceed DependencyTimeout, because a
 		// single downstream call is expected to fit inside it; if it does not, the
@@ -188,6 +195,41 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(target) == "" {
 			return fmt.Errorf("%s must not be empty", name)
 		}
+	}
+
+	// Mutations are refused unless a token is configured. This is the one place
+	// the service is fail-closed, and it is deliberate: the alternative reading of
+	// "no tokens configured" is "no authentication required", which is how an
+	// endpoint with ten write mutations ends up public because someone removed an
+	// environment variable rather than because anyone chose that.
+	//
+	// An operator who genuinely wants writes open has to say so by configuring an
+	// empty-but-present token, which reads differently in a deployment manifest
+	// from an absent variable.
+	if len(c.MutationTokens) == 0 {
+		return fmt.Errorf(
+			"MUTATION_TOKENS must list at least one token; an absent value refuses every " +
+				"mutation rather than permitting them unauthenticated",
+		)
+	}
+	seen := make(map[string]bool, len(c.MutationTokens))
+	for i, token := range c.MutationTokens {
+		if strings.TrimSpace(token) == "" {
+			return fmt.Errorf("MUTATION_TOKENS[%d] is empty", i)
+		}
+		// A short token is not a token. Rejecting it at startup is better than
+		// accepting a configuration that looks secured and is not.
+		if len(token) < 16 {
+			return fmt.Errorf(
+				"MUTATION_TOKENS[%d] is %d characters; use at least 16 so the value is not "+
+					"guessable by brute force",
+				i, len(token),
+			)
+		}
+		if seen[token] {
+			return fmt.Errorf("MUTATION_TOKENS[%d] duplicates an earlier token", i)
+		}
+		seen[token] = true
 	}
 
 	if c.RequestTimeout <= c.DependencyTimeout {

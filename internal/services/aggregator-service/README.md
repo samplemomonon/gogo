@@ -356,6 +356,62 @@ Dua hal yang tidak diekspos gRPC dan jadi batasan nyata:
 `documents`), supaya perubahan kontrak gagal keras di decode time, bukan diam-diam
 membaca nol.
 
+## Authentication
+
+Read publik; write tidak. Asimetri itu desainnya: katalog yang meminta kredensial
+untuk dijelajahi akan memories biaya ke setiap pengunjung anonim untukmembela apa yang tidak ada.
+
+```bash
+# Reads: no credential
+curl localhost:8085/query -H 'Content-Type: application/json' \
+  -d '{"query":"{ products(filter:{limit:5}) { total } }"}'
+
+# Writes: one
+curl localhost:8085/query -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MUTATION_TOKEN" \
+  -d '{"query":"mutation { createProduct(input:{categoryId:\"1\",name:\"X\",priceCents:1}) { projected } }"}'
+```
+
+Tanpa token, mutation menjawab `UNAUTHENTICATED` — **dan tidak menulis apa pun**.
+Kegagalan itu diuji dengan menghitung call ke domain layer, bukan dengan memeriksa
+kode status, karena error yang terlihat otentik tetapi datang setelah write sudah
+terlanjur terjadi akan lolos pemeriksaan mana pun yang hanya melihat respons.
+
+### Di mana pemeriksaan dilakukan, dan kenapa bukan di middleware
+
+"Apakah request ini write?" tidak bisa dijawab dari HTTP method, karena `POST /query`
+membawa query maupun mutation. Dan tidak seharusnya dijawab dengan parse ulang
+dokumen di middleware: itu parse dua kali untuk setiap request, sementara biaya parse
+justru yang dihindari oleh Automatic Persisted Queries.
+
+Jadi pemeriksaan berjalan di lapisan operasi lewat `AroundOperations`. Di titik itu
+gqlgen sudah parse dokumen, resolve persisted query, dan memilih operasi berdasarkan
+nama — sehingga jenis operasinya diketahui pasti, bukan ditebak. Query yang tidak
+pernah menyentuh write juga hanya satu perbandingan integer.
+
+Konsekuensi yang ikut diuji: mutation yang dikirim sebagai hash persisted query
+tetap butuh token, jadi client tidak bisa mendaftarkan satu mutation sekali lalu
+mengeksekusinya lewat hash selamanya.
+
+### Mengapa token statis, dan bukan lebih dari itu
+
+Lima service di bawah ini juga tidak punya authentication, jadi tidak ada identitas
+untuk didelegasikan dan tidak ada principal yang bisa diturunkan. Yang tersedia di
+lapisan ini adalah yang sudah disebut README ini sejak awal: satu titik menutup
+semua API.
+
+Jadi ini credential check, bukan identity system. Beberapa token didukung karena
+rotasi adalah kebutuhan operasional, bukan fitur tambahan: satu token berarti
+merotasinya langsung membatalkan semua caller sekaligus. Perbandingan
+constant-time di atas digest SHA-256, dan token disimpan sebagai digest supaya
+dump heap tidak membocorkan kredensial yang bisa dipakai.
+
+Properti constant-time itu **tidak** ditutup test perilaku, dengan sengaja. Mengukur
+loop perbandingan secara andal butuh test statistik dengan iterasi besar atau
+pemeriksaan AST atas sumber file ini sendiri, dan keduanya lebih buruk dari celah
+yang ditutupnya: test timing yang lolos karena beruntung membuat pembaca mengira
+propertinya terverifikasi.
+
 ## Configuration
 
 Semua dari environment; default ada di setiap baris dan Startup gagal pada
@@ -382,6 +438,7 @@ konfigurasi yang tidak bisa bekerja, bukan pada request pertama yang membutuhkan
 | `ENABLE_PLAYGROUND` | false | mengeksekusi query nyata |
 | `ENABLE_PERSISTED_QUERIES` | true | |
 | `ALLOWED_ORIGINS` | kosong | `*` untuk wildcard; request tanpa Origin selalu diizinkan |
+| `MUTATION_TOKENS` | **wajib** | bearer token untuk mutation, dipisah koma, tiap token ≥16 karakter. Kosong = startup ditolak |
 | `SHUTDOWN_TIMEOUT` | 30s | |
 
 Boolean menerima `1/true/yes/on` dan `0/false/no/off`. `strconv.ParseBool`
@@ -557,10 +614,19 @@ paling berguna. Pada titik itu ini butuh count-by-group RPC di service listing.
 log, proxy log, dan browser history. Di sini ia berguna untuk read-only health check
 dan client yang tidak bisa POST. Jika aggregator ini jadi publik, matikan.
 
-**Belum ada authentication.** Query dan mutation terbuka. Service ini mewarisi
-keterbatasan ini dari lima service di bawahnya, yang juga tidak punya auth; tetapi
-composition layer adalah tempat yang paling logis untuk menambahkannya, karena satu
-titik menutup semua API. Mekanisme tokennya belum diputuskan.
+**Authentication itu credential check, bukan identity system.** Read publik; setiap
+mutation memerlukan bearer token. Token diatur lewat `MUTATION_TOKENS` (daftar,
+dipisah koma, minimal 16 karakter), dan konfigurasi tanpa token **ditolak saat
+startup** — bukan diperlakukan sebagai "auth tidak diperlukan", yang merupakan cara
+sebuah endpoint dengan sepuluh mutasi tulis menjadi publik karena seseorang menghapus
+sebuah environment variable. Lihat
+[Authentication](#authentication).
+
+Yang belum ada: identitas. Token itu menjawab satu pertanyaan — boleh tidak
+caller ini menulis — dan tidak menclaims lebih dari itu. Caller diidentifikasi lewat
+token mana yang ia bawa, bukan siapa dia. Sistem identitas sungguhan, dengan
+otorisasi per-caller dan audit, adalah keputusan yang lebih besar dan milik lapisan
+di atas service ini.
 
 **Trace hanya mencakup sisi aggregator.** Kelima service di bawah tidak mengekstrak
 `traceparent`, jadi sebuah trace punya satu span HTTP dan span client untuk setiap

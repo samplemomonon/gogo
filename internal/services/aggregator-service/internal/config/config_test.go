@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -10,9 +11,21 @@ import (
 // passes Load. The second is the one that catches deployment mistakes at startup
 // rather than on the first request that needs the bad value.
 
+// A valid configuration needs a mutation token: config.Load refuses to return one
+// without, because an absent MUTATION_TOKENS must refuse every mutation rather
+// than permit them. Tests about other settings get this baseline instead of
+// tripping over a rule they are not exercising.
+const configTestToken = "config-test-mutation-token-value"
+
+func withToken(t *testing.T) {
+	t.Helper()
+	t.Setenv("MUTATION_TOKENS", configTestToken)
+}
+
 func TestLoadAppliesDefaults(t *testing.T) {
 	// Nothing set: a developer running locally with no environment should get a
 	// working configuration pointing at localhost.
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -58,6 +71,7 @@ func TestEmptyGrpcTargetIsRejected(t *testing.T) {
 	// getEnv treats empty as unset, so this exercises the whitespace path instead.
 	t.Setenv("CATEGORY_GRPC_TARGET", "   ")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("whitespace should fall back to the default: %v", err)
@@ -172,6 +186,7 @@ func TestGetEnvBoolAcceptsTheSpellingsComposeFilesUse(t *testing.T) {
 	// accepting them.
 	for _, value := range []string{"1", "true", "TRUE", "yes", "YES", "on"} {
 		t.Setenv("ENABLE_PLAYGROUND", value)
+		withToken(t)
 		cfg, err := Load()
 		if err != nil {
 			t.Fatalf("%s: %v", value, err)
@@ -182,6 +197,7 @@ func TestGetEnvBoolAcceptsTheSpellingsComposeFilesUse(t *testing.T) {
 	}
 	for _, value := range []string{"0", "false", "FALSE", "no", "NO", "off"} {
 		t.Setenv("ENABLE_PLAYGROUND", value)
+		withToken(t)
 		cfg, err := Load()
 		if err != nil {
 			t.Fatalf("%s: %v", value, err)
@@ -196,6 +212,7 @@ func TestGetEnvBoolFallsBackOnGarbage(t *testing.T) {
 	// Falling back to the default is the safe direction for a hardening toggle: an
 	// unparseable "ENABLE_PLAYGROUND=maybe" leaves it off.
 	t.Setenv("ENABLE_PLAYGROUND", "maybe")
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -236,6 +253,7 @@ func TestAllowedOriginsListDropsEmptyEntries(t *testing.T) {
 	// which would then match requests with no Origin.
 	t.Setenv("ALLOWED_ORIGINS", "https://a.example, ,https://b.example,")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -261,6 +279,7 @@ func TestDependenciesAreReportedForLogging(t *testing.T) {
 	t.Setenv("CATEGORY_GRPC_TARGET", "category-app:9090")
 	t.Setenv("SEARCH_GRPC_TARGET", "search-app:9094")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -283,6 +302,7 @@ func TestMalformedNumericAndDurationValuesFallBack(t *testing.T) {
 	t.Setenv("MAX_QUERY_COMPLEXITY", "not-a-number")
 	t.Setenv("REQUEST_TIMEOUT", "not-a-duration")
 
+	withToken(t)
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -326,4 +346,64 @@ func contains(haystack, needle string) bool {
 		}
 	}
 	return false
+}
+
+// --- mutation authentication ------------------------------------------------
+
+// The fail-closed property, tested where it actually lives: in Load.
+//
+// The alternative reading of an absent MUTATION_TOKENS — "no authentication
+// required" — is how an endpoint with ten write mutations becomes public because
+// someone removed an environment variable rather than because anyone chose that.
+func TestAbsentMutationTokensRefuseToLoad(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", "")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("a configuration with no mutation token loaded successfully; " +
+			"startup must refuse rather than default to open")
+	} else if !strings.Contains(err.Error(), "MUTATION_TOKENS") {
+		t.Errorf("error %q does not name the variable to set", err)
+	}
+}
+
+func TestAMutationTokenIsAccepted(t *testing.T) {
+	withToken(t)
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("a configuration with a valid token was rejected: %v", err)
+	}
+}
+
+func TestSeveralMutationTokensAreAccepted(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", "first-token-value-here, second-token-value-here")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("rejected: %v", err)
+	}
+	if len(cfg.MutationTokens) != 2 {
+		t.Errorf("parsed %d tokens, want 2", len(cfg.MutationTokens))
+	}
+}
+
+// A short token is not a token. Accepting one produces a configuration that looks
+// secured and is not.
+func TestAShortMutationTokenIsRejected(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", "short")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("a four-character mutation token was accepted")
+	}
+	if !strings.Contains(err.Error(), "16") {
+		t.Errorf("error %q does not state the minimum length", err)
+	}
+}
+
+func TestADuplicateMutationTokenIsRejected(t *testing.T) {
+	t.Setenv("MUTATION_TOKENS", "same-token-value-here-x, same-token-value-here-x")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("a duplicated token was accepted; it suggests a misconfigured rotation")
+	}
 }

@@ -42,6 +42,10 @@ services:
       ALLOWED_ORIGINS: "*"
 
       APP_PORT: "8085"
+      # Writes require a bearer token and startup refuses to run without one. This
+      # is a local development credential and is not a secret: it exists so the
+      # compose stack can write, and it is published here on purpose.
+      MUTATION_TOKENS: "local-dev-mutation-token-not-a-secret"
       LOG_FORMAT: text
       LOG_LEVEL: debug
     restart: unless-stopped
