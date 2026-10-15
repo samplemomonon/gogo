@@ -1,0 +1,87 @@
+# Port registry — the single place a port is assigned in this repository.
+#
+# Every port a service listens on, the environment variable that configures it,
+# and who else on a developer machine wants the same number. Nothing else here is
+# authoritative: the Go defaults, the Dockerfile EXPOSE lines, the compose
+# mappings and the aggregator's dependency targets are all checked against this
+# file, so this is where a change is made.
+#
+# [service-ports] rows are whitespace-separated, six fields, no spaces inside a
+# field:
+#
+#   <service> <kind> <env-var> <container-port> <dev-host-port> <owner>
+#
+#   kind    http | grpc | postgres
+#   owner   gogo  the port is ours
+#           -     unallocated; nobody's default, we took it first
+#           OTHER a well-known tool's documented default. See [reserved].
+#
+# The dev column is the port bound on the developer's own machine. Staging and
+# production publish no host port at all: services reach each other over the
+# container network by service name, so the host port does not exist there. That
+# is why this file has a dev column and no staging/prod ones — adding them would
+# imply a mapping nobody should create. TestNoDeploymentPublishesHostPorts
+# enforces their absence.
+#
+# Every collision recorded below is therefore a laptop collision. A container
+# publishing 9092 takes the port from the Prometheus running beside it; the same
+# container in staging publishes nothing and collides with nothing. The dev
+# column makes collisions rare, not impossible: whether the developer's own
+# machine already has something on a port is not knowable from this repository.
+
+[reserved]
+# Well-known defaults this repository must not allocate. Each verified against
+# that project's own documentation.
+#
+# Note what 9092 means to Prometheus itself: its own port-allocation wiki marks
+# 9092 "UNALLOCATED (to avoid collision with Kafka)". The gRPC range below sits
+# exactly on Prometheus's allocated range, which is why this file exists.
+3000 GRAFANA Grafana server
+4317 OTLP_GRPC OpenTelemetry Collector gRPC receiver
+4318 OTLP_HTTP OpenTelemetry Collector HTTP receiver
+5432 POSTGRESQL PostgreSQL
+6379 REDIS Redis
+9090 PROMETHEUS Prometheus server
+9091 PUSHGATEWAY Prometheus Pushgateway
+9092 KAFKA Apache Kafka broker (plaintext)
+9093 ALERTMANAGER Prometheus Alertmanager
+9094 ALERTMANAGER_CLUSTERING Prometheus Alertmanager clustering / memberlist
+16686 JAEGER_UI Jaeger query and UI service
+
+[service-ports]
+# Four of our ports are also somebody else's default. They are recorded as
+# accepted rather than as unknown, because a registry listing 9092 as ours with
+# no note is how that collision became invisible.
+#
+# Renumbering them was considered and deferred: it changes the default every
+# client, deployment manifest and client-side fallback depends on, and it is not
+# worth the blast radius while nothing is deployed. Deferred, not accepted
+# forever.
+#
+# product-listing and product-search sit beside Prometheus's Alertmanager;
+# product-service sits on Kafka's broker port.
+gateway                 http     PORT      8080 8080 gogo
+product-service         http     APP_PORT  8082 8082 gogo
+product-service         grpc     GRPC_PORT 9092 9092 KAFKA
+product-listing-service http     APP_PORT  8083 8083 gogo
+product-listing-service grpc     GRPC_PORT 9093 9093 ALERTMANAGER
+product-search-service  http     APP_PORT  8084 8084 gogo
+product-search-service  grpc     GRPC_PORT 9094 9094 ALERTMANAGER_CLUSTERING
+aggregator-service      http     APP_PORT  8085 8085 gogo
+postgres                postgres DB_PORT   5432 5432 POSTGRESQL
+
+[notes]
+# category-service and media-service have no module in this repository, yet the
+# aggregator's default targets point at 9090 and 9091 — Prometheus and its
+# Pushgateway. Run the aggregator with defaults beside a running Prometheus and
+# it sends gRPC to Prometheus's HTTP port, failing with a message that points
+# nowhere useful.
+#
+# They are described here rather than listed as rows because the gate walks the
+# code of services that exist; a row it cannot verify is a row that will rot
+# silently. When either lands, add it above and delete this note.
+#
+# The dev Postgres is 5432, PostgreSQL's own default, because it is a dependency
+# of the whole stack rather than of one project. The per-service projects avoid
+# the clash by mapping 5434, 5436 and 5437 onto their own containers — that
+# offset exists for this reason.
