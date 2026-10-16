@@ -29,18 +29,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CategoryService_GetCategory_FullMethodName     = "/category.v1.CategoryService/GetCategory"
-	CategoryService_ListCategories_FullMethodName  = "/category.v1.CategoryService/ListCategories"
-	CategoryService_GetCategoryTree_FullMethodName = "/category.v1.CategoryService/GetCategoryTree"
-	CategoryService_CategoryExists_FullMethodName  = "/category.v1.CategoryService/CategoryExists"
+	CategoryService_GetCategory_FullMethodName            = "/category.v1.CategoryService/GetCategory"
+	CategoryService_ListCategories_FullMethodName         = "/category.v1.CategoryService/ListCategories"
+	CategoryService_GetCategoryTree_FullMethodName        = "/category.v1.CategoryService/GetCategoryTree"
+	CategoryService_CategoryExists_FullMethodName         = "/category.v1.CategoryService/CategoryExists"
+	CategoryService_CreateMerchantCategory_FullMethodName = "/category.v1.CategoryService/CreateMerchantCategory"
 )
 
 // CategoryServiceClient is the client API for CategoryService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// CategoryService exposes the read side of the category hierarchy. Writes stay
-// on the REST API: only the owning service should mutate categories.
+// CategoryService exposes global and merchant-scoped reads plus merchant-scoped
+// creation. Global writes remain on the administrator REST API.
 type CategoryServiceClient interface {
 	// GetCategory returns one category.
 	GetCategory(ctx context.Context, in *GetCategoryRequest, opts ...grpc.CallOption) (*GetCategoryResponse, error)
@@ -51,6 +52,9 @@ type CategoryServiceClient interface {
 	// CategoryExists answers a batch existence check. Callers that only need to
 	// validate a foreign key should prefer this over N GetCategory calls.
 	CategoryExists(ctx context.Context, in *CategoryExistsRequest, opts ...grpc.CallOption) (*CategoryExistsResponse, error)
+	// CreateMerchantCategory creates a category scoped to the caller's tenant.
+	// Global categories remain administrator-managed through the category API.
+	CreateMerchantCategory(ctx context.Context, in *CreateMerchantCategoryRequest, opts ...grpc.CallOption) (*CreateMerchantCategoryResponse, error)
 }
 
 type categoryServiceClient struct {
@@ -101,12 +105,22 @@ func (c *categoryServiceClient) CategoryExists(ctx context.Context, in *Category
 	return out, nil
 }
 
+func (c *categoryServiceClient) CreateMerchantCategory(ctx context.Context, in *CreateMerchantCategoryRequest, opts ...grpc.CallOption) (*CreateMerchantCategoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateMerchantCategoryResponse)
+	err := c.cc.Invoke(ctx, CategoryService_CreateMerchantCategory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CategoryServiceServer is the server API for CategoryService service.
 // All implementations must embed UnimplementedCategoryServiceServer
 // for forward compatibility.
 //
-// CategoryService exposes the read side of the category hierarchy. Writes stay
-// on the REST API: only the owning service should mutate categories.
+// CategoryService exposes global and merchant-scoped reads plus merchant-scoped
+// creation. Global writes remain on the administrator REST API.
 type CategoryServiceServer interface {
 	// GetCategory returns one category.
 	GetCategory(context.Context, *GetCategoryRequest) (*GetCategoryResponse, error)
@@ -117,6 +131,9 @@ type CategoryServiceServer interface {
 	// CategoryExists answers a batch existence check. Callers that only need to
 	// validate a foreign key should prefer this over N GetCategory calls.
 	CategoryExists(context.Context, *CategoryExistsRequest) (*CategoryExistsResponse, error)
+	// CreateMerchantCategory creates a category scoped to the caller's tenant.
+	// Global categories remain administrator-managed through the category API.
+	CreateMerchantCategory(context.Context, *CreateMerchantCategoryRequest) (*CreateMerchantCategoryResponse, error)
 	mustEmbedUnimplementedCategoryServiceServer()
 }
 
@@ -138,6 +155,9 @@ func (UnimplementedCategoryServiceServer) GetCategoryTree(context.Context, *GetC
 }
 func (UnimplementedCategoryServiceServer) CategoryExists(context.Context, *CategoryExistsRequest) (*CategoryExistsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CategoryExists not implemented")
+}
+func (UnimplementedCategoryServiceServer) CreateMerchantCategory(context.Context, *CreateMerchantCategoryRequest) (*CreateMerchantCategoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMerchantCategory not implemented")
 }
 func (UnimplementedCategoryServiceServer) mustEmbedUnimplementedCategoryServiceServer() {}
 func (UnimplementedCategoryServiceServer) testEmbeddedByValue()                         {}
@@ -232,6 +252,24 @@ func _CategoryService_CategoryExists_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CategoryService_CreateMerchantCategory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMerchantCategoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CategoryServiceServer).CreateMerchantCategory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CategoryService_CreateMerchantCategory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CategoryServiceServer).CreateMerchantCategory(ctx, req.(*CreateMerchantCategoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CategoryService_ServiceDesc is the grpc.ServiceDesc for CategoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -254,6 +292,10 @@ var CategoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CategoryExists",
 			Handler:    _CategoryService_CategoryExists_Handler,
+		},
+		{
+			MethodName: "CreateMerchantCategory",
+			Handler:    _CategoryService_CreateMerchantCategory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

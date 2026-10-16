@@ -33,15 +33,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductService_CreateProduct_FullMethodName = "/product.v1.ProductService/CreateProduct"
-	ProductService_UpdateProduct_FullMethodName = "/product.v1.ProductService/UpdateProduct"
-	ProductService_DeleteProduct_FullMethodName = "/product.v1.ProductService/DeleteProduct"
+	ProductService_ListProductTypes_FullMethodName = "/product.v1.ProductService/ListProductTypes"
+	ProductService_CreateProduct_FullMethodName    = "/product.v1.ProductService/CreateProduct"
+	ProductService_UpdateProduct_FullMethodName    = "/product.v1.ProductService/UpdateProduct"
+	ProductService_DeleteProduct_FullMethodName    = "/product.v1.ProductService/DeleteProduct"
 )
 
 // ProductServiceClient is the client API for ProductService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductServiceClient interface {
+	ListProductTypes(ctx context.Context, in *ListProductTypesRequest, opts ...grpc.CallOption) (*ListProductTypesResponse, error)
 	// CreateProduct validates the category and media references against the
 	// owning services over gRPC, then stores the product. The response is the
 	// committed row; the change also becomes a domain event that the listing
@@ -59,6 +61,16 @@ type productServiceClient struct {
 
 func NewProductServiceClient(cc grpc.ClientConnInterface) ProductServiceClient {
 	return &productServiceClient{cc}
+}
+
+func (c *productServiceClient) ListProductTypes(ctx context.Context, in *ListProductTypesRequest, opts ...grpc.CallOption) (*ListProductTypesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProductTypesResponse)
+	err := c.cc.Invoke(ctx, ProductService_ListProductTypes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *productServiceClient) CreateProduct(ctx context.Context, in *CreateProductRequest, opts ...grpc.CallOption) (*CreateProductResponse, error) {
@@ -95,6 +107,7 @@ func (c *productServiceClient) DeleteProduct(ctx context.Context, in *DeleteProd
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
 type ProductServiceServer interface {
+	ListProductTypes(context.Context, *ListProductTypesRequest) (*ListProductTypesResponse, error)
 	// CreateProduct validates the category and media references against the
 	// owning services over gRPC, then stores the product. The response is the
 	// committed row; the change also becomes a domain event that the listing
@@ -114,6 +127,9 @@ type ProductServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProductServiceServer struct{}
 
+func (UnimplementedProductServiceServer) ListProductTypes(context.Context, *ListProductTypesRequest) (*ListProductTypesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListProductTypes not implemented")
+}
 func (UnimplementedProductServiceServer) CreateProduct(context.Context, *CreateProductRequest) (*CreateProductResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateProduct not implemented")
 }
@@ -142,6 +158,24 @@ func RegisterProductServiceServer(s grpc.ServiceRegistrar, srv ProductServiceSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ProductService_ServiceDesc, srv)
+}
+
+func _ProductService_ListProductTypes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProductTypesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).ListProductTypes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_ListProductTypes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).ListProductTypes(ctx, req.(*ListProductTypesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ProductService_CreateProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -205,6 +239,10 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "product.v1.ProductService",
 	HandlerType: (*ProductServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListProductTypes",
+			Handler:    _ProductService_ListProductTypes_Handler,
+		},
 		{
 			MethodName: "CreateProduct",
 			Handler:    _ProductService_CreateProduct_Handler,

@@ -15,8 +15,8 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "gogo/contracts/category/v1;categoryv1";
 
-// CategoryService exposes the read side of the category hierarchy. Writes stay
-// on the REST API: only the owning service should mutate categories.
+// CategoryService exposes global and merchant-scoped reads plus merchant-scoped
+// creation. Global writes remain on the administrator REST API.
 service CategoryService {
   // GetCategory returns one category.
   rpc GetCategory(GetCategoryRequest) returns (GetCategoryResponse);
@@ -30,6 +30,10 @@ service CategoryService {
   // CategoryExists answers a batch existence check. Callers that only need to
   // validate a foreign key should prefer this over N GetCategory calls.
   rpc CategoryExists(CategoryExistsRequest) returns (CategoryExistsResponse);
+
+  // CreateMerchantCategory creates a category scoped to the caller's tenant.
+  // Global categories remain administrator-managed through the category API.
+  rpc CreateMerchantCategory(CreateMerchantCategoryRequest) returns (CreateMerchantCategoryResponse);
 }
 
 // Category mirrors model.Category. parent_id is 0 when the category is a root,
@@ -41,6 +45,19 @@ message Category {
   int64 parent_id = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  // True for administrator-managed categories shared by all merchants.
+  bool is_global = 7;
+}
+
+message CreateMerchantCategoryRequest {
+  string name = 1;
+  string description = 2;
+  // 0 creates a root category; a non-zero parent must belong to this merchant.
+  int64 parent_id = 3;
+}
+
+message CreateMerchantCategoryResponse {
+  Category category = 1;
 }
 
 // CategoryNode is a category with its immediate children.

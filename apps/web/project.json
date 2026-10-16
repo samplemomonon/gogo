@@ -1,0 +1,180 @@
+{
+  "name": "gogo",
+  "$schema": "{NX_ROOT}/node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/web/cmd",
+  "tags": [
+    "tier:composition",
+    "type:app",
+    "lang:go",
+    "scope:gateway"
+  ],
+  "implicitDependencies": [
+    "gogo-contracts"
+  ],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make build"
+          }
+        ]
+      }
+    },
+    "bundle": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make build"
+          }
+        ]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make test"
+          }
+        ]
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make lint"
+          }
+        ]
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make fmt"
+          }
+        ]
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make check"
+          }
+        ]
+      }
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make tidy"
+          }
+        ]
+      }
+    },
+    "run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make run"
+          }
+        ]
+      }
+    },
+    "generate": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "buf",
+        "command": "make buf-generate",
+        "cwd": "apps/web",
+        "label": "buf generate"
+      }
+    },
+    "check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make check"
+          }
+        ]
+      }
+    },
+    "arch-graph": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make arch-graph"
+          }
+        ]
+      }
+    },
+    "docker:build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make docker-build"
+          }
+        ]
+      }
+    },
+    "docker:up": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make up"
+          }
+        ]
+      }
+    },
+    "docker:down": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make down"
+          }
+        ]
+      }
+    },
+    "k8s:build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/web",
+        "commands": [
+          {
+            "command": "make k8s-build"
+          }
+        ]
+      }
+    }
+  }
+}

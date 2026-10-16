@@ -1,14 +1,14 @@
 # Implementation Plan — gogo
 
 **Companion to:** [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) (boundaries & topology) and [`ARCHITECTURE.md`](../ARCHITECTURE.md) (canonical rules).
-**Purpose:** close the `metadata-driven` vs `domain-business` distinction, audit what in this repository conflicts with either, measure where resources actually go, and sequence the fixes.
+**Purpose:** distinguish architecture metadata from runtime product metadata and domain rules, audit the repository boundaries, and sequence the implementation work.
 **Status:** actionable. Every phase has an exit condition and a file list.
 
 ---
 
 ## 0. TL;DR
 
-**The one idea that resolves the confusion (§1):** they are not alternatives. They are two perpendicular axes. Metadata-driven answers *"what is the shape and what changes when it changes?"* Domain business answers *"what must be true, and who decides?"* **In this repository the metadata-driven opportunity is 100% in the plumbing and 0% in the domain. There is exactly one domain that is currently wrong, and it is wrong because a rule escaped into SQL, not because it was made declarative.**
+**The key distinction (§1):** metadata and domain rules work together. Metadata describes a shape that admins or platform owners need to change; domain code enforces the invariants that must remain correct for every input. For the architecture-governance work below, the metadata opportunity is mainly in plumbing. Product Type and Attribute definitions are a separate runtime business-metadata use case: admins need to change them without a code deployment, while Product Service code remains responsible for validating values and enforcing invariants.
 
 **Do these first (§4, P0–P1, roughly one day):**
 
@@ -19,13 +19,13 @@
 | 3 | Delete `internal/modules/media` and `internal/modules/reporting` (+ `contracts/proto/reporting/v1`) | 1,347 lines and a migration that duplicate authority that already exists elsewhere |
 | 4 | Fix the `cmd/modulegen` templates so the golden path compiles | The scaffolder currently teaches a shape that does not build |
 
-Everything else in this document is Phase 2+, and Phase 3+ should not start until Phase 1 is verified.
+The remaining architecture-governance work follows the ordering in §4. P7 is a separate product capability track and does not depend on completing that governance work.
 
 ---
 
-## 1. Metadata-driven vs domain business — the distinction
+## 1. Architecture metadata, runtime product metadata, and domain rules
 
-You said you cannot tell these apart. The reason is that they are usually presented as alternatives, and they are not. **They are perpendicular.** Neither one substitutes for the other; a healthy system has both, in different places, doing different jobs.
+These concepts are often presented as alternatives, but they answer different questions. A healthy system can use runtime metadata to describe editable product schemas while keeping validation mechanics and invariants in Product Service code.
 
 ### 1.1 What each one actually answers
 
@@ -33,15 +33,15 @@ You said you cannot tell these apart. The reason is that they are usually presen
 |---|---|---|
 | Question it answers | *What must be true? Who decides?* | *What is the shape? What changes when it changes?* |
 | Substance | vocabulary, invariants, authority | contracts, topology, composition, configuration |
-| Why it must be **code** | rules must be **exhaustive** and **type-checked**; a rule the compiler cannot see is a rule nobody maintains | — |
-| Why it must be **metadata** | — | shapes must be **diffable**, **versioned**, and **mechanically checked for compatibility** |
-| Artifact | Go types + invariants in `domain/` | `.proto`, `.yaml`, `.json` + a validator |
+| Why it must be **code** | validation mechanics and universal invariants must be exhaustive and testable | — |
+| Why it must be **metadata** | — | schemas that admins need to edit at runtime must be versioned and checked for compatibility |
+| Artifact | Go types + validation in Product Service | `.proto` contracts; versioned product schemas in Product Service's database; architecture YAML/JSON with validators |
 | Failure when misused | rules become strings; a runtime interpreter nobody can refactor | shapes become hand-edited code; every change is a coordinated edit across every implementation |
 
 **The shortest useful formulation:**
 
-> **The domain is where the words are. Metadata is where the shapes are.**
-> `domain.Stock` and the rule that stock cannot go negative are **code**. `inventory.v1`'s message layout is **metadata**. Both are correct. Neither substitutes for the other.
+> **The domain code enforces the rules; metadata describes supported shapes.**
+> Product Service code validates a value as a non-negative number. An admin-managed product schema declares whether `weight` exists, its label, and whether it is required. Both are necessary; the schema does not replace the validator.
 
 ### 1.2 The decision rule
 
@@ -53,7 +53,7 @@ Ask which of these it is:
 | must be provable correct for all inputs | **code / domain** |
 | has a vocabulary whose words also appear in the code that calls it | **code / domain** |
 | must be reviewable as a diff and versioned compatibly | **metadata** |
-| must change without a code change or a redeploy | **metadata** |
+| an authorized admin must change it without a code change or a redeploy | **runtime metadata** |
 | is a contract between two things that deploy independently | **metadata** |
 | is discovered by an IDE, a linter, or a graph tool | **metadata** |
 
@@ -74,15 +74,14 @@ This is the mental model to carry. Two axes, four quadrants:
 
 | | **Structure in code** | **Structure as metadata** |
 |---|---|---|
-| **Has business rules** | **Q1 · the domain** — `domain.Stock`, the oversell invariant, `sales`' checkout saga, `auth`'s PIN rules | **Q2 · contracts + rules** — `inventory.v1/inventory.proto`, `module.Descriptor`. The *shape* is metadata, the *rule* stays code. **Correct and normal.** |
+| **Has business rules** | **Q1 · the domain** — `domain.Stock`, the oversell invariant, `sales`' checkout saga, `auth`'s PIN rules | **Q2 · contracts + runtime schemas** — `inventory.v1/inventory.proto`, `module.Descriptor`, and versioned Product Type schemas. The schema describes supported fields; Product Service code validates their values. **Correct and normal.** |
 | **No business rules** | **Q4 · hardcoded plumbing** — literal call lists, string constants repeated in Go | **Q3 · declarative plumbing** — `buf.yaml`, `project.json`, `devenv.nix`, `docker-compose.yml`, k8s manifests, `import_graph.txt`. **The target.** |
 
 **The finding that answers your question directly:**
 
-> **The metadata-driven opportunity in this repository is entirely in Q4, and entirely absent from Q1 and Q2.**
-> Q1 and Q2 are already right. Q3 is already right. **Only Q4 is available to improve — and Q4 contains no business rules whatsoever.**
+> **The architecture-governance metadata opportunity in this plan is mainly Q4.** Product schemas are a distinct Q2 runtime-metadata capability because administrators need to change the supported product shape without redeploying. Neither case moves domain invariants out of code.
 
-That is why the phrase "make it metadata-driven" feels dangerous when applied to a domain module: **it would be a category error.** Every legitimate metadata-driven improvement in this repo is a change to *plumbing*.
+This distinction keeps "make it metadata-driven" from turning into an untyped rule interpreter. Use runtime metadata for the editable product schema; keep supported value kinds and validation behavior in code. Use declarative metadata for architecture topology and wiring.
 
 ### 1.5 Three confusions worth naming explicitly
 
@@ -91,6 +90,35 @@ That is why the phrase "make it metadata-driven" feels dangerous when applied to
 | *"The rules should be configurable, so put them in YAML."* | Then they are no longer rules. A rule the compiler cannot check is a rule nobody maintains. `inventory`'s non-negative invariant belongs in `domain/`, not in a config map. |
 | *"The `Descriptor` makes this metadata-driven."* | `Descriptor` makes the **module list** metadata-driven. It says nothing about how the module decides anything. Those are different claims. |
 | *"`product-service` is metadata-driven because it uses protobuf."* | It is **contract**-metadata-driven. Its usecases, outbox relay and validation are ordinary code — which is correct. |
+| *"Product types are dynamic, so the CMS should own validation."* | Product Service owns the versioned schema and validation. An editorial CMS may own banners and page copy, but it is not the product write authority. |
+
+### 1.6 Runtime product schema — admin-managed, Product Service-owned
+
+Product Type and Attribute definitions change less often than product values,
+but an admin must be able to add or edit them without a code change or service
+deployment. Store drafts and immutable published versions in Product Service's
+database. Expose published schemas through the product contract so Seller
+renders its form from the same definition Product Service validates.
+
+Product Service still owns validation mechanics: supported kinds, required
+field checks, numeric parsing, option membership, and safe limits. Admin input
+chooses among those supported capabilities; it does not provide executable
+validation code. A product records the published schema version used at write
+time. Existing products are not silently invalidated by later schema edits.
+
+Product metadata must not be confused with three other things:
+
+| Need | Owner/tool | Runtime relationship |
+|---|---|---|
+| Product types and attributes | Product Service database + admin workflow | Seller reads published schema; Product Service validates writes |
+| Banners and editorial page blocks | Headless CMS such as Builder.io | Gateway SSR consumes published content through an allowlisted block contract |
+| Developer docs, ADRs, API guides | Rspress site with source in Git | Static documentation build; not a runtime content API |
+
+Keep these capabilities in the current repository/deployment topology initially.
+Create a separate repository or service only when an independent team or
+lifecycle needs that boundary, or several independent systems need to author
+and consume a shared schema. A new repository alone does not make product
+metadata dynamic.
 
 ---
 
@@ -113,10 +141,10 @@ That is why the phrase "make it metadata-driven" feels dangerous when applied to
 | `internal/bootstrap` | – | ❌ | ❌ | ✅✅ | **conflict A2 — the biggest one** |
 | `internal/shared/**` | Q3 | ❌ | ✅ | ✅ | mostly correct; A5 |
 | `internal/shared/module` | Q2 | ❌ | ✅ | – | correct |
-| `internal/services/product-service` | Q1+Q2 | ✅ | ✅ | – | correct |
-| `internal/services/product-listing-service` | Q1+Q2 | ✅ | ✅ | – | correct (see §3.3 on cost) |
-| `internal/services/product-search-service` | Q1+Q2 | ✅ | ✅ | – | correct (see §3.3) |
-| `internal/services/aggregator-service` | Q3 at rung 3 | ❌ | ✅ | ✅ | correct in kind; A6; **no consumer** (§3.3) |
+| `services/product-service` | Q1+Q2 | ✅ | ✅ | – | correct |
+| `services/product-listing-service` | Q1+Q2 | ✅ | ✅ | – | correct (see §3.3 on cost) |
+| `services/product-search-service` | Q1+Q2 | ✅ | ✅ | – | correct (see §3.3) |
+| `services/aggregator-service` | Q3 at rung 3 | ❌ | ✅ | ✅ | correct in kind; A6; **no consumer** (§3.3) |
 
 ### 2.2 Confirmed conflicts
 
@@ -245,7 +273,7 @@ Measured, not estimated. Hand-written lines exclude `_test.go`, `_templ.go`, `ge
 
 **The resource finding, stated plainly:** cost is concentrated in the components serving the least, and the component serving the most is the cheapest per capability. This is not automatically wrong — `product-service` earning rung 3 is defensible under `T-data` (§4.3 of the PRD), because it is the sole write authority and has an outbox. **`listing` and `search` earned rung 3 on `T-scaling`, which is the weakest trigger**: cadence is observable rather than constraining, and scaling independence is only worth paying for if the load profile actually diverges.
 
-**Decision rule, not a verdict.** I do not know your traffic, and B6 is undecided. So:
+**Decision rule, not a verdict.** Traffic and workload evidence still determine whether separate deployments earn their cost. The monorepo decision does not settle this question. So:
 
 > If the home page grid is the only consumer of `listing` and `search`, and its load does not require independent scaling from writes, then their rung-3 promotion was not earned, and consolidating them into `product-service`'s deployment behind a schema boundary removes **2 processes, 2 databases, 2 consumer groups, 1 DLQ topic** — and costs one schema boundary, which is cheap and reversible.
 >
@@ -267,7 +295,9 @@ W-3 is a correctness risk in the guard, not just a performance one. It is first 
 
 ## 4. Implementation plan
 
-Six phases. Each states what it does **not** do, so scope cannot creep forward.
+The architecture work has phases P0–P6. P7 is a separate end-to-end product
+capability track. Each phase states what it does **not** do, so scope cannot
+creep forward.
 
 Effort assumes one developer familiar with the codebase. All commands verified against this repository.
 
@@ -382,7 +412,65 @@ Per PRD §8 and §12 Phase 1. One metadata file declaring team, tier, rung, cont
 
 Per §3.3. For `listing` and `search`, record whether the `T-scaling` trigger is still true. If it is not, consolidating them behind a schema boundary in `product-service`'s deployment removes 2 processes, 2 databases, 2 consumer groups and a DLQ topic.
 
-**Blocked on B6** (monorepo vs polyrepo, PRD §2.6) — a consolidation decision and a distribution decision interact, and doing the first without the second risks doing it twice.
+**Blocked on evidence and ownership.** Revisit only if measured scaling needs no longer justify independent Listing/Search deployments and their owners agree. The modules can remain in the monorepo either way.
+
+### P7 · Admin-managed Product Type schemas — *product capability track*
+
+This is an end-to-end runtime feature, not a request to make domain invariants
+configurable. The existing product metadata slice carries Product Type,
+schema-version, and attribute values through product creation and projections,
+but the type registry is still hardcoded in Product Service. This phase replaces
+that registry with admin-managed, database-backed schemas.
+
+**Boundary decision:** Product Service owns schema storage, publication,
+validation, and product values. Keep the admin interface in the current
+application/repository boundary initially; authorize writes using the existing
+admin identity flow. The service's internal gRPC credential is not, by itself,
+proof that an end user is an administrator. Do not add a new repository or
+service until an independent owner/lifecycle justifies the added contract and
+operational work.
+
+**Implementation sequence:**
+
+1. **Model and migrate.** Add tables for product types, schema versions, and
+attribute definitions (or a normalized schema document with equivalent
+constraints). Seed the existing `general` and `apparel` definitions. Preserve
+product `product_type_id`, `schema_version`, and attribute values.
+2. **Add the admin workflow.** Provide list, draft create/edit, validation,
+preview, publish, and audit history. Published versions are immutable;
+publication assigns a monotonic version atomically. Validate keys, supported
+types, limits, enum options, and incompatible edits before publish.
+3. **Replace the hardcoded registry.** Add a repository port and database
+adapter. Product creation/update validates against the submitted published
+version. Seller reads the published schema from the product contract. Unknown,
+unpublished, or stale versions fail with a field-level validation response.
+4. **Propagate changes.** Keep product type, schema version, and attribute
+values in product snapshots. Listing and Search project values independently.
+Define the event/rebuild behavior for schema changes before implementing
+attribute facets; SSR continues to read projections, not Product Service.
+5. **Complete user feedback.** Admin sees publish success/failure and the
+published version. Seller sees fields from the published schema and actionable
+validation errors. Existing products remain readable if a newer schema changes.
+6. **Verify the vertical slice.** Verify admin authorization, draft isolation,
+publish/version behavior, seller discovery, valid and invalid product writes,
+event projection, and storefront rendering. Add the checks to the existing
+module test/build gates used by this repository.
+
+**Not included:** one service per metadata concept, arbitrary code/expressions
+from admins, changing Listing/Search into synchronous service calls, or
+integrating a CMS as the product validation authority.
+
+**Editorial and documentation tooling:** use a headless CMS (Builder.io is one
+option) for banners and allowlisted editorial page blocks. The Go gateway owns
+SSR composition and renders supported blocks with platform UI primitives. Use
+Rspress for developer documentation authored and reviewed in Git, then publish
+the generated static site independently. Neither tool replaces the admin
+product-schema workflow.
+
+**Exit:** an admin publishes a new product type without code changes or a
+Product Service deployment; a seller creates a product using that type; the
+write service validates and persists the published schema version; Listing and
+Search project the event; and storefront SSR displays the projected values.
 
 ---
 
@@ -396,16 +484,17 @@ Per §3.3. For `listing` and `search`, record whether the `T-scaling` trigger is
 | **P3** declarative bootstrap | 1 d | med | P5 | the biggest Q4 win; touches no business logic |
 | **P4** rule table | 1 d | med | P5 | provides the mechanism P5 plugs into |
 | **P5** team catalog | 2 d | med | — | needs P4 |
-| **P6** rung-3 review | — | — | B6 decision | do not decide distribution and topology in the same motion |
+| **P6** rung-3 review | — | — | measured scaling and service ownership | repository layout does not determine deployment boundaries |
+| **P7** admin-managed Product Type schemas | sized after admin-auth review | medium | product admin authorization + schema migration design | end-to-end business metadata; independent of P0–P6 topology tooling |
 
-**Total P0–P4: about five days.** That is enough to remove every conflict in §2 except A1, which is scoped into the Phase 0 pilot in PRD §12.1 rather than into this plan — because it needs a vertical slice to land in, not a standalone refactor.
+**Total P0–P4: about five days.** P7 has a separate estimate because the admin authorization and schema lifecycle need to be designed against the existing product platform; do not fold it into this infrastructure estimate. A1 remains scoped to the Phase 0 pilot in PRD §12.1 because it needs a vertical slice, not a standalone refactor.
 
 ### 5.1 What to stop doing
 
 | Stop | Because |
 |---|---|
 | Declaring domain rules as configuration | §1.4 — the entire metadata-driven opportunity is in Q4, which contains no rules |
-| Adding a unit to `internal/services/` | PRD §2.6 TT-062, until B6 is decided |
+| Adding a unit to `services/` | Give it its own `go.mod`, deployment config, project descriptor, and explicit `go.work` entry |
 | Editing `internal/bootstrap` by hand | P3 exists so this stops being possible |
 | Treating `team_catalog.yaml` as documentation | it is validated input to a test; if it can drift, it must not exist yet |
 | Promoting a unit to rung 3 without recording a trigger | an unrecorded trigger is indistinguishable from a default |
@@ -440,7 +529,7 @@ rm -rf internal/modules/probe
 # Verify the current state at any time
 make check                                   # the whole gate
 make arch-graph                               # regenerate the committed import graph
-go test ./internal/architecture/ -v           # the eight boundary rules, by name
+go -C apps/web test ./internal/architecture/ -v # the eight boundary rules, by name
 ```
 
 ---
@@ -453,8 +542,15 @@ Three questions surfaced during implementation and were deliberately left open r
 - **OD-2** · whether the aggregator may hold a cache or read model. **Undecided** — and the current architecture test permits it as an accident of a narrow rule, not as a ratified position.
 - **OD-3** · whether `type Mutation` is part of the permanent aggregator contract. **Undecided**; the test asserts it as a marked temporary guard.
 
+P7 does not depend on changing the monorepo layout. It does depend on
+confirming which existing identity claim/role the gateway uses to authorize
+administrator actions. Do not infer admin authorization from the
+service-to-service token.
+
 ## 7. References
 
 [Skelton & Pais, *Team Topologies*](https://teamtopologies.com/book) · [cognitive-load heuristics](https://itrevolution.com/articles/minimize-cognitive-load-of-teams/) · [Conway 1967](https://melconway.com/Home/Conways%5FLaw.html) · [Cockburn, Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/) · [Martin, The Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) · [Khononov, Learning DDD](https://www.oreilly.com/library/view/learning-domain-driven-design/9781098100124) · [Feature-Sliced Design](https://feature-sliced.design/docs) · [dependency-cruiser rules](https://github.com/sverweij/dependency-cruiser/blob/main/doc/rules-reference.md) · [Deptrac concepts](https://deptrac.github.io/deptrac/concepts) · [Nx module boundaries](https://nx.dev/docs/features/enforce-module-boundaries) · [Backstage descriptor format](https://backstage.io/docs/features/software-catalog/descriptor-format/) · [Terraform drift](https://developer.hashicorp.com/terraform/tutorials/state/resource-drift) · [devenv](https://devenv.sh/) · [Bazel hermeticity](https://bazel.build/basics/hermeticity) · [12-factor config](https://12factor.net/config)
 
-Repository-local: [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) · [`ARCHITECTURE.md`](../ARCHITECTURE.md) · `internal/architecture/architecture_test.go` · `internal/bootstrap/di.go` · `cmd/modulegen/` · `Dockerfile` · `.gitignore` · `.dockerignore`
+Product content tools: [Rspress introduction](https://www.rspress.dev/guide/start/introduction) · [Rspress static generation](https://www.rspress.dev/guide/basic/ssg) · [Builder.io Visual Editor](https://www.builder.io/c/docs/visual-editor) · [Payload drafts and publishing](https://payloadcms.com/docs/versions/drafts)
+
+Repository-local: [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) · [`MONOREPO_STRUCTURE.md`](./MONOREPO_STRUCTURE.md) · [`ARCHITECTURE.md`](../ARCHITECTURE.md) · `apps/web/internal/architecture/architecture_test.go` · `apps/web/internal/bootstrap/di.go` · `apps/web/cmd/modulegen/` · `services/` · `Dockerfile` · `.gitignore` · `.dockerignore`

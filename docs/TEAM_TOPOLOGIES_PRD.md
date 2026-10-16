@@ -17,7 +17,7 @@ Rev 1 was organised team-first. Rev 2 is organised **boundary-first**, because a
 | # | Correction | Where it landed |
 |---|---|---|
 | 1 | **Duplication → delete one, do not reconcile.** | §3, promoted to a first-class register with a deletion order |
-| 2 | **No monorepo/polyrepo decision exists.** Rev 1 assumed "separate repository, same team" and that was wrong. | §2.6 defines the boundary as **explicitly undecided**, plus the constraints any future decision must satisfy |
+| 2 | **Monorepo is the selected distribution model.** Separate Go modules still provide service build and release boundaries. | §2.6 records the decision and the repository layout |
 | 3 | **Git and CI/CD governance is not implemented.** Rev 1 asserted CODEOWNERS generation and CI wiring as if they existed. | §1 maturity ladder; every rule in §9–§10 now carries a rung label |
 | 4 | **One feature end-to-end first.** Rev 1's plan was breadth-first. | §12 Phase 0 is a single named vertical slice; everything else follows its template |
 | 5 | **Hybrid is the priority: modular monolith → microservice.** Rev 1 treated services as given. | §4 — a five-rung escalation ladder is now the spine of the architecture |
@@ -33,9 +33,10 @@ Stated up front, because Rev 1 overreached on two of these.
 
 | Not decided here | Why | Where it is parked |
 |---|---|---|
-| **Monorepo vs polyrepo** | No decision has been made by anyone with the authority to make it. This document records the constraints and the ownership model is identical either way. | §2.6 |
+| **Future service extraction from the monorepo** | The current implementation stays in one repository. Extraction is revisited only when an independent owner, access policy, or release lifecycle requires it. | §2.6 |
 | **Team names, headcount, reporting lines** | The repository contains zero organisational information: no `CODEOWNERS`, no `OWNERS`, no team directory. Inventing teams would be fiction. §6 uses **team ids** (`T1`…`T5`) as placeholders with a substitution procedure. | §6.1, §12 Phase 3 |
-| **Whether the product catalogue leaves this repository** | The repo says both things (G11 in §1.3). Resolving it is a distribution decision, i.e. §2.6. | §2.6 |
+| **Whether the product catalogue leaves this repository** | It stays in this monorepo; service modules remain independently deployable. Revisit only on the extraction triggers in §2.6. | §2.6 |
+| **Whether product types and attributes are admin-managed** | This PRD records the target workflow and ownership; implementation details belong to the product metadata feature plan in §12.6 and `IMPLEMENTATION_PLAN.md`. | §8.6, §12.6 |
 | **CI/CD pipeline design** | Not implemented; out of scope until the boundaries are declared. | §1, §12 |
 
 ### 0.4 One migration hazard
@@ -51,7 +52,7 @@ Correction 3: git and CI governance are not implemented. Any PRD that lists unbu
 | Rung | Meaning | Enforcement mechanism | Requires CI? |
 |---|---|---|---|
 | **A · Declared** | Exists as metadata or prose. Nothing checks it. | `ARCHITECTURE.md`, `team_catalog.yaml` | no |
-| **B · Locally enforced** | A test exists and `make check` runs it. | `internal/architecture/architecture_test.go` | no |
+| **B · Locally enforced** | A test exists and `make check` runs it. | `apps/web/internal/architecture/architecture_test.go` | no |
 | **C · Merge-enforced** | CI runs it; a PR cannot merge without it. | `.github/workflows/ci.yml` → `make check` | yes |
 | **D · Drift-proof** | Generated *from* metadata, and CI verifies the generated artefact is current. | `make arch-graph`, `make CODEOWNERS` | yes |
 
@@ -59,7 +60,7 @@ Correction 3: git and CI governance are not implemented. Any PRD that lists unbu
 
 | Capability | Rung | Evidence |
 |---|---|---|
-| The seven import rules | **C** | `make check` runs `go test ./internal/architecture/`, which runs `TestImportBoundaries`; `ci.yml` runs `make check` |
+| The seven import rules | **C** | `make check` runs `go -C apps/web test ./internal/architecture/`, which runs `TestImportBoundaries`; `ci.yml` runs `make check` |
 | Import-graph freshness | **D** | `make arch-graph` regenerates `import_graph.txt` from `BUILD.bazel`; `make check` fails on a stale copy |
 | Parser honesty (`TestParserIsHonest`) | **C** | floors on package counts and required edges — "a guard on the guard" |
 | Per-module hexagon rules | **A** | `ARCHITECTURE.md` states them in prose and says so explicitly |
@@ -88,7 +89,7 @@ Correction 6. Each boundary gets a definition, a machine-checkable test, and cur
 | **B3** | Contract | *What wire format separates them?* | import rule 6 + `buf breaking` | **C** |
 | **B4** | Data / aggregate | *Who is the sole writer of this row?* | import rule 7 + `TT-047` | **C**, with a live hole (§2.4) |
 | **B5** | Composition vs domain | *May this code know a business noun?* | import rules 1–4 | **C** |
-| **B6** | Distribution | *Which repository?* | — | **undecided** (§2.6) |
+| **B6** | Distribution | *Which repository?* | `go.work` + root build/CI + module paths | **monorepo selected** (§2.6) |
 
 ### 2.1 B1 · Ownership boundary
 
@@ -109,7 +110,7 @@ Correction 6. Each boundary gets a definition, a machine-checkable test, and cur
 | Level | Question | Decided by |
 |---|---|---|
 | **Deployment boundary** (B2) | Which OS process? | The import graph — importable ⇒ same process |
-| **Distribution boundary** (B6) | Which repository? | Undecided. §2.6 |
+| **Distribution boundary** (B6) | Which repository? | One monorepo with multiple Go modules. §2.6 |
 
 **Why B2 is a *real* boundary here even though everything is in one process.** `internal/modules/auth/presentation/grpcservice` and `internal/pages/seller` communicate over **in-process gRPC** through `grpcx.InProcess`. That is a deliberate seam, and the code says so:
 
@@ -209,35 +210,51 @@ A page is not a view layer. `internal/pages/seller` consumes four contracts, sha
 
 **Test.** import rules 1–4 (C) + `TT-040` (A).
 
-### 2.6 B6 · Distribution boundary — deliberately undecided
+### 2.6 B6 · Distribution boundary — monorepo selected
 
-Correction 2. **No monorepo/polyrepo decision exists. This PRD does not make one.**
+Correction 2. **Keep one Git repository with multiple Go modules.** The repository
+contains an application, independently buildable services, and shared wire
+contracts. A Go module boundary is not a repository boundary, and neither one
+automatically decides team ownership or deployment.
 
-**What the repository currently says, all at once:**
+**The directory layout makes those boundaries visible:**
 
-| Evidence | Says |
+| Path | Responsibility |
 |---|---|
-| `go.work` lists `.`, `./contracts`, `./internal/services/product-listing-service` — **3 of 6** Go modules | neither monorepo nor polyrepo |
-| `docker-compose.yml` points at a *repository-root* platform stack | monorepo |
-| `deploy/k8s/networkpolicy.yaml` — the product namespace is *"deployed by the platform's own manifests"* | polyrepo |
-| `docs/circuit-breaker/ARCHITECTURE.md:30,185` — *"another team, another repo"* | polyrepo |
-| `internal/pages/home/infrastructure/listingclient/client.go:4` — *"The platform teams own those servers"* | polyrepo |
-| Module paths: `gogo`, `aggregator-service`, `product-search-service`, `contracts`, but `github.com/ruangbercerita182-tech/product-listing-service` | all four answers at once |
+| `apps/web/` | Gateway Go module, SSR, pages, and in-process modules |
+| `apps/mobile/` | Mobile client boundary; native navigation and presentation |
+| `apps/desktop/` | Desktop client boundary; desktop navigation and presentation |
+| `services/<name>/` | One Go module and service deployment boundary per service |
+| `contracts/` | Protobuf source and generated Go contract module |
+| `go.work` | Explicit local workspace containing all modules |
+| Repository root | Compose, Make, CI, deployment manifests, and docs |
 
-**A boundary that disagrees with itself is not a boundary.** That is the finding. The *decision* is not this PRD's to make.
+The directory and build guidance is documented in
+[`MONOREPO_STRUCTURE.md`](./MONOREPO_STRUCTURE.md). Service checks use
+`GOWORK=off` to prove each module builds independently; the root workspace is
+for local development and does not merge service releases.
 
-**Constraint set any future decision must satisfy.** These are derived from the code, so they bind regardless of which way it goes:
+**Keep ownership and distribution separate.** Teams own capabilities, not
+directories merely because they share a repository. Services communicate
+through versioned contracts and events, not imports of one another's private
+packages. The monorepo gives reviewers one change set when an intentional
+contract rollout touches several consumers.
 
-| # | Constraint | Why |
-|---|---|---|
-| **N-1** | Ownership follows the **team**, not the repository. | Otherwise §7's entire matrix changes meaning the day someone moves a directory |
-| **N-2** | `internal/shared/**` must keep passing `platform must not import app code` as a *standalone, publishable* unit. | This test exists precisely so extraction is "a copy", per its own comment. It is currently a class-shaped package inside `gogo`; publishing it is a module-path change |
-| **N-3** | If polyrepo: the consumer kits (`shared/productconsumer`, `shared/authconsumer`, `shared/grpcconsumer`) become **published libraries with their own versions and deprecation policy**. | They are currently in-process packages. D-016 deliberately kept them wire-type-free and app-free, which is the precondition for publishing them. That decision is already paid for |
-| **N-4** | If polyrepo: contract generation must become a *published artifact*, not a `make buf-generate` in the consumer's CI. | Currently `contracts/*.pb.go` are committed and reviewed in the consumer's PR — that is a monorepo affordance and it does not survive the split |
-| **N-5** | `buf breaking --against` must continue to work. | It already reads a *committed* snapshot rather than a live registry, which is exactly why it is hermetic ([buf breaking](https://buf.build/docs/docs/breaking/)). This constraint survives either decision |
-| **N-6** | The catalogue must not be split between two teams. | This is the substantive one. A split *repository* is a distribution concern; a split *team* is an ownership concern and would reintroduce the D-011 drift risk. See §6.2 |
+**Extraction trigger.** Revisit polyrepo only when a service has a distinct
+owner and independent release process, repository access needs differ, or a
+shared contract needs its own published lifecycle. An extraction must preserve
+module independence, compatibility checks, contract versioning, and service
+ownership. Until then, `services/` is the canonical location for platform
+services; `internal/` is reserved for packages private to their owning Go
+module. The former TT-062 freeze on moving or adding services is retired by
+this decision.
 
-**Interim rule (TT-062):** until B6 is decided, **no new file is placed under `internal/services/`**, and no existing service directory is moved. The current mixed state is already costing clarity (§12 Phase 2 resolves it once, deliberately, rather than by drift).
+The mobile and desktop directories are architecture boundaries, not runnable
+clients yet. Their framework, client generation, release packaging, and CI are
+chosen when each gets its first end-to-end workflow. Web `templ.Component`
+primitives stay web-specific; native clients own their platform primitives.
+Cross-platform design tokens should be extracted only after a second real app
+consumes them and the source format is agreed.
 
 ---
 
@@ -289,7 +306,7 @@ Five rungs. Each has a promotion trigger and a stated test.
 | **1** | **Module** — manifest + routes + ports, no domain | no | no | no | It acquires a rule that cannot be expressed as a port precondition |
 | **2** | **Domain module** — `domain/` + `application/` + `ports/` + `infrastructure/` + `presentation/` + `compose/` | no | yes | yes | It needs an independent scaling profile, release cadence, data authority, runtime, or blast-radius isolation (§4.3) |
 | **3** | **Service** — own process, own database | **yes** | yes | yes | It needs an independent release cycle *and* a separate team |
-| **4** | **Externally-owned service** — separate repo, separate team, versioned contract | yes | yes | yes | (terminal — see §2.6 constraint N-6) |
+| **4** | **Externally-owned service** — independently owned and deployed; may later use a separate repo and versioned contract | yes | yes | yes | terminal unless the ownership/deployment trigger changes |
 
 **Where every unit currently sits:**
 
@@ -300,10 +317,10 @@ Five rungs. Each has a promotion trigger and a stated test.
 | `internal/modules/auth` | 2 | PIN hashing, session TTL, role rules |
 | `internal/modules/inventory` | 2 — **mis-shaped** | see §4.4 |
 | `internal/modules/sales` | 2 | checkout saga + compensation |
-| `internal/services/product-service` | 3 | sole write authority + outbox |
-| `internal/services/product-listing-service` | 3 | independent scaling (cache + projection) — trigger fired |
-| `internal/services/product-search-service` | 3 | independent scaling + separate ranking logic |
-| `internal/services/aggregator-service` | **0 at rung 3** | a composition layer that happens to run as a process. See §4.5 |
+| `services/product-service` | 3 | sole write authority + outbox |
+| `services/product-listing-service` | 3 | independent scaling (cache + projection) — trigger fired |
+| `services/product-search-service` | 3 | independent scaling + separate ranking logic |
+| `services/aggregator-service` | **0 at rung 3** | a composition layer that happens to run as a process. See §4.5 |
 | `internal/pages/**` | **Z-U** | not on this ladder; governed by §2.5 |
 
 ### 4.3 Promotion triggers, enumerated
@@ -317,7 +334,7 @@ A module may be promoted to rung 3 **only** when a trigger is named in `team_cat
 | **T-data** — owns data others must not write | `product-service`: the product aggregate, D-018 | **fired** |
 | **T-runtime** — needs a different runtime or scale unit | *not fired* | — |
 | **T-blast-radius** — a failure must not take down the caller | *arguably fired for listing/search*; defensible either way | **contested** |
-| **T-contract-consumer** — consumed by a team in a different repository | *not fired; B6 undecided* (§2.6) | — |
+| **T-contract-consumer** — consumed by a team in a different repository | *not fired; modules currently share a monorepo* (§2.6) | — |
 
 **T-cadence is the one people reach for first and it is the weakest**, because cadence is an observable, not a constraint: two contexts can have different release days inside one process with no cost whatsoever. Team Topologies' fracture-plane guidance reaches the same conclusion from the other side — technology-driven splits should cut *deployables*, not *teams*.
 
@@ -455,10 +472,10 @@ So: **team ids** `T1`…`T5`, a **substitution procedure**, and a hard rule.
 
 | Owns | Rung |
 |---|---|
-| `internal/services/product-service/**` | 3 — sole write authority for the product aggregate |
-| `internal/services/product-listing-service/**` | 3 — browse read model |
-| `internal/services/product-search-service/**` | 3 — search read model; owns the `search.Engine` seam |
-| `internal/services/aggregator-service/**` | 0 at rung 3 (§4.5) |
+| `services/product-service/**` | 3 — sole write authority for the product aggregate |
+| `services/product-listing-service/**` | 3 — browse read model |
+| `services/product-search-service/**` | 3 — search read model; owns the `search.Engine` seam |
+| `services/aggregator-service/**` | 0 at rung 3 (§4.5) |
 | `contracts/proto/{product,productlisting,productsearch,category,media}/**` | content |
 
 **Why one team for four deployables.** Three reasons, all structural:
@@ -468,7 +485,7 @@ So: **team ids** `T1`…`T5`, a **substitution procedure**, and a hard rule.
 
 **Split trigger (TT-018), all three required:** the aggregator needs its own release cadence for ≥2 consecutive quarters, **and** its own on-call rotation, **and** the other three release independently of it.
 
-**Constraint N-6 binds here:** B6 may make this a separate *repository*. It may not make this a separate *team*.
+The service modules may be extracted into separate repositories later, but catalogue ownership remains a single-team responsibility unless an explicit domain boundary changes that decision.
 
 ### 6.3 T2 · Merchant Console
 
@@ -545,7 +562,7 @@ gRPC over `grpcx.InProcess`, so the deployment boundary is same-process while th
 | C-10 | `GET /api/v1/listing/status` | T1 | T1 `aggregator` `ProjectionStore` | — |
 | C-11 | `GET /api/v1/search/status` | T1 | T1 `aggregator` `ProjectionStore` | — |
 
-**These rows are correct under either B6 outcome**, because ownership follows the team (§2.6 constraint N-1). That is the point of N-1.
+**These rows are correct if a service is extracted later**, because ownership follows the team and contract rather than the directory or repository.
 
 ### 7.3 Platform capabilities (T5 as provider)
 
@@ -597,6 +614,11 @@ One confirmed violation (T2, §6.3), declared with a trigger.
 ---
 
 ## 8. The metadata contract
+
+> **Scope note:** this section's catalog is the *architecture catalog* (units,
+> owners, contracts, and topology). It is distinct from the runtime product
+> catalog described in §8.6. Both use metadata, but they have different owners,
+> storage, change controls, and validators.
 
 ### 8.1 One catalog, derived not duplicated
 
@@ -711,6 +733,63 @@ Consumes []string `json:"consumes,omitempty"`
 
 ---
 
+
+### 8.6 Runtime product metadata — admin-managed schema, code-owned invariants
+
+**Decision.** Product types and attribute definitions are editable by an
+authorized administrator through the product platform. Product Service stores
+drafts and immutable published schema versions in its own database. It remains
+the authority that validates product writes. This is runtime business metadata;
+it does not belong in the architecture catalog or in seller UI code.
+
+**Boundary.** Metadata describes the permitted shape of a product form: type,
+attribute key and label, value kind, required status, options, and applicable
+constraints. Product Service code enforces universal invariants and interprets
+that definition. Admins cannot upload executable validation logic or arbitrary
+code. Variant dimensions such as color and size remain variant data, not free
+form descriptive attributes.
+
+**Lifecycle.** An administrator edits a draft, validates and previews it, then
+publishes a new monotonically versioned schema. A published version is
+immutable. Seller forms fetch the published schema and submit its version with
+the product. Product Service validates against that version and stores the
+version alongside the values. Schema changes do not silently rewrite or
+invalidate existing products; incompatible changes require an explicit product
+migration or a compatibility policy.
+
+**Consumers.** Product Service emits product snapshots with type, schema
+version, and values through the existing event path. Listing and Search update
+their own projections; SSR reads those projections and does not call Product
+Service for each page render. Attribute facets are a later capability and need
+an agreed query/index strategy.
+
+**Editorial content is a separate capability.** Use a headless CMS for banners
+and editorial page content, with an allowlisted set of renderable blocks. The
+gateway owns SSR composition and renders those blocks using platform UI
+primitives. Do not use the CMS as the source of truth for product validation.
+Use Rspress for developer documentation authored and reviewed with the code;
+publish its static build independently. Neither a CMS nor Rspress requires a
+new product-service repository.
+
+**Repository decision.** Keep the admin UI/API and schema persistence in the
+existing product platform boundary. A new repository or service is justified
+only when a distinct team/lifecycle needs independent ownership, or multiple
+independent systems need to author and consume a shared catalog schema. A
+repository split by itself does not make the feature dynamic.
+
+**Acceptance checks for this capability:**
+
+1. An authorized administrator can create and publish a product type without a
+   code change or Product Service deployment.
+2. Seller UI discovers the published type and renders its attributes from the
+   schema contract; it contains no hardcoded type registry.
+3. Product Service rejects unknown, stale-version, and invalid attribute
+   values, and records the schema version used.
+4. Listing and Search project product values from events; storefront SSR reads
+   those projections without a per-request Product Service call.
+5. Draft content is not publicly visible; published schema versions are
+   immutable and auditable.
+
 ## 9. Validation
 
 **Every row carries its current rung and the rung Phase 0 targets.**
@@ -761,11 +840,11 @@ Correction 3: these do not exist yet.
 
 ```make
 arch-team-catalog:            ## regenerate the derived half and report diffs
-	go test ./internal/architecture/ -run 'TeamCatalog|Descriptor' -update
+	go -C apps/web test ./internal/architecture/ -run 'TeamCatalog|Descriptor' -update
 
 check: vet test
 	… existing gofmt / templ / buf / arch-graph checks …
-	go test ./internal/architecture/ -run 'TeamCatalog|Descriptor'
+	go -C apps/web test ./internal/architecture/ -run 'TeamCatalog|Descriptor'
 	@echo "team catalog current and consistent with the import graph"
 ```
 
@@ -802,7 +881,7 @@ Buf's four categories are strictest-first and *"Passing a stricter category impl
 | TT-054 | root devenv provides the shared baseline: `go 1.27.1`, `buf`, `templ`, `bun`, `goimports`, and tasks for `arch-graph`, `check`, `dev` |
 | TT-055 | root `services` provide the local stack, so `devenv up` replaces `docker compose up` for the dev loop; compose remains the CI/integration artefact |
 | TT-056 | per-service devenvs `imports: [ ../.. ]` so the toolchain version is declared once (flake-input deduplication, applied to devenv modules) |
-| TT-057 | root `git-hooks`: `gofmt`, `templ`, `buf lint`, `go test ./internal/architecture/` |
+| TT-057 | root `git-hooks`: `gofmt`, `templ`, `buf lint`, `go -C apps/web test ./internal/architecture/` |
 | TT-058 | rewrite the two scaffolds — remove `env.GREET`, `scripts.hello`, the no-op `enterShell` |
 | TT-059 | `devcontainer.enable = true` so `.devcontainer/devcontainer.json` is generated from the same metadata ([spec supporting tools](https://github.com/devcontainers/spec/blob/main/docs/specs/supporting-tools.md)) |
 
@@ -877,7 +956,7 @@ Correction 4. Rev 1's plan was breadth-first: fix all the docs, then build all t
 
 **Exit condition:** the pilot feature works end to end; `make check` fails if any of its five units' ownership is changed wrongly; and **`team_catalog.yaml` + the validator are demonstrably reusable without modification for the next feature.** That last clause is the real test of Phase 0.
 
-**What Phase 0 deliberately does not do:** touch the other 6 units, change the team topology, decide B6, or write any CI.
+**What Phase 0 deliberately does not do:** touch the other 6 units, change the team topology, change the selected monorepo distribution, or write any CI.
 
 ### 12.2 Phase 1 · Generalise the pattern
 
@@ -893,9 +972,9 @@ Repeat Phase 0 for: Storefront grid (T3), Identity (T4), then the four services 
 | Fix `product-listing-service`'s `+event.Topic+` usage-string artefact | G7 |
 | Add `bazel test //...` to CI so the hermetic-snapshot benefit is actually used | rung C→D for the existing rules |
 
-### 12.4 Phase 3 · Decide B6 and bind organisation
+### 12.4 Phase 3 · Bind organisation and repository governance
 
-**B6 decision** (monorepo vs polyrepo), against constraints N-1…N-6, with the interim rule TT-062 in force until then. If polyrepo: publish `internal/shared/**`'s consumer kits as versioned modules (N-3) and move contract generation to a published artefact (N-4).
+The monorepo decision is recorded in §2.6 and implemented by the layout in `MONOREPO_STRUCTURE.md`. Bind real team identities to the declared ownership model. If an extraction trigger in §2.6 fires later, publish the affected consumer kits as versioned modules and give contract generation a separately governed artifact before splitting repositories.
 
 **Organisation binding:** substitute real team ids into `team_catalog.yaml`; generate `CODEOWNERS` **from** it (never hand-maintained — that would be a second source of truth, §8.1) and CI-verify freshness (rung D). Name a contact channel and on-call rotation per team. Write or retire `D-010` (§0.4).
 
@@ -912,7 +991,49 @@ Repeat Phase 0 for: Storefront grid (T3), Identity (T4), then the four services 
 | R-05 | `internal/shared/**` becomes a shared-services ticket queue | M | two-consumer minimum + extractability test; TT-064 kills unconsumed primitives |
 | R-06 | Deleting `reporting` destroys a capability someone was about to build | L | DEL-3's precondition is a grep; and reporting is un-ownable as a stream context (§2.4) — it would have to be rebuilt inside T1 or T2 regardless |
 | R-07 | `media.v1` has no breaker in the gateway, unlike the other four upstreams | M | add `upstreamMedia` to the seven `contributeBreaker` calls, or record why exempt. Currently unexplained |
-| R-08 | B6 stays undecided indefinitely, so `internal/services/` remains half-in/half-out | H | TT-062 freezes new additions; Phase 3 forces the decision; §7 ownership is already correct under both outcomes |
+| R-08 | A future service extraction happens before its contracts and release ownership are ready | M | Keep the monorepo as the default; require an extraction plan covering contract publication, module independence, CI, and team ownership |
+
+### 12.6 Product capability track — admin-managed product types
+
+This is an end-to-end product capability, separate from the team-catalog
+governance phases above. It uses the existing product platform boundary and
+does not require a repository split.
+
+**User outcome:** an authorized admin can publish a product type and its
+attribute definitions; the seller form discovers the published schema and
+renders matching fields; Product Service validates and stores submissions;
+Listing and Search receive product snapshots and project the values; storefront
+SSR renders from those read models.
+
+**Implementation order:**
+
+1. Persist product types, attribute definitions, schema versions, publication
+status, and audit metadata in Product Service's database. Seed the existing
+`general` and `apparel` types as the migration starting state.
+2. Add an admin-authorized draft/edit/validate/preview/publish workflow. Keep
+published schema versions immutable and make publication atomic.
+3. Replace the code-owned type registry with a schema repository. Keep
+validation mechanics in Product Service code and validate writes against the
+requested published version.
+4. Expose the published schema through the existing product contract. Remove
+the seller form's dependency on any code-owned registry and keep its controls
+limited to supported field kinds.
+5. Preserve the schema version and attribute values in product snapshots and
+Listing/Search projections. Handle schema-publication events or provide an
+explicit projection rebuild path where a schema change affects search facets.
+6. Verify the full workflow with admin authorization, stale-version and invalid
+value rejection, seller form discovery, read-model propagation, and SSR.
+
+**Explicitly out of scope for this track:** creating one service per metadata
+concept; arbitrary executable rules from admin input; using the editorial CMS
+as the validation authority; and moving Listing/Search to synchronous calls on
+the SSR request path.
+
+**Separate content tools:** use a headless CMS for banners and editorial page
+content with allowlisted content blocks; use Rspress for developer
+documentation. The gateway remains the SSR composition owner and uses platform
+UI primitives to render content. These tools have separate deployment and
+content lifecycles from product schema management.
 
 ---
 
@@ -941,11 +1062,23 @@ Repeat Phase 0 for: Storefront grid (T3), Identity (T4), then the four services 
 16. Dead CI step removed; TT-052 wired. *(G5)*
 
 **Phase 3** — decided and bound:
-17. B6 decided and recorded; the repository no longer contradicts itself about it. *(G11)*
+17. The monorepo layout matches `MONOREPO_STRUCTURE.md`; Go workspace entries, Compose contexts, CI, and service paths point to the same module locations. *(G11 resolved)*
 18. `CODEOWNERS` generated from the catalog, CI-verified for freshness. *(rung D)*
 19. Every team has a named contact channel and on-call rotation. *(G14)*
 20. `D-010` written or retired; the decision log is verifiably complete. *(§0.4)*
 21. Git and CI/CD policy written. *(§12.4)*
+
+**Product capability track (§12.6)** — admin-managed schema is live end to end:
+22. An authorized admin can draft, validate, preview, publish, and audit product
+   type schema changes without a code change or Product Service deployment.
+23. Published schema versions are immutable; product writes validate against
+   their submitted published version and persist that version.
+24. Seller forms discover published schema through the product contract; no
+   product-type registry is hardcoded in seller or Product Service source.
+25. Product snapshots reach Listing and Search, and the storefront renders
+   projected values without a synchronous Product Service read.
+26. Banner/editorial CMS content and Rspress documentation are documented and
+   deployed separately from product-schema administration.
 
 ---
 
@@ -989,7 +1122,7 @@ Repeat Phase 0 for: Storefront grid (T3), Identity (T4), then the four services 
 [devenv](https://devenv.sh/) ([options](https://devenv.sh/reference/options/), [repo](https://github.com/cachix/devenv/), [processes](https://devenv.sh/processes/)) · [Nix pure-eval](https://zemdregon.github.io/nix-docs/07-flakes/pure-eval-and-impure/) · [builders & sandboxes](https://zemdregon.github.io/nix-docs/04-store-and-build/builders-and-sandboxes/) · [`nix.conf`](https://nix.dev/manual/nix/latest/command-ref/conf-file.html) · [Devbox](https://www.jetify.com/docs/devbox/configuration) · [Dev Containers spec](https://containers.dev/implementors/spec/) ([supporting tools](https://github.com/devcontainers/spec/blob/main/docs/specs/supporting-tools.md)) · [nix-direnv](https://github.com/nix-community/nix-direnv/) · [Bazel hermeticity](https://bazel.build/basics/hermeticity) / [FAQ](https://bazel.build/about/faq) / [sandboxing](https://bazel.build/docs/sandboxing) · [Tilt](https://docs.tilt.dev/tutorial/2-tilt-up.html) · [mise](https://mise.jdx.dev/) · [12-factor config](https://12factor.net/config) ([tension](https://github.com/twelve-factor/twelve-factor/issues/4), [counter-case](https://hitchdev.com/strictyaml/why-not/environment-variables-as-config/), [compose both](https://blog.pilosus.org/posts/2019/06/07/application-configs-files-or-environment-variables-actually-both/))
 
 ### Repository-local
-`ARCHITECTURE.md` (four zones in §1, seven rules in §2, `D-0xx` log — **`D-010` absent**) · `internal/architecture/architecture_test.go` · `internal/architecture/import_graph.txt` · `internal/shared/module/{module,lifecycle}.go` · `internal/shared/web/render/{strategy,planner,composer,htmx,render}.go` · `internal/shared/web/ui/doc.go` · `internal/shared/{grpcconsumer,productconsumer,authconsumer,productevents}/` · `internal/bootstrap/*.go` · `internal/modules/*/{module.go,compose/}` · `internal/services/aggregator-service/{README.md,cmd/server/main.go,graph/}` · `Makefile` · `project.json` × 6 · `go.work` · `deploy/k8s/networkpolicy.yaml`
+`ARCHITECTURE.md` (four zones in §1, seven rules in §2, `D-0xx` log — **`D-010` absent**) · `apps/web/internal/architecture/architecture_test.go` · `apps/web/internal/architecture/import_graph.txt` · `apps/web/internal/shared/module/{module,lifecycle}.go` · `apps/web/internal/shared/web/render/{strategy,planner,composer,htmx,render}.go` · `apps/web/internal/shared/web/ui/doc.go` · `apps/web/internal/shared/{grpcconsumer,productconsumer,authconsumer,productevents}/` · `apps/web/internal/bootstrap/*.go` · `apps/web/internal/modules/*/{module.go,compose/}` · `services/aggregator-service/{README.md,cmd/server/main.go,graph/}` · `contracts/` · `Makefile` · module `project.json` descriptors · `go.work` · `deploy/k8s/networkpolicy.yaml`
 
 ---
 
@@ -1002,7 +1135,7 @@ Repeat Phase 0 for: Storefront grid (T3), Identity (T4), then the four services 
 **Breaking-change category** — Buf's layered strictness: `FILE` > `PACKAGE` > `WIRE_JSON` > `WIRE`.
 **Declared == derived** — D-2: catalog edges must equal edges extracted from the real import graph.
 **Deployment boundary (B2)** — which OS process. *Distinct from* distribution boundary (B6).
-**Distribution boundary (B6)** — which repository. **Undecided** (§2.6).
+**Distribution boundary (B6)** — which repository. **One monorepo, with separate Go modules** (§2.6).
 **Escalation ladder** — rungs 0–4, modular monolith first, service on a named trigger (§4.2).
 **Hybrid doctrine** — start in-process; a service is what a module becomes when a trigger fires (§4).
 **Interaction mode** — collaboration / X-as-a-Service / facilitating; exactly one per edge.

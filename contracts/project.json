@@ -2,7 +2,7 @@
   "name": "gogo-contracts",
   "$schema": "{NX_ROOT}/node_modules/nx/schemas/project-schema.json",
   "projectType": "library",
-  "sourceRoot": "apps/gogo/contracts",
+  "sourceRoot": "contracts",
   "tags": [
     "tier:foundation",
     "type:lib",
@@ -13,7 +13,7 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "go build ./..."
@@ -24,7 +24,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "go test ./..."
@@ -38,7 +38,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
@@ -53,7 +53,7 @@
     "format": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "gofmt -w ."
@@ -65,7 +65,7 @@
     "format:check": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
@@ -77,7 +77,7 @@
     "tidy": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/gogo/contracts",
+        "cwd": "contracts",
         "commands": [
           {
             "command": "go mod tidy"
@@ -91,7 +91,7 @@
       "options": {
         "tool": "buf",
         "command": "buf generate",
-        "cwd": "apps/gogo",
+        "cwd": ".",
         "label": "buf generate"
       }
     },
@@ -100,7 +100,7 @@
       "options": {
         "tool": "buf",
         "command": "buf lint",
-        "cwd": "apps/gogo",
+        "cwd": ".",
         "label": "buf lint"
       }
     }

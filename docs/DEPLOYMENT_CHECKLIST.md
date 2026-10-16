@@ -2,9 +2,9 @@
 
 ## Pre-Deployment
 
-- [ ] Review code changes in `internal/bootstrap/bootstrap.go`
-- [ ] Verify all tests pass: `go test -race ./internal/shared/breaker/... ./internal/bootstrap/...`
-- [ ] Build binary: `go build -o bin/gateway cmd/server/main.go`
+- [ ] Review code changes in `apps/web/internal/bootstrap/bootstrap.go`
+- [ ] Verify all tests pass: `go -C apps/web test -race ./internal/shared/breaker/... ./internal/bootstrap/...`
+- [ ] Build binary: `make build`
 - [ ] Review alert thresholds in `deploy/prometheus/circuit_breaker_alerts.yml`
 
 ## Deployment Steps

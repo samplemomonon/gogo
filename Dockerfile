@@ -23,19 +23,21 @@ WORKDIR /src
 # The contracts module is a separate go.mod in the same repository and the
 # gateway imports it, so it must be on disk before `go mod download` resolves
 # anything. There is no replace directive; the workspace resolves it.
-COPY go.mod go.sum ./
+COPY apps/web/go.mod apps/web/go.sum ./apps/web/
 COPY contracts/go.mod contracts/go.sum ./contracts/
-RUN go mod download
+RUN cd apps/web && go mod download
 
 COPY . .
-COPY --from=assets /src/internal/shared/web/assets/css/output.css ./internal/shared/web/assets/css/output.css
+COPY --from=assets /src/apps/web/internal/shared/web/assets/css/output.css ./apps/web/internal/shared/web/assets/css/output.css
 
 # *_templ.go files are gitignored, so generate them in the image.
-RUN go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+# templ is a Go tool dependency, so the module download layer above caches its
+# complete command dependency graph as part of the normal, checksum-pinned build.
+RUN cd apps/web && go tool templ generate
 
 ARG VERSION=dev
 ARG LDFLAGS=
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+RUN cd apps/web && CGO_ENABLED=0 GOOS=linux go build -trimpath \
     -ldflags "-s -w -X gogo/internal/shared/version.Version=${VERSION} ${LDFLAGS}" \
     -o /out/gogo ./cmd/server
 

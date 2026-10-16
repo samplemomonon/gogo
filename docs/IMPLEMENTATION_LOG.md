@@ -223,11 +223,11 @@ working as intended.
 |---|---|---|---|
 | 1 | `inventory`'s oversell invariant lives in SQL, not in `domain/`; `ports.StockService` is satisfied by repositories, and there is no `application/service.go` | `internal/modules/inventory` | **design** — needs the Phase 0 vertical slice, not a refactor |
 | 2 | `bootstrap` reaches `sales/infrastructure` | `sales_connection.go:30` | design — §5.2 |
-| 3 | ~~`aggregator-service` owns no persistence, and nothing checks it~~ | — | **CLOSED.** Tripwire written at `internal/services/aggregator-service/internal/architecture/`. See §8 |
+| 3 | ~~`aggregator-service` owns no persistence, and nothing checks it~~ | — | **CLOSED.** Tripwire written at `services/aggregator-service/internal/architecture/`. See §8 |
 | 4 | ~~`media.v1` has no breaker in the gateway~~ | — | **NOT A FINDING — verified and withdrawn.** `productconsumer.Connections` has exactly four upstreams: Write, Browse, Search, Category. The gateway never calls `media.v1`; `media-service` is reached by `aggregator-service`, a different binary. A breaker would guard a dependency that does not exist. The `units.yaml` comment already had this right; the log entry was wrong |
 | 5 | ~~`product-listing-service`'s usage string contains a `+event.Topic+` template artefact~~ | — | **CLOSED.** The `event` import existed only to support the dead placeholder — with the placeholder removed the import was unused and the package stopped compiling. `config.DefaultKafkaTopic` / `DefaultKafkaDeadLetterTopic` are now named constants, and `usage` uses `Fprintf` so the placeholders actually expand |
-| 6 | B6 (monorepo vs polyrepo) undecided; the repository still contradicts itself about whether `internal/services/` is in-tree | see PRD §2.6 | needs a decision, not code |
-| 7 | `devenv.lock` exists for 2 of 6 units; the two `devenv.nix` files are still `devenv init` scaffolds | `internal/services/*/devenv.nix` | small |
+| 6 | ~~B6 (monorepo vs polyrepo) undecided; services were nested under the gateway's `internal/`~~ | PRD §2.6 | **CLOSED.** Selected a monorepo with separate Go modules; gateway moved to `apps/web`, services to `services/`. See [`MONOREPO_STRUCTURE.md`](./MONOREPO_STRUCTURE.md) |
+| 7 | `devenv.lock` exists for 2 of 6 units; the two `devenv.nix` files are still `devenv init` scaffolds | `services/*/devenv.nix` | small |
 | 8 | 675 MB of `.devenv` state still on disk (git- and docker-ignored) | two service directories | cosmetic — yours to delete |
 
 ---
@@ -344,7 +344,7 @@ checked because nothing had ever checked them.
 ### `GOWORK=off` is load-bearing, not hygiene
 
 A directory not listed in `go.work` but living inside the workspace tree does not
-resolve to itself. `go list ./...` inside `internal/services/aggregator-service`
+resolve to itself. `go list ./...` inside `services/aggregator-service`
 silently enumerates the **gateway's** packages. Measured: aggregator, product and
 product-search all returned an *identical* list under workspace mode.
 
@@ -359,11 +359,11 @@ only build inside this workspace could not be released on its own.
 
 The obvious fix for an incomplete `go.work`, and the one independent research
 recommended. The tree contains two devenv environments under
-`internal/services/*/.devenv` whose `state/go/pkg/mod` is a Go module cache. A
+`services/*/.devenv` whose `state/go/pkg/mod` is a Go module cache. A
 recursive walk adopts every cached module into the workspace and the build fails
 with `module google.golang.org/protobuf appears multiple times in workspace`.
 
-`go.work` now lists all six modules by hand and carries a comment saying so. The
+`go.work` now lists all eight modules by hand and carries a comment saying so. The
 same hazard that motivated ignoring `.devenv` in Git and Docker has a third
 appearance here; a directory can be invisible to Git and still be discovered by
 any tool that walks the tree.

@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "css:build": "bunx @tailwindcss/cli -i ./internal/shared/web/assets/css/app.css -o ./internal/shared/web/assets/css/output.css",
-    "css:watch": "bunx @tailwindcss/cli -i ./internal/shared/web/assets/css/app.css -o ./internal/shared/web/assets/css/output.css --watch"
+    "css:build": "bunx @tailwindcss/cli -i ./apps/web/internal/shared/web/assets/css/app.css -o ./apps/web/internal/shared/web/assets/css/output.css",
+    "css:watch": "bunx @tailwindcss/cli -i ./apps/web/internal/shared/web/assets/css/app.css -o ./apps/web/internal/shared/web/assets/css/output.css --watch"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3"

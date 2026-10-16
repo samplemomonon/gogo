@@ -124,6 +124,9 @@ type SearchProduct struct {
 	// Projected_at is when this read model last wrote the row. It is not the same
 	// as updated_at: an event can republish a product without changing it.
 	ProjectedAt   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=projected_at,json=projectedAt,proto3" json:"projected_at,omitempty"`
+	ProductTypeId string                 `protobuf:"bytes,16,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
+	SchemaVersion int32                  `protobuf:"varint,17,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Attributes    map[string]string      `protobuf:"bytes,18,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -259,6 +262,27 @@ func (x *SearchProduct) GetUpdatedAt() *timestamppb.Timestamp {
 func (x *SearchProduct) GetProjectedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ProjectedAt
+	}
+	return nil
+}
+
+func (x *SearchProduct) GetProductTypeId() string {
+	if x != nil {
+		return x.ProductTypeId
+	}
+	return ""
+}
+
+func (x *SearchProduct) GetSchemaVersion() int32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *SearchProduct) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
 	}
 	return nil
 }
@@ -447,7 +471,7 @@ var File_productsearch_v1_search_proto protoreflect.FileDescriptor
 
 const file_productsearch_v1_search_proto_rawDesc = "" +
 	"\n" +
-	"\x1dproductsearch/v1/search.proto\x12\x10productsearch.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x04\n" +
+	"\x1dproductsearch/v1/search.proto\x12\x10productsearch.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\x06\n" +
 	"\rSearchProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -468,7 +492,15 @@ const file_productsearch_v1_search_proto_rawDesc = "" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12=\n" +
-	"\fprojected_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vprojectedAt\"\x85\x02\n" +
+	"\fprojected_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vprojectedAt\x12&\n" +
+	"\x0fproduct_type_id\x18\x10 \x01(\tR\rproductTypeId\x12%\n" +
+	"\x0eschema_version\x18\x11 \x01(\x05R\rschemaVersion\x12O\n" +
+	"\n" +
+	"attributes\x18\x12 \x03(\v2/.productsearch.v1.SearchProduct.AttributesEntryR\n" +
+	"attributes\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x02\n" +
 	"\x15SearchProductsRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -505,28 +537,30 @@ func file_productsearch_v1_search_proto_rawDescGZIP() []byte {
 }
 
 var file_productsearch_v1_search_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_productsearch_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_productsearch_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_productsearch_v1_search_proto_goTypes = []any{
 	(ProductStatus)(0),             // 0: productsearch.v1.ProductStatus
 	(*SearchProduct)(nil),          // 1: productsearch.v1.SearchProduct
 	(*SearchProductsRequest)(nil),  // 2: productsearch.v1.SearchProductsRequest
 	(*SearchProductsResponse)(nil), // 3: productsearch.v1.SearchProductsResponse
-	(*timestamppb.Timestamp)(nil),  // 4: google.protobuf.Timestamp
+	nil,                            // 4: productsearch.v1.SearchProduct.AttributesEntry
+	(*timestamppb.Timestamp)(nil),  // 5: google.protobuf.Timestamp
 }
 var file_productsearch_v1_search_proto_depIdxs = []int32{
 	0, // 0: productsearch.v1.SearchProduct.status:type_name -> productsearch.v1.ProductStatus
-	4, // 1: productsearch.v1.SearchProduct.created_at:type_name -> google.protobuf.Timestamp
-	4, // 2: productsearch.v1.SearchProduct.updated_at:type_name -> google.protobuf.Timestamp
-	4, // 3: productsearch.v1.SearchProduct.projected_at:type_name -> google.protobuf.Timestamp
-	0, // 4: productsearch.v1.SearchProductsRequest.status:type_name -> productsearch.v1.ProductStatus
-	1, // 5: productsearch.v1.SearchProductsResponse.products:type_name -> productsearch.v1.SearchProduct
-	2, // 6: productsearch.v1.ProductSearchService.SearchProducts:input_type -> productsearch.v1.SearchProductsRequest
-	3, // 7: productsearch.v1.ProductSearchService.SearchProducts:output_type -> productsearch.v1.SearchProductsResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	5, // 1: productsearch.v1.SearchProduct.created_at:type_name -> google.protobuf.Timestamp
+	5, // 2: productsearch.v1.SearchProduct.updated_at:type_name -> google.protobuf.Timestamp
+	5, // 3: productsearch.v1.SearchProduct.projected_at:type_name -> google.protobuf.Timestamp
+	4, // 4: productsearch.v1.SearchProduct.attributes:type_name -> productsearch.v1.SearchProduct.AttributesEntry
+	0, // 5: productsearch.v1.SearchProductsRequest.status:type_name -> productsearch.v1.ProductStatus
+	1, // 6: productsearch.v1.SearchProductsResponse.products:type_name -> productsearch.v1.SearchProduct
+	2, // 7: productsearch.v1.ProductSearchService.SearchProducts:input_type -> productsearch.v1.SearchProductsRequest
+	3, // 8: productsearch.v1.ProductSearchService.SearchProducts:output_type -> productsearch.v1.SearchProductsResponse
+	8, // [8:9] is the sub-list for method output_type
+	7, // [7:8] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_productsearch_v1_search_proto_init() }
@@ -540,7 +574,7 @@ func file_productsearch_v1_search_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_productsearch_v1_search_proto_rawDesc), len(file_productsearch_v1_search_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

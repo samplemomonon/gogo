@@ -1,0 +1,164 @@
+{
+  "name": "product-listing-service",
+  "$schema": "{NX_ROOT}/node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "services/product-listing-service/cmd",
+  "tags": [
+    "tier:platform",
+    "type:app",
+    "lang:go",
+    "scope:catalogue"
+  ],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "go build ./..."
+          }
+        ]
+      }
+    },
+    "bundle": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "mkdir -p bin && go build -trimpath -ldflags \"-s -w -X github.com/ruangbercerita182-tech/product-listing-service/internal/version.Version=${VERSION:-0.0.0-dev} -X github.com/ruangbercerita182-tech/product-listing-service/internal/version.Commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -X github.com/ruangbercerita182-tech/product-listing-service/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)\" -o bin/product-listing-service ./cmd/server"
+          }
+        ]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "go test -race -count=1 ./..."
+          }
+        ],
+        "env": {
+          "CGO_ENABLED": "0"
+        }
+      }
+    },
+    "test:integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "go test -race -count=1 ./internal/repository/..."
+          }
+        ],
+        "env": {
+          "CGO_ENABLED": "1",
+          "POSTGRES_TEST_DSN": "postgres://postgres:postgres@127.0.0.1:5432/cat_listing?sslmode=disable"
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
+          },
+          {
+            "command": "go vet ./..."
+          }
+        ],
+        "env": {}
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "gofmt -w ."
+          }
+        ],
+        "env": {}
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "unformatted=$(gofmt -l .); if [ -n \"$unformatted\" ]; then echo \"not gofmt-clean:\"; echo \"$unformatted\"; exit 1; fi"
+          }
+        ],
+        "env": {}
+      }
+    },
+    "tidy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "go mod tidy"
+          }
+        ],
+        "env": {}
+      }
+    },
+    "run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "services/product-listing-service",
+        "commands": [
+          {
+            "command": "go run ./cmd/server"
+          }
+        ],
+        "env": {}
+      }
+    },
+    "docker:build": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "docker",
+        "command": "docker compose build",
+        "cwd": "services/product-listing-service",
+        "label": "docker compose build"
+      }
+    },
+    "docker:up": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "docker",
+        "command": "docker compose up -d --build",
+        "cwd": "services/product-listing-service",
+        "label": "docker compose up"
+      }
+    },
+    "docker:down": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "docker",
+        "command": "docker compose down",
+        "cwd": "services/product-listing-service",
+        "label": "docker compose down"
+      }
+    },
+    "docker:logs": {
+      "executor": "./tools/nx-platform:run-tool",
+      "options": {
+        "tool": "docker",
+        "command": "docker compose logs -f --tail=100",
+        "cwd": "services/product-listing-service",
+        "label": "docker compose logs"
+      }
+    }
+  }
+}

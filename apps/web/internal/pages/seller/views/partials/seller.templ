@@ -1,0 +1,478 @@
+package partials
+
+import (
+	"strconv"
+	"strings"
+
+	"gogo/internal/pages/seller/application/results"
+	"gogo/internal/shared/money"
+	"gogo/internal/shared/web/ui"
+)
+
+// stockKinds is the movement vocabulary: the wire value is stored in the ledger
+// and must stay stable, while the word the seller reads is Indonesian. Keeping
+// both in one place stops the stock form and the movement table from drifting
+// into showing the same kind two different ways.
+var stockKinds = []struct{ Value, Label string }{
+	{Value: "restock", Label: "Restok"},
+	{Value: "adjustment", Label: "Penyesuaian"},
+	{Value: "opname", Label: "Opname"},
+}
+
+func StockKindLabel(kind string) string {
+	for _, k := range stockKinds {
+		if k.Value == kind {
+			return k.Label
+		}
+	}
+	// An unknown kind is stored data, not a typo to paper over: showing the raw
+	// value is more useful to a seller than hiding it behind a blank.
+	return kind
+}
+
+// productStatuses is the product lifecycle vocabulary. The wire value is what the
+// write side stores; the label is the word the seller reads. A product is only
+// sellable while it is active — draft and archived products exist but must not be
+// offered at the till.
+var productStatuses = []struct{ Value, Label string }{
+	{Value: "active", Label: "Aktif"},
+	{Value: "draft", Label: "Draf"},
+	{Value: "archived", Label: "Diarsipkan"},
+}
+
+// ProductStatusLabel maps a stored product status to the word the seller reads.
+// An unrecognised status is data from the owning service, shown as-is rather than
+// blanked: hiding it would make a new status look like a missing one.
+func ProductStatusLabel(status string) string {
+	for _, s := range productStatuses {
+		if s.Value == status {
+			return s.Label
+		}
+	}
+	if status == "" {
+		return "Tanpa status"
+	}
+	return status
+}
+
+// productStatusTone maps a stored status to the badge tone used for it. Active is the
+// only sellable state, so it is the only one that reads as positive.
+func productStatusTone(status string) string {
+	switch status {
+	case "active":
+		return "success"
+	case "draft":
+		return "warning"
+	default:
+		return "ghost"
+	}
+}
+
+templ DashboardSection(products []*results.Product, categories []*results.Category, outOfStock int) {
+	@ui.PageHero("Seller", "primary", "Toko", "Kelola produk, kategori dan stok toko dalam satu konsol.", ui.IconCart("size-5")) {
+		@ui.StatTile("Produk", strconv.Itoa(len(products)))
+		@ui.StatTile("Stok kosong", strconv.Itoa(outOfStock))
+	}
+
+	<div class={ ui.GridClass }>
+		@ui.StatCardLink("/seller/produk", "Produk", strconv.Itoa(len(products)), "primary")
+		@ui.StatCardLink("/seller/kategori", "Kategori", strconv.Itoa(len(categories)), "secondary")
+		@ui.StatCardLink("/seller/stok", "Stok", strconv.Itoa(outOfStock), "secondary")
+	</div>
+}
+
+templ ProductsSection(products []*results.Product, categories []*results.Category, types []results.ProductType, errMsg string, successMsg string) {
+	@ui.PageHero("Produk", "secondary", "Katalog", "Tambah, ubah dan hapus produk.", ui.IconTag("size-5"))
+
+	@ui.Alert("error", errMsg)
+	@ui.Alert("success", successMsg)
+
+	@ui.Panel("Produk baru") {
+		@ui.Form(ui.FormOptions{Action: "/seller/produk", Layout: ui.FormFieldset}) {
+			@ui.FormField("Nama") {
+				<input name="name" class={ ui.InputClass } required/>
+			}
+			@ui.FormField("Slug") {
+				<input name="slug" class={ ui.InputClass } aria-describedby="slug-help"/>
+			}
+			@ui.FormField("Kategori") {
+				<select name="categoryId" class={ ui.SelectClass }>
+					<option value="">— Tanpa kategori —</option>
+					for _, row := range categoryRows(categories) {
+						<option value={ row.Category.ID }>
+							if row.Category.IsGlobal {
+								Global · { row.Label }
+							} else {
+								Toko · { row.Label }
+							}
+						</option>
+					}
+				</select>
+			}
+			@ui.FormField("Jenis produk") {
+				<select name="productTypeId" class={ ui.SelectClass } hx-get="/seller/produk/attributes" hx-trigger="change" hx-target="#product-attributes" hx-include="this">
+					for i, typ := range types {
+						<option value={ typ.ID } selected?={ i == 0 }>{ typ.Name }</option>
+					}
+				</select>
+			}
+			<div id="product-attributes">
+				if len(types) > 0 {
+					@ProductAttributeFields(types[0])
+				}
+			</div>
+			@ui.FormField("Merek") {
+				<input name="brand" class={ ui.InputClass }/>
+			}
+			@ui.FormField("Harga jual") {
+				<input name="price" type="number" min="0" value="0" class={ ui.InputClass }/>
+			}
+			@ui.FormField("Stok awal") {
+				<input name="stock" type="number" min="0" value="0" class={ ui.InputClass }/>
+			}
+			@ui.FormField("Status") {
+				<select name="status" class={ ui.SelectClass }>
+					for _, status := range productStatuses {
+						<option value={ status.Value } selected?={ status.Value == "active" }>{ status.Label }</option>
+					}
+				</select>
+			}
+			@ui.FormField("Deskripsi") {
+				<textarea name="description" rows="3" class={ ui.InputClass }></textarea>
+			}
+			@ui.FormActions("") {
+				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, nil) {
+					@ui.IconSave("size-4")
+					Simpan produk
+				}
+			}
+		}
+		<p id="slug-help" class={ ui.SmallMutedClass }>Kosongkan untuk membuat slug dari nama produk.</p>
+	}
+
+	@ui.TablePanel(ui.TablePanelOptions{
+		Title:    "Daftar produk",
+		Count:    len(products),
+		MinWidth: "min-w-[44rem]",
+		Columns: []ui.Column{
+			{Label: "Nama"},
+			{Label: "Kategori"},
+			{Label: "Merek"},
+			{Label: "Harga", Align: "right", Numeric: true},
+			{Label: "Status", Align: "center"},
+			{Label: "", Align: "right", AriaLabel: "Aksi"},
+		},
+		EmptyTitle:       "Belum ada produk",
+		EmptyDescription: "Tambahkan produk pertama lewat formulir di atas.",
+	}) {
+		for _, product := range products {
+			@ui.TableRow() {
+				@ui.TableRowHeader("") {
+					{ product.Name }
+					if product.Slug != "" {
+						<span class={ ui.SmallMutedClass }>{ product.Slug }</span>
+					}
+				}
+					@ui.TableCell("", "") { { categoryName(categories, product.CategoryID) } }
+				@ui.TableCell("", "") { { product.Brand } }
+				@ui.TableCell("right", ui.NumClass) { { money.Rupiah(product.Price) } }
+				@ui.TableCell("center", "") {
+					@ui.Badge(productStatusTone(product.Status)+" badge-soft", "sm", "") { { ProductStatusLabel(product.Status) } }
+				}
+				@ui.TableCell("right", "") {
+					@ui.Form(ui.FormOptions{Action: "/seller/produk/" + product.ID + "/delete"}) {
+						@ui.Button(ui.ActionClass(ui.IntentDanger, "sm"), ui.SubmitAttrs("Hapus produk “"+product.Name+"”? Tindakan ini tidak dapat dibatalkan.")) {
+							@ui.IconTrash("size-4")
+							Hapus
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+templ ProductAttributeFields(typ results.ProductType) {
+	<input type="hidden" name="schemaVersion" value={ strconv.Itoa(int(typ.SchemaVersion)) }/>
+	if len(typ.Attributes) > 0 {
+		<fieldset class="space-y-3" aria-label={ "Atribut " + typ.Name }>
+			<legend class={ ui.SmallMutedClass }>Atribut { typ.Name }</legend>
+			for _, attr := range typ.Attributes {
+				@ui.FormField(attr.Label) {
+					if attr.Kind == "enum" {
+						<select name={ "attribute_" + attr.Key } class={ ui.SelectClass } required?={ attr.Required }>
+							<option value="">Pilih { strings.ToLower(attr.Label) }</option>
+							for _, option := range attr.Options {
+								<option value={ option }>{ option }</option>
+							}
+						</select>
+					} else if attr.Kind == "number" {
+						<input name={ "attribute_" + attr.Key } type="number" min="0" step="any" class={ ui.InputClass } required?={ attr.Required }/>
+					} else {
+						<input name={ "attribute_" + attr.Key } class={ ui.InputClass } required?={ attr.Required }/>
+					}
+				}
+			}
+		</fieldset>
+	}
+}
+
+// CategoriesSection renders global references and the current merchant's local tree.
+templ CategoriesSection(categories []*results.Category, errMsg string, successMsg string) {
+	@ui.PageHero("Kategori", "secondary", "Katalog", "Kategori admin dipakai bersama; kategori toko hanya berlaku untuk merchant ini.", ui.IconTag("size-5"))
+
+	@ui.Alert("error", errMsg)
+	@ui.Alert("success", successMsg)
+
+	@ui.Panel("Buat kategori toko") {
+		@ui.Form(ui.FormOptions{Action: "/seller/kategori", Layout: ui.FormFieldset}) {
+			@ui.FormField("Nama kategori") {
+				<input name="name" class={ ui.InputClass } maxlength="255" required/>
+			}
+			@ui.FormField("Kategori induk") {
+				<select name="parentId" class={ ui.SelectClass }>
+					<option value="">Kategori utama</option>
+					for _, row := range categoryRows(categories) {
+						if !row.Category.IsGlobal {
+							<option value={ row.Category.ID }>{ row.Label }</option>
+						}
+					}
+				</select>
+			}
+			@ui.FormActions("") {
+				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, nil) {
+					@ui.IconSave("size-4")
+					Simpan kategori toko
+				}
+			}
+		}
+		<p class={ ui.SmallMutedClass }>Kategori toko hanya dapat dipakai merchant ini. Kategori global dikelola admin.</p>
+	}
+
+	@ui.TablePanel(ui.TablePanelOptions{
+		Title: "Daftar kategori",
+		Count: len(categories),
+		Columns: []ui.Column{{Label: "Nama"}, {Label: "Pemilik"}},
+		EmptyTitle:       "Belum ada kategori",
+		EmptyDescription: "Belum ada kategori global atau kategori toko.",
+	}) {
+		for _, row := range categoryRows(categories) {
+			@ui.TableRow() {
+				@ui.TableRowHeader("") { { row.Label } }
+				@ui.TableCell("", "") {
+					if row.Category.IsGlobal {
+						Admin global
+					} else {
+						Toko ini
+					}
+				}
+			}
+		}
+	}
+}
+
+templ StockSection(products []*results.Product, stocks []*results.Stock, movements []*results.Movement, errMsg string) {
+	@ui.PageHero("Stok", "primary", "Inventori", "Sesuaikan stok dan lihat riwayat pergerakan.", ui.IconLayers("size-5"))
+
+	@ui.Alert("error", errMsg)
+
+	@ui.Panel("Penyesuaian stok") {
+		@ui.Form(ui.FormOptions{Action: "/seller/stok", Layout: ui.FormFieldset}) {
+			@ui.FormField("Produk") {
+				<select name="productId" class={ ui.SelectClass } required>
+					for _, product := range products {
+						<option value={ product.ID }>{ product.Name }</option>
+					}
+				</select>
+			}
+			@ui.FormField("Jumlah (+/-)") {
+				<input name="delta" type="number" value="0" class={ ui.InputClass } required/>
+			}
+			@ui.FormField("Jenis") {
+				<select name="kind" class={ ui.SelectClass }>
+					for _, kind := range stockKinds {
+						<option value={ kind.Value }>{ kind.Label }</option>
+					}
+				</select>
+			}
+			@ui.FormField("Catatan") { <input name="note" class={ ui.InputClass }/> }
+			@ui.FormField("Petugas") { <input name="actor" class={ ui.InputClass }/> }
+			@ui.FormActions("") {
+				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, nil) {
+					@ui.IconLayers("size-4")
+					Terapkan
+				}
+			}
+		}
+	}
+
+	@ui.TablePanel(ui.TablePanelOptions{
+		Title: "Stok saat ini",
+		Count: len(stocks),
+		Columns: []ui.Column{
+			{Label: "Produk"},
+			{Label: "Stok", Align: "right", Numeric: true},
+		},
+		EmptyTitle:       "Belum ada catatan stok",
+		EmptyDescription: "Penyesuaian stok yang Anda terapkan akan tercatat di sini.",
+	}) {
+		for _, stock := range stocks {
+			@ui.TableRow() {
+				@ui.TableRowHeader("") { { productName(products, stock.ProductID) } }
+				@ui.TableCell("right", ui.NumClass) { { strconv.Itoa(stock.Quantity) } }
+			}
+		}
+	}
+
+	@ui.TablePanel(ui.TablePanelOptions{
+		Title:    "Riwayat pergerakan",
+		Count:    len(movements),
+		MinWidth: "min-w-[36rem]",
+		Columns: []ui.Column{
+			{Label: "Produk"},
+			{Label: "Jenis"},
+			{Label: "Δ", Align: "right", Numeric: true},
+			{Label: "Sesudah", Align: "right", Numeric: true},
+			{Label: "Petugas"},
+		},
+		EmptyTitle:       "Belum ada pergerakan stok",
+		EmptyDescription: "Penyesuaian yang Anda terapkan akan tercatat di sini.",
+	}) {
+		for _, movement := range movements {
+			@ui.TableRow() {
+				@ui.TableRowHeader("") { { productName(products, movement.ProductID) } }
+				@ui.TableCell("", "") { { StockKindLabel(movement.Kind) } }
+				@ui.TableCell("right", ui.NumClass) { { strconv.Itoa(movement.Delta) } }
+				@ui.TableCell("right", ui.NumClass) { { strconv.Itoa(movement.After) } }
+				@ui.TableCell("", "") { { movement.Actor } }
+			}
+		}
+	}
+}
+
+func productName(products []*results.Product, id string) string {
+	for _, product := range products {
+		if product.ID == id {
+			return product.Name
+		}
+	}
+	return id
+}
+
+// KasirSection renders the point-of-sale grid. Only active products are offered:
+// a draft or archived product exists in the catalogue but must not be sellable.
+templ KasirSection(products []*results.Product, errMsg string) {
+	@ui.PageHero("Kasir", "primary", "Point of Sale", "Isi jumlah pada produk yang dijual, lalu bayar.", ui.IconCart("size-5"))
+
+	@ui.Alert("error", errMsg)
+
+	@ui.Form(ui.FormOptions{Action: "/seller/kasir", Layout: ui.FormStack}) {
+		@ui.TablePanel(ui.TablePanelOptions{
+			Title:    "Keranjang",
+			Count:    len(products),
+			MinWidth: "min-w-[36rem]",
+			Columns: []ui.Column{
+				{Label: "Produk"},
+				{Label: "Harga", Align: "right", Numeric: true},
+				{Label: "Jumlah", Align: "right", AriaLabel: "Jumlah dibeli"},
+			},
+			EmptyTitle:       "Keranjang kosong",
+			EmptyDescription: "Belum ada produk aktif yang bisa dijual.",
+		}) {
+			for _, product := range products {
+				@ui.TableRow() {
+					@ui.TableRowHeader("") { { product.Name } }
+					@ui.TableCell("right", ui.NumClass) { { money.Rupiah(product.Price) } }
+					@ui.TableCell("right", "") {
+						<input
+							name={ "qty_" + product.ID }
+							type="number"
+							min="0"
+							value="0"
+							aria-label={ "Jumlah " + product.Name }
+							class={ ui.InputClass + " input-sm w-24 " + ui.TapTargetClass }
+						/>
+					}
+				}
+			}
+		}
+
+		@ui.Panel("Pembayaran") {
+			<div class={ ui.FieldsetClass + " sm:grid-cols-3" }>
+				@ui.FormField("Metode") {
+					<select name="method" class={ ui.SelectClass }>
+						<option value="Tunai">Tunai</option>
+						<option value="QRIS">QRIS</option>
+						<option value="Transfer">Transfer</option>
+					</select>
+				}
+				@ui.FormField("Dibayar") {
+					<input name="paid" type="number" min="0" value="0" class={ ui.InputClass }/>
+				}
+				@ui.FormField("Kasir") {
+					<input name="cashier" class={ ui.InputClass }/>
+				}
+			</div>
+			@ui.FormActions("-mt-2") {
+				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, ui.SubmitAttrs("Proses pembayaran untuk produk yang dipilih?")) {
+					@ui.IconCheckBadge("size-4")
+					Bayar
+				}
+			}
+		}
+	}
+}
+
+templ TransactionsSection(transactions []*results.Transaction, errMsg string) {
+	@ui.PageHero("Transaksi", "secondary", "Penjualan", "Riwayat transaksi dan pembatalan.", ui.IconCart("size-5"))
+
+	@ui.Alert("error", errMsg)
+
+	@ui.TablePanel(ui.TablePanelOptions{
+		Title:    "Riwayat",
+		Count:    len(transactions),
+		MinWidth: "min-w-[44rem]",
+		Columns: []ui.Column{
+			{Label: "Nomor"},
+			{Label: "Total", Align: "right", Numeric: true},
+			{Label: "Metode"},
+			{Label: "Kasir"},
+			{Label: "Status", Align: "center"},
+			{Label: "", Align: "right", AriaLabel: "Aksi"},
+		},
+		EmptyTitle:       "Belum ada transaksi",
+		EmptyDescription: "Transaksi yang dibayar di kasir akan tercatat di sini.",
+	}) {
+		for _, transaction := range transactions {
+			@ui.TableRow() {
+				@ui.TableRowHeader(ui.MonoClass) { { transaction.Number } }
+				@ui.TableCell("right", ui.NumClass) { { money.Rupiah(transaction.Total) } }
+				@ui.TableCell("", "") { { transaction.PaymentMethod } }
+				@ui.TableCell("", "") { { transaction.Cashier } }
+				@ui.TableCell("center", "") {
+					if transaction.VoidedAt != nil {
+						@ui.Badge("error badge-soft", "sm", "") { Batal }
+					} else {
+						@ui.Badge("success badge-soft", "sm", "") { Selesai }
+					}
+				}
+				@ui.TableCell("right", "") {
+					if transaction.VoidedAt == nil {
+						@ui.Form(ui.FormOptions{Action: "/seller/transaksi/" + transaction.ID + "/void", Class: "flex flex-wrap items-center justify-end gap-2"}) {
+							<input
+								name="voidedBy"
+								placeholder="Petugas"
+								aria-label={ "Nama petugas pembatal transaksi " + transaction.Number }
+								class={ ui.InputClass + " input-sm w-28 " + ui.TapTargetClass }
+							/>
+							@ui.Button(ui.ActionClass(ui.IntentDanger, "sm"), ui.SubmitAttrs("Batalkan transaksi "+transaction.Number+"? Tindakan ini tidak dapat dibatalkan.")) {
+								@ui.IconXCircle("size-4")
+								Batal
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,27 +1,27 @@
 go 1.27.1
 
-// Every module in the repository, listed explicitly.
+// Every Go module in the repository, listed explicitly.
 //
 // Do NOT run `go work use -r .` here. The tree contains two devenv
-// environments under internal/services/*/.devenv, whose state/go/pkg/mod is a
+// environments under services/*/.devenv, whose state/go/pkg/mod is a
 // Go module cache. A recursive walk treats every one of those cached modules as
 // a workspace module and the build fails with "module X appears multiple times
-// in workspace". Listing the six modules by hand is what keeps the workspace
-// equal to the repository.
+// in workspace". Listing the eight modules by hand keeps the workspace equal
+// to the repository.
 //
-// The platform services are listed because they are part of this workspace, not
-// because they should build against it. `make services-vet` and
-// `make services-test` set GOWORK=off so each service is built and tested on its
+// The gateway, contracts, and platform services are listed because they are
+// part of this workspace, not because services should build against it.
+// `make services-vet` and `make services-test` set GOWORK=off so each service is built and tested on its
 // own go.mod, the same way it is deployed. The build graph being shared and the
 // dependency graph being independent are both deliberate: a service that could
 // only build inside this workspace could not be released on its own.
 use (
-	.
+	./apps/web
 	./contracts
-	./internal/services/aggregator-service
-	./internal/services/product-listing-service
-	./internal/services/product-search-service
-	./internal/services/product-service
-	./internal/services/media-service
-	./internal/services/category-service
+	./services/aggregator-service
+	./services/product-listing-service
+	./services/product-search-service
+	./services/product-service
+	./services/media-service
+	./services/category-service
 )
