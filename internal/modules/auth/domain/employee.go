@@ -22,6 +22,12 @@ var (
 	ErrInvalidRole       = fmt.Errorf("%w: role is required", ErrInvalidEmployee)
 	ErrDuplicateEmail    = fmt.Errorf("%w: email already exists", ErrInvalidEmployee)
 	ErrMissingCredential = fmt.Errorf("%w: credential is required", ErrInvalidEmployee)
+
+	// ErrInvalidCredentials is a sign-in refusal: the address or PIN presented
+	// did not match. It deliberately does not wrap ErrInvalidEmployee — that
+	// bucket means the request was malformed, while this one means the caller
+	// is not authenticated, and the adapters answer the two differently.
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 // Role represents an employee's role.

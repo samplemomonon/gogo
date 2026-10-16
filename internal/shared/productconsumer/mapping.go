@@ -276,18 +276,19 @@ func coreFromBrowse(p *productlistingv1.Product) Core {
 		return Core{}
 	}
 	core := Core{
-		ID:         formatID(p.GetId()),
-		Name:       p.GetName(),
-		Slug:       p.GetSlug(),
-		Brand:      p.GetBrand(),
-		Price:      p.GetPriceCents(),
-		Currency:   p.GetCurrency(),
-		Stock:      int(p.GetStock()),
-		Status:     statusToBrowse(p.GetStatus()),
-		CategoryID: formatID(p.GetCategoryId()),
-		MediaID:    formatID(p.GetPrimaryMediaId()),
-		CreatedAt:  timestamp(p.GetCreatedAt()),
-		UpdatedAt:  timestamp(p.GetUpdatedAt()),
+		ID:          formatID(p.GetId()),
+		Name:        p.GetName(),
+		Slug:        p.GetSlug(),
+		Description: p.GetDescription(),
+		Brand:       p.GetBrand(),
+		Price:       p.GetPriceCents(),
+		Currency:    p.GetCurrency(),
+		Stock:       int(p.GetStock()),
+		Status:      statusToBrowse(p.GetStatus()),
+		CategoryID:  formatID(p.GetCategoryId()),
+		MediaID:     formatID(p.GetPrimaryMediaId()),
+		CreatedAt:   timestamp(p.GetCreatedAt()),
+		UpdatedAt:   timestamp(p.GetUpdatedAt()),
 	}
 	if wire := p.GetVariants(); len(wire) > 0 {
 		core.Variants = make([]Variant, 0, len(wire))

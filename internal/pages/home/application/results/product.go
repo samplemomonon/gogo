@@ -8,10 +8,10 @@ package results
 // fields the storefront grid actually renders; anything beyond that stays behind
 // the remote port instead of creeping into this page's read model.
 //
-// Barcode is retained even though no current product contract carries one: the
-// grid renders it as the secondary line under the name, and the field stays so a
-// barcode-bearing contract can populate it without a template change. Until then
-// it is always empty, which the view handles as "no barcode shown".
+// Barcode is always empty today: no current product contract carries one and no
+// view renders it. The field is kept so a barcode-bearing contract can populate
+// it without reshaping this read model — until then the zero value flows
+// through unread.
 type Product struct {
 	ID       string
 	TenantID string
@@ -25,11 +25,11 @@ type Product struct {
 // Listing is one page of products plus the paging metadata the storefront needs
 // to render controls and crawl further pages.
 //
-// Total is the number of matching products before paging. NextCursor is retained
-// for the same reason as Barcode: the browse read model pages by offset and
-// returns no keyset cursor, so it is always empty today, but the storefront's
-// pagination component is written against it and the pagekit contract carries it
-// end to end.
+// Total is the number of matching products before paging. NextCursor is always
+// empty today: the browse read model pages by offset and returns no keyset
+// cursor, and the storefront pages by number — pagekit's Fetch contract declares
+// a cursor slot, but the handler ignores it and the UI is built from Total. The
+// field is kept for a cursor-bearing read model.
 type Listing struct {
 	Products   []*Product
 	Total      int

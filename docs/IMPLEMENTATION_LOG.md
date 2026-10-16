@@ -740,3 +740,80 @@ Six existing tests across the three services broke on the new requirement and we
 updated rather than worked around — including `TestPanicIsRecoveredAndIdentified`,
 which would have passed for the wrong reason (asserting 500 against a 401 the
 guard produced) had the credential not been supplied.
+
+## 14. The island ownership rule is enforced, not documented
+
+`docs/DECISION_UI_OWNERSHIP.md` §5 decided that an island key carries its owner
+namespace and that "the test fails on an unnamespaced key". Until now it was the
+only item of that decision with no code behind it: `render.Island` accepted any
+string, and §4's "add a test per island" had no per-island test either.
+
+**The rule.** `render.ValidateIslandName` accepts `"<owner>.<island>"` (or `/`),
+with the owner a lowercase identifier. Everything after the first separator is
+deliberately unconstrained — paged islands append their own coordinates
+(`":t<hash>:p3"`) — so the rule constrains exactly the part that carries
+ownership. The enforcement point is the constructors: `Island` and
+`ClientIsland` are the single place an island enters a composition, so an
+unnamespaced key panics there — and `pagekit.NewPagedListPage` checks eagerly,
+so the failure lands at wiring, not on the first request. A bare key would
+otherwise alias another unit's cache namespace, and the collision would surface
+as another team's invalidation dropping this team's cache with nothing in the
+build to explain it.
+
+**What the tests pin.** `islandname_test.go` table-tests the rule, including
+each failure shape (no separator, non-identifier owner, empty island,
+whitespace, the hostile `evil"><script>`). The composer fixtures now use
+namespaced names (`render.static`, …), which is what the rule requires of every
+real island. The home key is covered where it is declared: `islandkeys_test.go`
+asserts `home.product-grid` validates and is namespaced to the page that owns
+it — an unowned key fails at the declaration site rather than at the first
+render.
+
+**The XSS test is the one worth noting.** The old attribute-escaping test built
+a hostile island through `ClientIsland("evil\"><script>…")`. That name can no
+longer be constructed through the owner-enforcing constructor, and the test now
+builds the `Component` literally. The two layers stay distinguishable: the
+constructor refuses to create a hostile name; the renderer still escapes one if
+it ever arrives another way.
+
+**§4's per-island test.** `TestHomeGridIsPublicAndCacheable` primes the grid
+with a full-page request and then serves an HTMX fragment, asserting the
+platform is not fetched twice: the island is declared `Public` and not
+`Personalized`, which is what makes its tenant-qualified cache entry safe to
+serve.
+
+## 15. Four defects the coverage pass surfaced, fixed
+
+Taking the remaining 41 packages from "[no test files]" to covered turned up four
+defects that had survived review because nothing exercised the paths. Each fix
+writes the contract into a test.
+
+**The auth error table shadowed itself.** `ErrInvalidPIN` and `ErrExpired` wrap
+`ErrInvalidEmployee` and `ErrInvalidSession` (`fmt.Errorf("%w: …")`), and
+`Classify`/`Message` checked the buckets first, so every specific answer — "PIN
+must be 6 digits", "session has expired" — was demoted to its bucket's code and
+message: `KindFailedPrecondition` and `KindUnauthenticated` were unreachable.
+The table now checks specifics before the buckets they wrap, and login's
+credential mismatch is its own sentinel (`ErrInvalidCredentials`, answered
+`KindUnauthenticated`) instead of reusing the wrong-shape `ErrInvalidPIN`.
+`errors_test.go` pins every sentinel's kind and message, bare and wrapped. The
+grpcservice classification test, which had pinned the shadowed answers as "what
+the adapter actually answers", now pins the real ones: FailedPrecondition for a
+malformed PIN and an expired session, Unauthenticated for a credential mismatch.
+
+**The seller's transaction table mislabelled its columns.** Headers
+"Bayar"/"Metode" sat over the payment-method and cashier cells. The cells match
+the rest of the console — a `Petugas`-style person column, `Kasir` in the nav —
+so the headers were corrected to "Metode" and "Kasir". The reverse reading (a
+money "Bayar" column for `Paid`) was considered and rejected: nothing else in
+the page renders `Paid`, and the cells carry no numeric styling.
+
+**The browse mapper dropped Description.** `coreFromBrowse` never copied
+`Description` from the listing contract while the search and write mappers did;
+`TestListPageMapsWireToCore` now asserts it.
+
+**Two comments described behaviour that does not exist.** The home read model
+claimed the grid renders a barcode line (no contract carries a barcode and no
+view renders it) and that the pagination component is written against
+`NextCursor` (the UI pages by number, and pagekit's handler discards the cursor
+slot its Fetch contract declares). The comments now say what the code does.

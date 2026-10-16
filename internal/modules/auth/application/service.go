@@ -162,7 +162,7 @@ func (s *Service) Login(ctx context.Context, tenant domain.Tenant, email, pin st
 		return nil, nil, domain.ErrInvalidEmployee
 	}
 	if err := s.checkPIN(employee.PINHash, pin); err != nil {
-		return nil, nil, domain.ErrInvalidPIN
+		return nil, nil, domain.ErrInvalidCredentials
 	}
 
 	session, err := domain.NewSession(tenant, generateID(), employee.ID, s.ttl)

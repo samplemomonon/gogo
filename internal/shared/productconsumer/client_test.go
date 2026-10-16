@@ -131,7 +131,8 @@ func TestListPageMapsWireToCore(t *testing.T) {
 		return &productlistingv1.ListProductsResponse{
 			Products: []*productlistingv1.Product{{
 				Id: 42, Name: "Aurora Phone", Slug: "aurora-phone", Brand: "Aurora",
-				PriceCents: 12999000, Currency: "IDR", Stock: 7,
+				Description: "Aurora's flagship phone",
+				PriceCents:  12999000, Currency: "IDR", Stock: 7,
 				Status:         productlistingv1.ProductStatus_PRODUCT_STATUS_ACTIVE,
 				CategoryId:     3,
 				PrimaryMediaId: 9,
@@ -168,6 +169,9 @@ func TestListPageMapsWireToCore(t *testing.T) {
 	}
 	if got.Name != "Aurora Phone" || got.Brand != "Aurora" {
 		t.Errorf("name/brand = %q/%q", got.Name, got.Brand)
+	}
+	if got.Description != "Aurora's flagship phone" {
+		t.Errorf("Description = %q, want the wire description mapped", got.Description)
 	}
 	// Money stays in minor units: no conversion factor is applied at this boundary.
 	if got.Price != 12999000 {
