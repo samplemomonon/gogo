@@ -53,13 +53,14 @@ gogo/internal/pages/auth/application/results
 gogo/internal/pages/auth/handlers	gogo/internal/pages/auth/application/ports,gogo/internal/pages/auth/views/pages,gogo/internal/shared/authconsumer,gogo/internal/shared/grpcconsumer,gogo/internal/shared/tenant,gogo/internal/shared/web/render,gogo/internal/shared/web/session,gogo/internal/shared/web/shell
 gogo/internal/pages/auth/infrastructure/authclient	gogo/internal/pages/auth/application/results,gogo/internal/shared/authconsumer
 gogo/internal/pages/auth/views/pages	gogo/internal/shared/web/ui
-gogo/internal/pages/home	gogo/internal/pages/home/application/ports,gogo/internal/pages/home/handlers/products/list,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation,gogo/internal/shared/web/pagekit
+gogo/internal/pages/home	gogo/internal/pages/home/application/ports,gogo/internal/pages/home/handlers/products/detail,gogo/internal/pages/home/handlers/products/list,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation,gogo/internal/shared/web/pagekit
 gogo/internal/pages/home/application/ports	gogo/internal/pages/home/application/results
 gogo/internal/pages/home/application/results
+gogo/internal/pages/home/handlers/products/detail	gogo/internal/pages/home/application/ports,gogo/internal/pages/home/views/pages,gogo/internal/shared/productconsumer,gogo/internal/shared/tenant
 gogo/internal/pages/home/handlers/products/list	gogo/internal/pages/home/application/ports,gogo/internal/pages/home/application/results,gogo/internal/pages/home/infrastructure/listingclient,gogo/internal/pages/home/islandkeys,gogo/internal/pages/home/views/pages,gogo/internal/pages/home/views/partials,gogo/internal/shared/tenant,gogo/internal/shared/web/pagekit,gogo/internal/shared/web/render
 gogo/internal/pages/home/infrastructure/listingclient	gogo/internal/pages/home/application/ports,gogo/internal/pages/home/application/results,gogo/internal/shared/breaker,gogo/internal/shared/productconsumer,gogo/internal/shared/tenant
 gogo/internal/pages/home/islandkeys
-gogo/internal/pages/home/views/pages	gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/layouts,gogo/internal/shared/web/ui
+gogo/internal/pages/home/views/pages	gogo/internal/pages/home/application/results,gogo/internal/shared/money,gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/layouts,gogo/internal/shared/web/ui
 gogo/internal/pages/home/views/partials	gogo/internal/pages/home/application/results,gogo/internal/shared/money,gogo/internal/shared/web/pagekit,gogo/internal/shared/web/ui
 gogo/internal/pages/profile	gogo/internal/pages/profile/application/ports,gogo/internal/pages/profile/handlers,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation
 gogo/internal/pages/profile/application/ports	gogo/internal/pages/profile/application/results
@@ -70,7 +71,7 @@ gogo/internal/pages/profile/views/pages	gogo/internal/pages/profile/application/
 gogo/internal/pages/seller	gogo/internal/pages/seller/application/ports,gogo/internal/pages/seller/handlers,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation
 gogo/internal/pages/seller/application/ports	gogo/internal/pages/seller/application/results
 gogo/internal/pages/seller/application/results
-gogo/internal/pages/seller/handlers	gogo/internal/pages/seller/application/ports,gogo/internal/pages/seller/application/results,gogo/internal/pages/seller/httperr,gogo/internal/pages/seller/views/pages,gogo/internal/pages/seller/views/partials,gogo/internal/shared/web/render
+gogo/internal/pages/seller/handlers	gogo/internal/pages/seller/application/ports,gogo/internal/pages/seller/application/results,gogo/internal/pages/seller/httperr,gogo/internal/pages/seller/views/pages,gogo/internal/pages/seller/views/partials,gogo/internal/shared/productconsumer,gogo/internal/shared/tenant,gogo/internal/shared/web/render
 gogo/internal/pages/seller/httperr	gogo/internal/pages/seller/infrastructure/inventoryclient,gogo/internal/pages/seller/infrastructure/salesclient,gogo/internal/shared/productconsumer
 gogo/internal/pages/seller/infrastructure/catalogclient	gogo/internal/pages/seller/application/results,gogo/internal/shared/grpcconsumer,gogo/internal/shared/productconsumer
 gogo/internal/pages/seller/infrastructure/inventoryclient	gogo/contracts/inventory/v1,gogo/internal/pages/seller/application/results,gogo/internal/shared/breaker,gogo/internal/shared/grpcconsumer

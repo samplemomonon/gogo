@@ -65,17 +65,20 @@ import (
 
 // fakeProduct is one row in the fakes' shared catalogue.
 type fakeProduct struct {
-	id          int64
-	name        string
-	slug        string
-	description string
-	brand       string
-	priceCents  int64
-	currency    string
-	stock       int32
-	status      productv1.ProductStatus
-	categoryID  int64
-	tenant      string
+	id            int64
+	name          string
+	slug          string
+	description   string
+	brand         string
+	priceCents    int64
+	currency      string
+	stock         int32
+	status        productv1.ProductStatus
+	categoryID    int64
+	tenant        string
+	productTypeID string
+	schemaVersion int32
+	attributes    map[string]string
 }
 
 // fakePlatform is the in-process stand-in for the four product-platform services. One
@@ -83,11 +86,12 @@ type fakeProduct struct {
 // the write side is visible to a subsequent browse, exactly as it is against the real
 // platform where the read model is fed by the same events.
 type fakePlatform struct {
-	mu       sync.Mutex
-	products map[int64]*fakeProduct
-	cats     map[int64]*categoryv1.Category
-	nextID   int64
-	nextCat  int64
+	mu         sync.Mutex
+	products   map[int64]*fakeProduct
+	cats       map[int64]*categoryv1.Category
+	catTenants map[int64]string
+	nextID     int64
+	nextCat    int64
 
 	// searchCalls and browseCalls let a test assert which service actually answered.
 	searchCalls int
@@ -101,10 +105,11 @@ type fakePlatform struct {
 
 func newFakePlatform() *fakePlatform {
 	return &fakePlatform{
-		products: map[int64]*fakeProduct{},
-		cats:     map[int64]*categoryv1.Category{},
-		nextID:   1,
-		nextCat:  1,
+		products:   map[int64]*fakeProduct{},
+		cats:       map[int64]*categoryv1.Category{},
+		catTenants: map[int64]string{},
+		nextID:     1,
+		nextCat:    1,
 	}
 }
 
@@ -119,6 +124,12 @@ func tenantOf(ctx context.Context) string {
 type fakeProductServer struct {
 	productv1.UnimplementedProductServiceServer
 	platform *fakePlatform
+}
+
+func (s *fakeProductServer) ListProductTypes(context.Context, *productv1.ListProductTypesRequest) (*productv1.ListProductTypesResponse, error) {
+	return &productv1.ListProductTypesResponse{ProductTypes: []*productv1.ProductType{
+		{Id: "general", Name: "Produk umum", SchemaVersion: 1},
+	}}, nil
 }
 
 func (s *fakeProductServer) CreateProduct(ctx context.Context, req *productv1.CreateProductRequest) (*productv1.CreateProductResponse, error) {
@@ -159,6 +170,7 @@ func (s *fakeProductServer) CreateProduct(ctx context.Context, req *productv1.Cr
 		priceCents: req.GetPriceCents(), currency: req.GetCurrency(),
 		stock: req.GetStock(), status: statusValue,
 		categoryID: req.GetCategoryId(), tenant: tenantOf(ctx),
+		productTypeID: req.GetProductTypeId(), schemaVersion: req.GetSchemaVersion(), attributes: req.GetAttributes(),
 	}
 	s.platform.products[id] = product
 	return &productv1.CreateProductResponse{Product: toWireProduct(product)}, nil
@@ -196,6 +208,15 @@ func (s *fakeProductServer) UpdateProduct(ctx context.Context, req *productv1.Up
 	if req.CategoryId != nil {
 		product.categoryID = req.GetCategoryId()
 	}
+	if req.ProductTypeId != nil {
+		product.productTypeID = req.GetProductTypeId()
+	}
+	if req.SchemaVersion != nil {
+		product.schemaVersion = req.GetSchemaVersion()
+	}
+	if req.Attributes != nil {
+		product.attributes = req.GetAttributes()
+	}
 	// Stock is intentionally not updatable here, mirroring the real write side where
 	// inventory is the only writer after creation.
 	return &productv1.UpdateProductResponse{Product: toWireProduct(product)}, nil
@@ -227,6 +248,7 @@ func toWireProduct(p *fakeProduct) *productv1.Product {
 	}
 	return &productv1.Product{
 		Id: p.id, CategoryId: p.categoryID, Name: p.name, Slug: p.slug,
+		ProductTypeId: p.productTypeID, SchemaVersion: p.schemaVersion, Attributes: p.attributes,
 		Description: p.description, Brand: p.brand,
 		PriceCents: p.priceCents, Currency: p.currency,
 		Stock: p.stock, Status: p.status,
@@ -316,6 +338,7 @@ func toWireListingProduct(p *fakeProduct) *productlistingv1.Product {
 	}
 	return &productlistingv1.Product{
 		Id: p.id, CategoryId: p.categoryID, Name: p.name, Slug: p.slug,
+		ProductTypeId: p.productTypeID, SchemaVersion: p.schemaVersion, Attributes: p.attributes,
 		Brand:      p.brand,
 		PriceCents: p.priceCents, Currency: p.currency,
 		Stock: p.stock, Status: listStatusOf(p.status),
@@ -406,15 +429,36 @@ type fakeCategoryServer struct {
 	platform *fakePlatform
 }
 
-func (s *fakeCategoryServer) ListCategories(_ context.Context, req *categoryv1.ListCategoriesRequest) (*categoryv1.ListCategoriesResponse, error) {
+func (s *fakeCategoryServer) ListCategories(ctx context.Context, req *categoryv1.ListCategoriesRequest) (*categoryv1.ListCategoriesResponse, error) {
 	s.platform.mu.Lock()
 	defer s.platform.mu.Unlock()
 
 	out := make([]*categoryv1.Category, 0, len(s.platform.cats))
 	for _, c := range s.platform.cats {
+		if !c.GetIsGlobal() && s.platform.catTenants[c.GetId()] != tenantOf(ctx) {
+			continue
+		}
 		out = append(out, c)
 	}
 	return &categoryv1.ListCategoriesResponse{Categories: out, Total: int64(len(out))}, nil
+}
+
+func (s *fakeCategoryServer) CreateMerchantCategory(ctx context.Context, req *categoryv1.CreateMerchantCategoryRequest) (*categoryv1.CreateMerchantCategoryResponse, error) {
+	merchantID := tenantOf(ctx)
+	if merchantID == "" {
+		return nil, status.Error(codes.InvalidArgument, "merchant scope is required")
+	}
+	s.platform.mu.Lock()
+	defer s.platform.mu.Unlock()
+	id := s.platform.nextCat
+	s.platform.nextCat++
+	category := &categoryv1.Category{
+		Id: id, Name: req.GetName(), Description: req.GetDescription(), ParentId: req.GetParentId(),
+		CreatedAt: timestamppb.Now(), UpdatedAt: timestamppb.Now(), IsGlobal: false,
+	}
+	s.platform.cats[id] = category
+	s.platform.catTenants[id] = merchantID
+	return &categoryv1.CreateMerchantCategoryResponse{Category: category}, nil
 }
 
 func (s *fakeCategoryServer) GetCategory(_ context.Context, req *categoryv1.GetCategoryRequest) (*categoryv1.GetCategoryResponse, error) {
@@ -464,7 +508,7 @@ func (p *fakePlatform) addCategory(name string) int64 {
 	p.nextCat++
 	p.cats[id] = &categoryv1.Category{
 		Id: id, Name: name, Description: name + " category",
-		CreatedAt: timestamppb.Now(), UpdatedAt: timestamppb.Now(),
+		CreatedAt: timestamppb.Now(), UpdatedAt: timestamppb.Now(), IsGlobal: true,
 	}
 	return id
 }
@@ -578,6 +622,8 @@ type testGateway struct {
 // test states only what it cares about.
 func productForm(fields map[string]string) url.Values {
 	form := url.Values{}
+	form.Set("productTypeId", "general")
+	form.Set("schemaVersion", "1")
 	for key, value := range fields {
 		form.Set(key, value)
 	}

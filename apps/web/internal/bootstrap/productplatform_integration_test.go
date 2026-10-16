@@ -341,9 +341,9 @@ func TestOnlyActiveProductsAreSellable(t *testing.T) {
 	}
 }
 
-// A category the console does not own is read-only: it is offered as a picker, and the
-// page says where categories are managed rather than offering a form that cannot work.
-func TestCategoryPageIsReadOnlyAndSaysWhy(t *testing.T) {
+// Sellers can add categories scoped to their own merchant. Global categories remain
+// administrator-owned and are only offered as references.
+func TestCategoryPageCreatesMerchantLocalCategories(t *testing.T) {
 	t.Parallel()
 
 	gateway := newTestGateway(t, config.TenantConfig{})
@@ -359,10 +359,8 @@ func TestCategoryPageIsReadOnlyAndSaysWhy(t *testing.T) {
 			t.Errorf("category page missing %q", want)
 		}
 	}
-	// No create form: category.v1 exposes reads only, so a mutation form here would be a
-	// visible control that cannot work.
-	if strings.Contains(body, `action="/seller/kategori"`) {
-		t.Error("the category page still offers a create form for a read-only contract")
+	if !strings.Contains(body, `action="/seller/kategori"`) || !strings.Contains(body, "Kategori global dikelola admin") {
+		t.Error("the category page must let merchants create local categories and identify admin-owned global categories")
 	}
 }
 

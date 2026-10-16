@@ -20,6 +20,9 @@ func TestProductMarshalJSONIsWireSnapshot(t *testing.T) {
 
 	p := &Product{
 		ID:             7,
+		ProductTypeID:  "general",
+		SchemaVersion:  1,
+		Attributes:     map[string]string{},
 		CategoryID:     3,
 		Name:           "Aurora Phone 15 Pro",
 		Slug:           "aurora-phone-15-pro",
@@ -38,7 +41,7 @@ func TestProductMarshalJSONIsWireSnapshot(t *testing.T) {
 		t.Fatalf("Marshal: %v", err)
 	}
 
-	want := `{"id":7,"category_id":3,"name":"Aurora Phone 15 Pro","slug":"aurora-phone-15-pro",` +
+	want := `{"id":7,"product_type_id":"general","schema_version":1,"attributes":{},"category_id":3,"name":"Aurora Phone 15 Pro","slug":"aurora-phone-15-pro",` +
 		`"description":"6.7 inch OLED","brand":"Aurora","price_cents":12999000,"currency":"IDR",` +
 		`"stock":25,"status":"active","primary_media_id":9,` +
 		`"created_at":"2026-03-01T10:00:00Z","updated_at":"2026-03-02T11:30:00Z"}`

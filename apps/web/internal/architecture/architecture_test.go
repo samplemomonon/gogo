@@ -102,7 +102,7 @@ func findRepoRoot(t *testing.T) string {
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
-			if _, err := os.Stat(filepath.Join(dir, "apps", "gogo", "go.mod")); err == nil {
+			if _, err := os.Stat(filepath.Join(dir, "apps", "web", "go.mod")); err == nil {
 				return dir
 			}
 		}

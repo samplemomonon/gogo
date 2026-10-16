@@ -68,7 +68,7 @@ func requestAsHost(
 func createProductAs(t *testing.T, serverURL, host, name string) string {
 	t.Helper()
 
-	form := url.Values{"name": {name}, "price": {"25000"}}
+	form := url.Values{"name": {name}, "price": {"25000"}, "productTypeId": {"general"}, "schemaVersion": {"1"}}
 	resp, _ := requestAsHost(t, http.MethodPost, serverURL, "/seller/produk", host,
 		"application/x-www-form-urlencoded", form)
 

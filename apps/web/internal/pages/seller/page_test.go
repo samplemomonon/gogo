@@ -535,10 +535,9 @@ func TestStockAdjustmentReachesTheInventoryModule(t *testing.T) {
 	}
 }
 
-// The category surface is read-only because the owning service exposes reads only. The
-// page must say so rather than offering a form that cannot work — and must not offer one
-// at all.
-func TestTheCategoryPageIsReadOnly(t *testing.T) {
+// Sellers can add categories scoped to their merchant; global categories remain
+// administrator-owned.
+func TestTheCategoryPageCreatesMerchantLocalCategories(t *testing.T) {
 	t.Parallel()
 
 	router, _, _, _ := newRouter(t)
@@ -547,11 +546,11 @@ func TestTheCategoryPageIsReadOnly(t *testing.T) {
 	if !strings.Contains(body, "Minuman") {
 		t.Error("the category page does not list the category")
 	}
-	if strings.Contains(body, `action="/seller/kategori"`) {
-		t.Error("the category page offers a create form for a read-only contract")
+	if !strings.Contains(body, `action="/seller/kategori"`) {
+		t.Error("the category page does not offer merchant-local category creation")
 	}
-	if !strings.Contains(body, "layanan kategori") {
-		t.Error("the category page does not say where categories are managed")
+	if !strings.Contains(body, "Kategori global dikelola admin") {
+		t.Error("the category page does not distinguish admin-owned global categories")
 	}
 }
 

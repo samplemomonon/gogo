@@ -90,9 +90,6 @@ func (f *fakeCatalog) ListCategories(ctx context.Context) ([]*results.Category, 
 }
 
 func (f *fakeCatalog) CreateMerchantCategory(_ context.Context, input results.CategoryInput) (*results.Category, error) {
-	if f.createErr != nil {
-		return nil, f.createErr
-	}
 	category := &results.Category{ID: "local-new", Name: input.Name, ParentID: input.ParentID}
 	f.categories = append(f.categories, category)
 	return category, nil

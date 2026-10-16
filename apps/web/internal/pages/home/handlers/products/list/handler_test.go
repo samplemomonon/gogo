@@ -49,8 +49,14 @@ func (s *stubListing) ListPage(_ context.Context, q ports.Query) (results.Listin
 	return s.result, nil
 }
 
-func (*stubListing) GetProduct(context.Context, string) (*results.Product, error) {
-	return nil, nil
+func (s *stubListing) GetProduct(context.Context, string) (*results.Product, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if len(s.result.Products) == 0 {
+		return nil, nil
+	}
+	return s.result.Products[0], nil
 }
 
 func newTestHandler(t *testing.T, listing ports.Listing) *Handler {

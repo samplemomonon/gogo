@@ -154,7 +154,7 @@ func TestPortRegistryMatchesReality(t *testing.T) {
 			case "gateway":
 				// The gateway module listens on PORT, not APP_PORT, which is why the
 				// registry carries the variable name rather than assuming it.
-				assertConfigDefault(t, filepath.Join(root, "apps", "gogo", "internal", "shared", "config", "loader.go"),
+				assertConfigDefault(t, filepath.Join(root, "apps", "web", "internal", "shared", "config", "loader.go"),
 					e.envVar, e.container)
 				assertDockerfileExposes(t, filepath.Join(root, "Dockerfile"), e.container)
 				assertComposePublishes(t, filepath.Join(root, "docker-compose.yml"), e.devHost, e.container)

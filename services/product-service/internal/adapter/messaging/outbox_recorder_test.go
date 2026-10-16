@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"product-service/internal/adapter/messaging"
 	"product-service/internal/domain/product"
 )

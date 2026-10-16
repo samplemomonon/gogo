@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -29,10 +30,11 @@ func TestParseProductReadsTheWritableFields(t *testing.T) {
 	}
 
 	want := results.ProductInput{
-		Name: "Kopi Susu", Slug: "kopi-susu", Description: "Enak", Brand: "Gogo",
-		Price: 25000, Stock: 3, Status: "draft", CategoryID: "10",
+		Attributes: map[string]string{},
+		Name:       "Kopi Susu", Slug: "kopi-susu", Description: "Enak", Brand: "Gogo",
+		Price: 25000, Currency: "IDR", Stock: 3, Status: "draft", CategoryID: "10",
 	}
-	if input != want {
+	if !reflect.DeepEqual(input, want) {
 		t.Errorf("input = %+v, want %+v", input, want)
 	}
 }

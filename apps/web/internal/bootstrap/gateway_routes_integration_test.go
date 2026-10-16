@@ -153,7 +153,7 @@ func TestModuleRegistry(t *testing.T) {
 		// The catalog's browsable detail page left with the catalog, and the supplier
 		// console has no service behind it. Both must 404 rather than render something
 		// that looks like a working surface.
-		for _, gone := range []string{"/catalog/1", "/catalog/1/stock", "/seller/supplier"} {
+		for _, gone := range []string{"/catalog/1/stock", "/seller/supplier"} {
 			resp, _ := request(t, http.MethodGet, gateway.server.URL, gone, "", nil, nil)
 			if resp.StatusCode != http.StatusNotFound {
 				t.Errorf("GET %s = %d, want 404", gone, resp.StatusCode)

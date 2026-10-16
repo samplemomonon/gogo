@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -21,20 +22,21 @@ func TestProductCreateForwardsTheTrimmedFormAndRedirects(t *testing.T) {
 	router, catalog, _, _ := newConsole(t)
 
 	rec := do(t, router, postReq("/seller/produk",
-		"name=++Kopi+Susu++&slug=+kopi-susu+&description=+Enak+&brand=+Gogo+&price=+25000+&stock=+3+&categoryId=+10+&status="))
+		"productTypeId=general&schemaVersion=1&name=++Kopi+Susu++&slug=+kopi-susu+&description=+Enak+&brand=+Gogo+&price=+25000+&stock=+3+&categoryId=+10+&status="))
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("create status = %d, want 303", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != "/seller/produk" {
-		t.Errorf("Location = %q, want /seller/produk", got)
+	if got := rec.Header().Get("Location"); !strings.HasPrefix(got, "/seller/produk?created=") {
+		t.Errorf("Location = %q, want a redirect carrying the created product", got)
 	}
 
 	want := results.ProductInput{
 		Name: "Kopi Susu", Slug: "kopi-susu", Description: "Enak", Brand: "Gogo",
-		Price: 25000, Stock: 3, Status: "active", CategoryID: "10",
+		Price: 25000, Currency: "IDR", Stock: 3, Status: "active", CategoryID: "10",
+		ProductTypeID: "general", SchemaVersion: 1, Attributes: map[string]string{},
 	}
-	if catalog.lastCreate != want {
+	if !reflect.DeepEqual(catalog.lastCreate, want) {
 		t.Errorf("create input = %+v, want %+v", catalog.lastCreate, want)
 	}
 }
@@ -63,7 +65,7 @@ func TestProductCreateReRendersAt200OnAWriteFailure(t *testing.T) {
 			router, catalog, _, _ := newConsole(t)
 			catalog.createErr = fmt.Errorf("%w: upstream says something secret", tc.err)
 
-			rec := do(t, router, postReq("/seller/produk", "name=Kopi&price=25000&status=active"))
+			rec := do(t, router, postReq("/seller/produk", "productTypeId=general&schemaVersion=1&name=Kopi&price=25000&status=active"))
 
 			if rec.Code != http.StatusOK {
 				t.Errorf("status = %d, want 200 (the form re-renders)", rec.Code)

@@ -20,10 +20,10 @@ import (
 // The repository is the production implementation of the persistence and
 // in-transaction event ports.
 var (
-	_ ports.ProductRepository  = (*productrepository.ProductPostgres)(nil)
-	_ ports.VariantRepository  = (*productrepository.ProductPostgres)(nil)
-	_ ports.EventSink          = (*productrepository.ProductPostgres)(nil)
-	_ ports.EventRecorder      = (*productrepository.DomainEventRecorder)(nil)
+	_ ports.ProductRepository   = (*productrepository.ProductPostgres)(nil)
+	_ ports.VariantRepository   = (*productrepository.ProductPostgres)(nil)
+	_ ports.EventSink           = (*productrepository.ProductPostgres)(nil)
+	_ ports.EventRecorder       = (*productrepository.DomainEventRecorder)(nil)
 	_ ports.OutboxEventRecorder = (*productmessaging.OutboxRecorder)(nil)
 )
 
