@@ -59,18 +59,14 @@ Two remote-client kits sit between callers and contracts:
 
 These are the load-bearing boundaries. They are enforced by
 `internal/architecture`, which reads a committed snapshot of the import graph —
-`import_graph.txt`, generated from the Bazel BUILD files, which Gazelle in turn
-generates from `go list`. Test imports are excluded: tests may bridge, production
-code may not.
-
-The snapshot exists so these rules are hermetic. They used to shell out to
-`go list -deps` on a working checkout, which a Bazel sandbox cannot provide, so
-they were tagged `manual` and depended on CI remembering to run them out of
-band. Now the rules themselves run under `bazel test //...` like any other test.
+`import_graph.txt`, derived from `go list` (the Bazel/Gazelle derivation this
+paragraph used to describe rotted; the test file's header records why). Test
+imports are excluded: tests may bridge, production code may not.
 
 The snapshot can go stale, so staleness is itself a test
-(`TestImportGraphIsCurrent`), and `make check` fails if it is out of date. After
-adding a package or changing an import, run:
+(`TestImportGraphIsCurrent`), which re-derives the graph from the working tree on
+every run; `make check` fails if it is out of date. After adding a package or
+changing an import, run:
 
 ```bash
 make -C gogo arch-graph
@@ -80,7 +76,7 @@ and commit the result. A boundary change then shows up in review as a diff.
 
 | # | Rule |
 | - | ---- |
-| 1 | Runtime code under `internal/pages/**` **never** imports runtime code under `internal/modules/**`. Pages reach modules through remote contracts only. |
+| 1 | Runtime code under `internal/pages/**` may import a module **only through that module's `public` package** — the surface the owning team declares and maintains ([D-021](#d-021), [`ADR_CROSS_TEAM_UI_CONTRACT.md`](docs/ADR_CROSS_TEAM_UI_CONTRACT.md) §4.1) — and **never** any other runtime code under `internal/modules/**`. Everything else is reached through remote contracts. A page never imports another page. |
 | 2 | Runtime code under `internal/modules/**` **never** imports `internal/pages/**`. Modules do not know the gateway's read side exists. |
 | 3 | Runtime code under `internal/modules/**` **never** imports another module. Modules communicate through events on the bus, and the shared event vocabulary — type constants and payload structs — lives in the versioned `contracts/<name>/v1` module that both sides import. Today no module imports another. |
 | 4 | Only `internal/bootstrap` imports both `internal/pages/**` and `internal/modules/**`. It is the composition root. |
@@ -92,6 +88,19 @@ Rules 6 and 7 are what stop the product domain from quietly creeping back in.
 They are structural rather than conventional: rule 7 fails the build the moment a
 `catalog` or `product` module reappears under `internal/modules/`, whether or not
 anyone remembered this paragraph.
+
+Rule 1's `public` exception is the one deliberate cross-team UI contract
+([D-021](#d-021)): a module's `public` package is its page-facing surface, owned
+and compatibility-managed by the module's team, while the page still decides
+what appears on a page and in what order. The exception is granted to pages
+only — a module importing another module's `public` is still a rule 3 violation,
+because module-to-module communication stays event-based. No module ships a
+`public` package today; none is added speculatively, and the first one is
+extracted with its first real consumer — the rules that will govern it are
+already enforced —
+`TestImportBoundaries` (`pages import modules only through a module's public
+surface`, `pages must not import other pages`), `TestCompositionLayerReachesNoModuleInternals`,
+and the synthetic-graph fixtures in `internal/architecture/ui_contract_test.go`.
 
 The classic hexagon rules short of the above still apply per module:
 `presentation` and `infrastructure` both depend on `application` ports, never
@@ -662,3 +671,28 @@ The guard protects against *reachability*, not against an on-path attacker: the
 gRPC connections use insecure transport credentials, so the bearer token travels
 in the clear. That is recorded rather than discovered — see
 [`ADR_SERVICE_TO_SERVICE_AUTH.md`](docs/ADR_SERVICE_TO_SERVICE_AUTH.md).
+
+### D-021 · Pages may import a module's `public` surface, and nothing else
+**Date:** 2026-10-16 · **Status:** accepted
+
+[`docs/ADR_CROSS_TEAM_UI_CONTRACT.md`](docs/ADR_CROSS_TEAM_UI_CONTRACT.md)
+narrows rule 1. A page may import `<module>/public` — the one package the owning
+team declares and maintains as its cross-team UI surface, with integration tests
+and a compatibility policy as its price — and no other runtime code under a
+module: `domain`, `application`, `infrastructure`, `presentation` and `compose`
+stay closed, and a page never imports another page. The owning team keeps
+ownership of the feature when it publishes the contract; the page keeps the only
+page-composition decision.
+
+The grant is to **pages only**. Module-to-module imports stay event-based
+(rule 3): a module may not consume another module's `public` either. A future
+need for that is a separate ADR, not an edit to the import test.
+
+Nothing uses the grant today — no `public` package exists, and none is added
+speculatively. The change is enforcement-first: the page rule in
+`TestImportBoundaries` was narrowed, not deleted, its failure message names the
+ADR, `TestCompositionLayerReachesNoModuleInternals` extends the forbidden set to
+`compose`, and because a negative rule that has never seen a positive case
+cannot be distinguished from a broken parser, both predicates and the `public`
+grant are pinned on synthetic graphs in
+`internal/architecture/ui_contract_test.go`.

@@ -32,8 +32,8 @@ func TestRegisterEmployeeHashesPINAndAllowsLogin(t *testing.T) {
 	if _, _, err := svc.Login(ctx, "default", "budi@toko.com", "123456"); err != nil {
 		t.Fatalf("Login with the correct PIN: %v", err)
 	}
-	if _, _, err := svc.Login(ctx, "default", "budi@toko.com", "654321"); !errors.Is(err, domain.ErrInvalidPIN) {
-		t.Fatalf("Login with the wrong PIN = %v, want ErrInvalidPIN", err)
+	if _, _, err := svc.Login(ctx, "default", "budi@toko.com", "654321"); !errors.Is(err, domain.ErrInvalidCredentials) {
+		t.Fatalf("Login with the wrong PIN = %v, want ErrInvalidCredentials", err)
 	}
 }
 

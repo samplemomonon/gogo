@@ -176,7 +176,7 @@ func TestComposer(t *testing.T) {
 	t.Run("static island renders once and serves the cache", func(t *testing.T) {
 		composer := NewComposer(NewTTLCache())
 		renders := 0
-		comp := Island("static",
+		comp := Island("render.static",
 			countComponent{count: &renders, label: "s"},
 			RenderingContract{Public: true},
 		)
@@ -191,7 +191,7 @@ func TestComposer(t *testing.T) {
 			t.Fatalf("static island rendered %d times, want 1 (cached)", renders)
 		}
 
-		composer.Invalidate("static")
+		composer.Invalidate("render.static")
 		renderPage(t, composer, &Page{Components: []*Component{comp}})
 		if renders != 2 {
 			t.Errorf("static island should re-render after invalidate, got %d renders", renders)
@@ -201,7 +201,7 @@ func TestComposer(t *testing.T) {
 	t.Run("dynamic island renders on every request", func(t *testing.T) {
 		composer := NewComposer(NewTTLCache())
 		renders := 0
-		comp := Island("dynamic",
+		comp := Island("render.dynamic",
 			countComponent{count: &renders, label: "d"},
 			RenderingContract{Freshness: FreshnessRealtime},
 		)
@@ -217,7 +217,7 @@ func TestComposer(t *testing.T) {
 	t.Run("revalidate serves cache until ttl expires", func(t *testing.T) {
 		composer := NewComposer(NewTTLCache())
 		renders := 0
-		comp := Island("revalidate",
+		comp := Island("render.revalidate",
 			countComponent{count: &renders, label: "r"},
 			RenderingContract{Public: true, CacheTTL: 15 * time.Millisecond},
 		)
@@ -239,7 +239,7 @@ func TestComposer(t *testing.T) {
 		cache := NewTTLCache()
 		composer := NewComposer(cache)
 		renders := 0
-		comp := Island("personalized",
+		comp := Island("render.personalized",
 			countComponent{count: &renders, label: "p"},
 			RenderingContract{Public: true, Personalized: true},
 		)
@@ -249,7 +249,7 @@ func TestComposer(t *testing.T) {
 		if renders != 2 {
 			t.Errorf("personalized island rendered %d times, want 2 (never cached)", renders)
 		}
-		if _, ok := cache.Get("personalized"); ok {
+		if _, ok := cache.Get(composer.islandKey(context.Background(), comp.Name)); ok {
 			t.Error("personalized island must not be stored in the cache")
 		}
 	})
@@ -282,13 +282,15 @@ func TestComposer(t *testing.T) {
 
 	t.Run("client island escapes attribute values", func(t *testing.T) {
 		composer := NewComposer(nil)
-		hostile := ClientIsland(
-			`evil"><script>alert(1)</script>`,
-			nil,
-			`/x"><script>alert(1)</script>`,
-			nil,
-			RenderingContract{Mode: Mode(ModeClient)},
-		)
+		// Built literally, not via ClientIsland: the constructor now refuses an
+		// unowned name, so this pins the second layer — even if a hostile
+		// Component ever reaches the renderer, its name and URL are escaped
+		// rather than trusted.
+		hostile := &Component{
+			Name:     `evil"><script>alert(1)</script>`,
+			Contract: RenderingContract{Mode: Mode(ModeClient)},
+			FetchURL: `/x"><script>alert(1)</script>`,
+		}
 
 		html, err := renderComponentBytes(t, composer, hostile)
 		if err != nil {
@@ -321,8 +323,8 @@ func TestComposer(t *testing.T) {
 				})
 			},
 			Components: []*Component{
-				Island("a", countComponent{count: &renders, label: "a"}, RenderingContract{}),
-				Island("b", countComponent{count: &renders, label: "b"}, RenderingContract{}),
+				Island("render.a", countComponent{count: &renders, label: "a"}, RenderingContract{}),
+				Island("render.b", countComponent{count: &renders, label: "b"}, RenderingContract{}),
 			},
 		}
 
@@ -338,7 +340,7 @@ func TestComposer(t *testing.T) {
 	t.Run("render component serves a bare island fragment", func(t *testing.T) {
 		composer := NewComposer(NewTTLCache())
 		renders := 0
-		comp := Island("fragment",
+		comp := Island("render.fragment",
 			countComponent{count: &renders, label: "f"},
 			RenderingContract{Freshness: FreshnessRealtime},
 		)
@@ -355,7 +357,7 @@ func TestComposer(t *testing.T) {
 	t.Run("nil cache disables caching", func(t *testing.T) {
 		composer := NewComposer(nil)
 		renders := 0
-		comp := Island("nocache",
+		comp := Island("render.nocache",
 			countComponent{count: &renders, label: "n"},
 			RenderingContract{Public: true},
 		)
@@ -440,7 +442,7 @@ func TestRenderNavigation(t *testing.T) {
 			})
 		},
 		Components: []*Component{
-			Island("grid", countComponent{count: &renders, label: "g"}, RenderingContract{Public: true}),
+			Island("render.grid", countComponent{count: &renders, label: "g"}, RenderingContract{Public: true}),
 		},
 	}
 

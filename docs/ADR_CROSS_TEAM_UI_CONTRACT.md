@@ -1,6 +1,6 @@
 # ADR — Cross-Team UI Composition Contract
 
-**Status:** Proposed — awaiting review
+**Status:** Accepted — implemented 2026-10-16
 **Date:** 2026-10-15
 **Decision owner:** architecture review, not the author
 **Evidence base:** [`DECISION_UI_OWNERSHIP.md`](./DECISION_UI_OWNERSHIP.md)
@@ -181,16 +181,18 @@ These were flagged as blocking. §2 answers them for today's codebase. They are 
 
 ---
 
-## 8. Enforcement plan — not implemented, deliberately
+## 8. Enforcement — implemented
 
-This ADR changes an architecture rule, so it is not implemented in the same change that proposes it. The mechanism is specified here so that review can judge it.
+The rule change and its enforcement landed together, in the shape this section specified:
 
-1. Add a rule to `internal/architecture/layers_test.go`: a page's transitive closure may contain `<other-unit>/public`, and may **not** contain `<other-unit>/{domain,application,infrastructure,presentation,compose}`.
-2. Narrow `TestImportBoundaries`' existing `pages must not import modules` — it currently forbids the whole prefix, and under this ADR the `public` subpackage becomes legal. **The existing test must be changed, not deleted**, and its failure message must name this ADR.
-3. Decide whether a module may import another module's `public`. This ADR does **not** grant that: module-to-module communication stays event-based per import rule 3. A future need is a separate ADR.
-4. `ARCHITECTURE.md` rule 1 must be rewritten to state the narrowed rule, and its decision log extended. `ARCHITECTURE.md` is the canonical governance document; an ADR that contradicts it and does not update it is a documentation conflict, not a decision.
+1. `internal/architecture/layers_test.go` — `TestCompositionLayerReachesNoModuleInternals` ("a page reaches no module internals") now forbids `domain`, `application`, `infrastructure`, `presentation` **and `compose`** in a page's closure. `public` is the one layer it does not forbid, so the grant is the absence of a prohibition rather than a special case.
+2. `internal/architecture/architecture_test.go` — the old `pages must not import modules` rule was **narrowed, not deleted**. `pages import modules only through a module's public surface` (`moduleReachOffenses`) permits `<module>/public` and anything under it, and flags every other module package — the module root of a flat module included. `pages must not import other pages` (`pageCompositionOffenses`) covers the last row of the §4.1 table. Both failure messages name this ADR.
+3. Module-to-module `public` was **not granted**: `modules must not import other modules` (`crossModuleOffenses`) is unchanged in scope, and its failure message now says so explicitly. Rule 3 and its event-based reasoning stand.
+4. `ARCHITECTURE.md` rule 1 states the narrowed rule and the `public` exception; the decision log carries [D-021](../ARCHITECTURE.md#d-021), which records the ownership split, the pages-only scope, and the implementation.
 
-**Open point for review:** item 2 removes an enforced invariant and replaces it with a narrower one. That is a real reduction in what the build guarantees, and the ADR should be judged on whether the narrowed invariant is worth it — not on whether the new capability is useful.
+Because no `public` package exists yet — none is added speculatively, and the first is extracted with its first real consumer — the real-graph tests exercise only the negative half. The predicates are therefore additionally pinned on synthetic graphs in `internal/architecture/ui_contract_test.go`: the `public` grant, each forbidden layer, the transitive-taint rule (a `public` package that reaches its own module's internals fails every page that imports it), the `publicity`-style prefix trap, and module-to-module `public` refusal in both directions.
+
+**The trade, restated for the record:** item 2 replaced one enforced invariant ("no module import at all") with a narrower one ("no module import except `public`"). The reduction is real. It is the price of a cross-team UI contract that keeps feature ownership with the feature team, and the fixtures are what make the narrowed invariant as verifiable as the old one.
 
 ---
 

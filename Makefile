@@ -271,8 +271,15 @@ k8s-build:
 # would be accepted by a platform service.
 DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 
+# How long `smoke` waits for every endpoint before giving up, in seconds. The
+# default covers a cold start on a slow machine; a warm stack settles in seconds.
+SMOKE_TIMEOUT ?= 90
+
+# --wait holds the command until every container's healthcheck passes, so a
+# failure here names the unhealthy service instead of surfacing as seven
+# mysterious connection refusals in the smoke output.
 up:
-	$(DEV_COMPOSE) up -d --build
+	$(DEV_COMPOSE) up -d --build --wait --wait-timeout 300
 	@$(MAKE) --no-print-directory smoke
 
 down:
@@ -303,29 +310,43 @@ ps:
 #
 # It reports every failure rather than stopping at the first, because the usual
 # reason a dependency is down is that something earlier in the chain is.
+#
+# The endpoints are polled until they all answer or $(SMOKE_TIMEOUT) elapses.
+# A single pass made `up` a race: services accept connections seconds after
+# their container starts, and the loser was whichever dependency chain was
+# longest that day. Output is printed once, at the end, so a slow start does
+# not look like a loop of failures.
 smoke:
-	@fail=0; \
-	for target in \
-		"gateway|http://localhost:8080/healthz" \
-		"category-service|http://localhost:8086/healthz" \
-		"media-service|http://localhost:8081/healthz" \
-		"product-service|http://localhost:8082/healthz" \
-		"product-listing|http://localhost:8083/healthz" \
-		"product-search|http://localhost:8084/healthz" \
-		"aggregator|http://localhost:8085/healthz"; do \
-		name=$${target%%|*}; url=$${target#*|}; \
-		code=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 $$url 2>/dev/null); \
-		if [ "$$code" = "200" ]; then \
-			printf '  ok    %s\n' "$$name"; \
-		else \
-			printf '  FAIL  %s  (%s -> %s)\n' "$$name" "$$url" "$${code:-no response}"; \
-			fail=1; \
+	@deadline=$$(($$(date +%s) + $(SMOKE_TIMEOUT))); \
+	while :; do \
+		fail=0; report=""; \
+		for target in \
+			"gateway|http://localhost:8080/healthz" \
+			"category-service|http://localhost:8086/healthz" \
+			"media-service|http://localhost:8081/healthz" \
+			"product-service|http://localhost:8082/healthz" \
+			"product-listing|http://localhost:8083/healthz" \
+			"product-search|http://localhost:8084/healthz" \
+			"aggregator|http://localhost:8085/healthz"; do \
+			name=$${target%%|*}; url=$${target#*|}; \
+			code=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 $$url 2>/dev/null); \
+			if [ "$$code" = "200" ]; then \
+				report="$$report  ok    $$name\n"; \
+			else \
+				report="$$report  FAIL  $$name  ($$url -> $${code:-no response})\n"; \
+				fail=1; \
+			fi; \
+		done; \
+		if [ $$fail -eq 0 ] || [ $$(date +%s) -ge $$deadline ]; then \
+			printf '%b' "$$report"; \
+			break; \
 		fi; \
+		sleep 2; \
 	done; \
 	if [ $$fail -ne 0 ]; then \
 		echo; \
-		echo "not fully up yet — 'make logs' shows why. The first run builds six"; \
-		echo "images and takes several minutes; later runs start in under a minute."; \
+		echo "not fully up after $(SMOKE_TIMEOUT)s — 'make logs' shows why. The first run builds"; \
+		echo "six images and takes several minutes; later runs start in under a minute."; \
 	fi; \
 	exit $$fail
 

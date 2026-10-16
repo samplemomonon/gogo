@@ -478,12 +478,17 @@ func readinessCheck(clients *grpcclient.Clients, reporter *projection.Reporter, 
 			}},
 		}
 
+		// Every check publishes exactly one result, success included. The reader
+		// expects one message per check, so a silent success would deadlock the
+		// probe on the channel instead of reporting ready.
 		errs := make(chan error, len(checks))
 		for _, c := range checks {
 			go func(c check) {
 				if err := c.run(ctx); err != nil {
 					errs <- fmt.Errorf("%s: %w", c.name, err)
+					return
 				}
+				errs <- nil
 			}(c)
 		}
 

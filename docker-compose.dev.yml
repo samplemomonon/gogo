@@ -164,10 +164,11 @@ services:
       APP_PORT: "8086"
       GRPC_PORT: "9090"
     healthcheck:
-      test: ["CMD", "/bin/category-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8086/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   media-service:
     <<: *app
@@ -192,10 +193,11 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/media-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   product-service:
     <<: *app
@@ -223,10 +225,11 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/product-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   product-listing-service:
     <<: *app
@@ -250,10 +253,11 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/product-listing-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8083/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   product-search-service:
     <<: *app
@@ -279,10 +283,11 @@ services:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/product-search-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   # ----------------------------------------------------- composition & gateway
 
@@ -329,10 +334,11 @@ services:
     healthcheck:
       # Readiness, not liveness: it checks every dependency, so a partial outage
       # removes this instance from the load balancer instead of restarting it.
-      test: ["CMD", "/bin/aggregator-service", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8085/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   gateway:
     build:
@@ -357,10 +363,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/bin/gateway", "-version"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
 volumes:
   postgres-data:

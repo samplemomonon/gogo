@@ -275,6 +275,50 @@ func TestHomeGridFragment(t *testing.T) {
 	}
 }
 
+// TestHomeGridIsPublicAndCacheable pins the grid island's declaration in the
+// Prevent tier (docs/DECISION_UI_OWNERSHIP.md §4): the contract says Public and
+// not Personalized, so after the first full-page render an HTMX fragment
+// request is answered from the island cache without a second read on the
+// platform. If the declaration regressed — Private, or Personalized — the
+// fetch would reappear here, and transitively a tenant-qualified cache entry
+// would stop being safe to serve.
+func TestHomeGridIsPublicAndCacheable(t *testing.T) {
+	t.Parallel()
+
+	p := newRouter(t)
+	p.browse.add(1, "Aurora Phone", 12999000)
+
+	serve := func(htmx bool) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		if htmx {
+			req.Header.Set("HX-Request", "true")
+		}
+		rec := httptest.NewRecorder()
+		p.router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// A full-page request renders live data and populates the island cache.
+	if rec := serve(false); rec.Code != http.StatusOK {
+		t.Fatalf("full-page status = %d, want 200", rec.Code)
+	}
+	if got := p.browse.calls(); got != 1 {
+		t.Fatalf("browse calls after the priming request = %d, want 1", got)
+	}
+
+	// The fragment request must come straight from the island cache.
+	rec := serve(true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("fragment status = %d, want 200", rec.Code)
+	}
+	if got := p.browse.calls(); got != 1 {
+		t.Errorf("fragment request fetched the platform again (browse calls = %d, want 1): the grid island is not Public+non-personalized", got)
+	}
+	if !strings.Contains(rec.Body.String(), "Aurora Phone") {
+		t.Error("the cached fragment should still carry the rendered grid")
+	}
+}
+
 // TestNav pins the home page's shell-navigation contribution: pages declare their own
 // nav items (the registry is only for modules), and the home page contributes only its
 // storefront entry — the profile destination belongs to the profile page.

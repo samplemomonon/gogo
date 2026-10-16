@@ -2,6 +2,7 @@ package pagekit
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -132,6 +133,36 @@ func TestPagedKeyIsPerPageAndTerm(t *testing.T) {
 	if k1 == k0 || k2 == k0 || k1 == k2 {
 		t.Errorf("term-scoped keys must differ: %q / %q / %q", k0, k1, k2)
 	}
+}
+
+// TestNewPagedListPageRejectsUnownedIslandName pins the eager half of the
+// island-ownership rule (docs/DECISION_UI_OWNERSHIP.md §5): the constructor
+// fails a bad key at wiring, so an unowned name never reaches a request.
+func TestNewPagedListPageRejectsUnownedIslandName(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("NewPagedListPage with an unowned island name must panic")
+		}
+		if msg := fmt.Sprint(r); !strings.Contains(msg, "pagekit: island name") {
+			t.Errorf("panic = %q, want the pagekit: island name error", msg)
+		}
+	}()
+
+	NewPagedListPage(
+		"product-grid",
+		render.RenderingContract{Public: true},
+		"q",
+		func(context.Context, PagedQuery) ([]string, int, string, error) { return nil, 0, "", nil },
+		func([]string, Pagination) templ.Component { return nil },
+		func(inner templ.Component, _ []string, _ Pagination) templ.Component { return inner },
+		"failed",
+		20,
+		render.NewComposer(nil),
+		discardLogger(),
+	)
 }
 
 // rawBody returns a body renderer that counts its renders: the returned

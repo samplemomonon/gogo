@@ -171,7 +171,7 @@ func (c *Caller) classify(op string, err error) error {
 // businessError is a refusal, not an outage: the upstream answered, and the
 // answer was "no". It carries two things at once, because a consumer needs
 // both. The sentinel lets the caller branch without parsing prose
-// (errors.Is(err, authconsumer.ErrInvalidPIN)), and the detail is the upstream's
+// (errors.Is(err, authconsumer.ErrUnauthenticated)), and the detail is the upstream's
 // own client-facing reason, which is often the whole point of the call — a login
 // page that answered only "invalid" would tell the user nothing about whether
 // the email, the PIN or the tenant was the problem. The detail is safe to show
