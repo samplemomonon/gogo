@@ -200,7 +200,9 @@ func allowedList(layer string) string {
 //
 // Pages are checked by the same shape: a page reaches no module internals, which
 // is import rule 1 restated at layer granularity rather than package
-// granularity.
+// granularity. The one module package a page may reach is `public` — the
+// cross-team surface granted by docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1 — and it
+// is therefore the one layer this test does not forbid.
 func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
 	skipIfDisabled(t)
 
@@ -226,6 +228,13 @@ func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
 	// These are the layers that carry a module's business: rules in domain, use
 	// cases in application, rules again in the adapters that implement them.
 	internalModuleLayers := []string{"domain", "application", "presentation", "infrastructure"}
+
+	// A page must not reach any of those layers, and not the module's compose
+	// root either. A page reaching compose would drag the module's whole object
+	// graph — adapters, connections, wiring — into the page's build, which is
+	// the dependency the four-zone model exists to cut. Only `public` is open to
+	// pages, per docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1.
+	pageForbiddenModuleLayers := append([]string{"compose"}, internalModuleLayers...)
 
 	t.Run("bootstrap reaches modules only through their composition roots", func(t *testing.T) {
 		for _, dep := range g["gogo/internal/bootstrap"] {
@@ -264,10 +273,12 @@ func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
 					continue
 				}
 				_, layer, _ := strings.Cut(rest, "/")
-				for _, forbidden := range internalModuleLayers {
+				for _, forbidden := range pageForbiddenModuleLayers {
 					if layer == forbidden || strings.HasPrefix(layer, forbidden+"/") {
 						t.Errorf("page %s reaches module internals %s; pages consume modules over "+
-							"their remote contracts, never by importing them (ARCHITECTURE.md rule 1)",
+							"their remote contracts, never by importing them. A module's only "+
+							"page-importable package is its `public` surface "+
+							"(ARCHITECTURE.md rule 1; docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1)",
 							pagePkg, dep)
 					}
 				}

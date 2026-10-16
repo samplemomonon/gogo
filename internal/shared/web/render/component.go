@@ -26,13 +26,20 @@ type Component struct {
 	Fallback templ.Component
 }
 
-// Island builds a server-rendered component.
+// Island builds a server-rendered component. The name must carry its owner
+// namespace (ValidateIslandName); an invalid name is a wiring mistake that
+// would silently alias another unit's cache namespace, so it panics here
+// instead.
 func Island(name string, body templ.Component, contract RenderingContract) *Component {
+	if err := ValidateIslandName(name); err != nil {
+		panic("render: " + err.Error())
+	}
 	return &Component{Name: name, Contract: contract, Body: body}
 }
 
 // ClientIsland builds a CSR island: the server sends a placeholder that
-// the browser fills by fetching fetchURL.
+// the browser fills by fetching fetchURL. As with Island, the name must
+// carry its owner namespace.
 func ClientIsland(
 	name string,
 	body templ.Component,
@@ -40,6 +47,9 @@ func ClientIsland(
 	fallback templ.Component,
 	contract RenderingContract,
 ) *Component {
+	if err := ValidateIslandName(name); err != nil {
+		panic("render: " + err.Error())
+	}
 	return &Component{
 		Name:     name,
 		Contract: contract,

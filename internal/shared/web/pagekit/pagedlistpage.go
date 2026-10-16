@@ -127,7 +127,9 @@ type PagedListPage[T any] struct {
 const DefaultPageLimit = 20
 
 // NewPagedListPage builds a PagedListPage. It panics on a nil Composer or
-// Logger, which are composition-root wiring mistakes.
+// Logger, and on an island name without an owner namespace — all of them
+// composition-root wiring mistakes, failed at wiring rather than silently at
+// the first request.
 func NewPagedListPage[T any](
 	islandName string,
 	contract render.RenderingContract,
@@ -140,6 +142,9 @@ func NewPagedListPage[T any](
 	composer *render.Composer,
 	logger *slog.Logger,
 ) *PagedListPage[T] {
+	if err := render.ValidateIslandName(islandName); err != nil {
+		panic("pagekit: " + err.Error())
+	}
 	if composer == nil {
 		panic("pagekit: PagedListPage requires a composer")
 	}

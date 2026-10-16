@@ -296,6 +296,102 @@ func moduleName(pkg string) string {
 	return parts[0]
 }
 
+// pageName returns the page a package lives in, or "" for packages outside
+// internal/pages/.
+func pageName(pkg string) string {
+	rest, ok := strings.CutPrefix(pkg, pagesPrefix)
+	if !ok {
+		return ""
+	}
+	name, _, _ := strings.Cut(rest, "/")
+	return name
+}
+
+// isModulePublic reports whether pkg is a module's public surface — the
+// `<module>/public` package or something under it.
+//
+// This is the only kind of module package a page may import, per
+// docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1. The match is deliberately exact:
+// `public` or `public/…`, so a package named `publicity` is not mistaken for the
+// contract.
+func isModulePublic(pkg string) bool {
+	rest, ok := strings.CutPrefix(pkg, modulesPrefix)
+	if !ok {
+		return false
+	}
+	_, sub, nested := strings.Cut(rest, "/")
+	if !nested {
+		return false // the module's root package is not a contract
+	}
+	return sub == "public" || strings.HasPrefix(sub, "public/")
+}
+
+// moduleReachOffenses returns the module packages reachable from roots that are
+// not a module's public surface: every closure member under internal/modules/
+// that fails isModulePublic.
+//
+// It is the predicate behind ARCHITECTURE.md rule 1 as narrowed by
+// docs/ADR_CROSS_TEAM_UI_CONTRACT.md: a page may depend on `<module>/public`,
+// the surface the owning team declares and maintains, and on nothing else inside
+// a module. It is a plain function over a graph rather than a closure inside the
+// test so that the rule itself can be asserted on synthetic graphs — the real
+// graph contains no `public` package yet, and a rule that has never fired is a
+// rule nobody has tested.
+func moduleReachOffenses(g graph, roots ...string) []string {
+	var out []string
+	for _, dep := range closure(g, roots...) {
+		if strings.HasPrefix(dep, modulesPrefix) && !isModulePublic(dep) {
+			out = append(out, dep)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// pageCompositionOffenses returns page -> other-page edges: a package under
+// internal/pages/ reaching a package that lives in a different page's subtree.
+//
+// A page importing its own subtree is one owner and is not an offense. A page
+// importing another page makes one page's layout another page's build
+// dependency — the shared-authority failure the four-zone model splits apart
+// (docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1: pages do not compose pages).
+func pageCompositionOffenses(g graph, pagePkgs []string) []string {
+	var out []string
+	for _, pagePkg := range pagePkgs {
+		me := pageName(pagePkg)
+		for _, dep := range closure(g, pagePkg) {
+			if !strings.HasPrefix(dep, pagesPrefix) || pageName(dep) == me {
+				continue
+			}
+			out = append(out, pagePkg+" -> "+dep)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// crossModuleOffenses returns importer -> dep edges that cross from one module
+// into another, the predicate behind import rule 3.
+//
+// That includes the other module's `public` package: ADR_CROSS_TEAM_UI_CONTRACT.md
+// §8 item 3 grants the public surface to pages only. Module-to-module
+// communication stays event-based, so a future need for module-to-module imports
+// is a separate ADR, not a quiet edit to this predicate.
+func crossModuleOffenses(g graph, modulePkgs []string) []string {
+	var out []string
+	for _, importer := range modulePkgs {
+		me := moduleName(importer)
+		for _, dep := range closure(g, importer) {
+			if !strings.HasPrefix(dep, modulesPrefix) || moduleName(dep) == me {
+				continue
+			}
+			out = append(out, importer+" -> "+dep)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func sortedKeys(set map[string]bool) []string {
 	keys := make([]string, 0, len(set))
 	for k := range set {
@@ -327,27 +423,39 @@ func TestImportBoundaries(t *testing.T) {
 		}
 	})
 
-	t.Run("pages must not import modules", func(t *testing.T) {
-		if offending := withPrefix(closure(g, pagesPkgs...), modulesPrefix); len(offending) > 0 {
-			t.Errorf("pages import modules (violates ARCHITECTURE.md rule 1):\n  %s",
-				strings.Join(sortedKeys(offending), "\n  "))
+	// Rule 1 as narrowed by docs/ADR_CROSS_TEAM_UI_CONTRACT.md: a page may reach
+	// a module only through the module's `public` package — the surface the
+	// owning team declares and maintains — and everything else is reached over
+	// remote contracts. The test must be narrowed, never deleted: the invariant
+	// it removes ("no module import at all") is replaced by a narrower one
+	// ("no module import except `public`"), and the failure message names the
+	// ADR so the rule's authority is findable from the build output.
+	t.Run("pages import modules only through a module's public surface", func(t *testing.T) {
+		if offending := moduleReachOffenses(g, pagesPkgs...); len(offending) > 0 {
+			t.Errorf("pages import module internals (violates ARCHITECTURE.md rule 1 and docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1):\n  %s\n"+
+				"  a page may import only <module>/public, the surface the owning team declares and maintains; "+
+				"everything else inside a module is reached over remote contracts",
+				strings.Join(offending, "\n  "))
+		}
+	})
+
+	// The other half of the ADR's zone table: pages do not compose pages. A page
+	// importing another page makes one page's layout another page's build
+	// dependency, which is exactly the shared-authority failure the four-zone
+	// model splits apart. A page importing its own subtree is fine — that is
+	// one owner.
+	t.Run("pages must not import other pages", func(t *testing.T) {
+		if offending := pageCompositionOffenses(g, pagesPkgs); len(offending) > 0 {
+			t.Errorf("pages import pages (violates ARCHITECTURE.md rule 1 and docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1); "+
+				"pages do not compose pages — move the shared piece into internal/shared:\n  %s",
+				strings.Join(offending, "\n  "))
 		}
 	})
 
 	t.Run("modules must not import other modules", func(t *testing.T) {
-		var offending []string
-		for _, importer := range modulePkgs {
-			me := moduleName(importer)
-			for _, dep := range closure(g, importer) {
-				if !strings.HasPrefix(dep, modulesPrefix) || moduleName(dep) == me {
-					continue
-				}
-				offending = append(offending, importer+" -> "+dep)
-			}
-		}
-		sort.Strings(offending)
-		if len(offending) > 0 {
-			t.Errorf("cross-module runtime imports (violates ARCHITECTURE.md rule 3); share the contract module instead:\n  %s",
+		if offending := crossModuleOffenses(g, modulePkgs); len(offending) > 0 {
+			t.Errorf("cross-module runtime imports (violates ARCHITECTURE.md rule 3); share the contract module instead — "+
+				"a module's `public` surface is granted to pages only (docs/ADR_CROSS_TEAM_UI_CONTRACT.md §8 item 3):\n  %s",
 				strings.Join(offending, "\n  "))
 		}
 	})
