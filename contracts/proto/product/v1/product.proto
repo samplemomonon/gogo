@@ -20,6 +20,7 @@ import "google/protobuf/timestamp.proto";
 option go_package = "gogo/contracts/product/v1;productv1";
 
 service ProductService {
+  rpc ListProductTypes(ListProductTypesRequest) returns (ListProductTypesResponse);
   // CreateProduct validates the category and media references against the
   // owning services over gRPC, then stores the product. The response is the
   // committed row; the change also becomes a domain event that the listing
@@ -59,7 +60,27 @@ message Product {
   repeated Variant variants = 12;
   google.protobuf.Timestamp created_at = 13;
   google.protobuf.Timestamp updated_at = 14;
+  string product_type_id = 15;
+  int32 schema_version = 16;
+  map<string, string> attributes = 17;
 }
+
+message ListProductTypesRequest {}
+message ProductAttributeDefinition {
+  string key = 1;
+  string label = 2;
+  string kind = 3;
+  bool required = 4;
+  repeated string options = 5;
+  string unit = 6;
+}
+message ProductType {
+  string id = 1;
+  string name = 2;
+  int32 schema_version = 3;
+  repeated ProductAttributeDefinition attributes = 4;
+}
+message ListProductTypesResponse { repeated ProductType product_types = 1; }
 
 // Variant is a purchasable size or colour of a product.
 message Variant {
@@ -87,6 +108,9 @@ message CreateProductRequest {
   ProductStatus status = 9;
   int64 primary_media_id = 10;
   repeated VariantSpec variants = 11;
+  string product_type_id = 12;
+  int32 schema_version = 13;
+  map<string, string> attributes = 14;
 }
 
 // VariantSpec describes a variant to create alongside the product. It has no id
@@ -118,6 +142,9 @@ message UpdateProductRequest {
   optional int32 stock = 9;
   optional ProductStatus status = 10;
   optional int64 primary_media_id = 11;
+  optional string product_type_id = 12;
+  optional int32 schema_version = 13;
+  map<string, string> attributes = 14;
 }
 
 message UpdateProductResponse {

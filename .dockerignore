@@ -6,7 +6,7 @@
 bin/
 _build/
 coverage/
-internal/shared/web/assets/css/output.css
+apps/web/internal/shared/web/assets/css/output.css
 
 # local env files (may contain secrets)
 .env
@@ -18,7 +18,9 @@ internal/shared/web/assets/css/output.css
 # in two stages, so an unignored .devenv ships the whole Go module cache to
 # the Docker daemon as build context on every build.
 node_modules/
+**/node_modules/
 .devenv/
+**/.devenv/
 .nix-devenv
 
 # Editor cruft

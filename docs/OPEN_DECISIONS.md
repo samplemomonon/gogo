@@ -36,7 +36,7 @@ first-party import edges and fails on additions *and* stale entries. See the ADR
 
 **Why it was not adopted.** The repository enforces its architecture with plain `go test` — five architecture test packages, no linter dependency, no lint configuration. Adding `golangci-lint` with `depguard` and `forbidigo` changes the enforcement *mechanism* and adds a maintenance burden across every future change. That is a decision for the project owner, not something to slip in alongside a boundary test.
 
-**What exists today instead.** `internal/services/aggregator-service/internal/architecture/architecture_test.go` denies exactly one import — `database/sql` — derived from `go list -deps`. That is a **denylist of one**, which is the weakest form of the idea OD-1 proposes to replace.
+**What exists today instead.** `services/aggregator-service/internal/architecture/architecture_test.go` denies exactly one import — `database/sql` — derived from `go list -deps`. That is a **denylist of one**, which is the weakest form of the idea OD-1 proposes to replace.
 
 **Closure options.**
 

@@ -73,6 +73,9 @@ message SearchProduct {
   // Projected_at is when this read model last wrote the row. It is not the same
   // as updated_at: an event can republish a product without changing it.
   google.protobuf.Timestamp projected_at = 15;
+  string product_type_id = 16;
+  int32 schema_version = 17;
+  map<string, string> attributes = 18;
 }
 
 message SearchProductsRequest {

@@ -111,6 +111,9 @@ type Product struct {
 	// Projected_at is when this read model last wrote the row. It is not the same
 	// as updated_at: an event can republish a product without changing it.
 	ProjectedAt   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=projected_at,json=projectedAt,proto3" json:"projected_at,omitempty"`
+	ProductTypeId string                 `protobuf:"bytes,16,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
+	SchemaVersion int32                  `protobuf:"varint,17,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Attributes    map[string]string      `protobuf:"bytes,18,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -246,6 +249,27 @@ func (x *Product) GetUpdatedAt() *timestamppb.Timestamp {
 func (x *Product) GetProjectedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ProjectedAt
+	}
+	return nil
+}
+
+func (x *Product) GetProductTypeId() string {
+	if x != nil {
+		return x.ProductTypeId
+	}
+	return ""
+}
+
+func (x *Product) GetSchemaVersion() int32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *Product) GetAttributes() map[string]string {
+	if x != nil {
+		return x.Attributes
 	}
 	return nil
 }
@@ -720,7 +744,7 @@ var File_productlisting_v1_listing_proto protoreflect.FileDescriptor
 
 const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"\n" +
-	"\x1fproductlisting/v1/listing.proto\x12\x11productlisting.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\x04\n" +
+	"\x1fproductlisting/v1/listing.proto\x12\x11productlisting.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x06\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -741,7 +765,15 @@ const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12=\n" +
-	"\fprojected_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vprojectedAt\"\xc2\x02\n" +
+	"\fprojected_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vprojectedAt\x12&\n" +
+	"\x0fproduct_type_id\x18\x10 \x01(\tR\rproductTypeId\x12%\n" +
+	"\x0eschema_version\x18\x11 \x01(\x05R\rschemaVersion\x12J\n" +
+	"\n" +
+	"attributes\x18\x12 \x03(\v2*.productlisting.v1.Product.AttributesEntryR\n" +
+	"attributes\x1a=\n" +
+	"\x0fAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc2\x02\n" +
 	"\aVariant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1d\n" +
 	"\n" +
@@ -805,7 +837,7 @@ func file_productlisting_v1_listing_proto_rawDescGZIP() []byte {
 }
 
 var file_productlisting_v1_listing_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_productlisting_v1_listing_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_productlisting_v1_listing_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_productlisting_v1_listing_proto_goTypes = []any{
 	(ProductStatus)(0),            // 0: productlisting.v1.ProductStatus
 	(*Product)(nil),               // 1: productlisting.v1.Product
@@ -816,31 +848,33 @@ var file_productlisting_v1_listing_proto_goTypes = []any{
 	(*ListProductsResponse)(nil),  // 6: productlisting.v1.ListProductsResponse
 	(*ListVariantsRequest)(nil),   // 7: productlisting.v1.ListVariantsRequest
 	(*ListVariantsResponse)(nil),  // 8: productlisting.v1.ListVariantsResponse
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	nil,                           // 9: productlisting.v1.Product.AttributesEntry
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_productlisting_v1_listing_proto_depIdxs = []int32{
 	0,  // 0: productlisting.v1.Product.status:type_name -> productlisting.v1.ProductStatus
 	2,  // 1: productlisting.v1.Product.variants:type_name -> productlisting.v1.Variant
-	9,  // 2: productlisting.v1.Product.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: productlisting.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: productlisting.v1.Product.projected_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: productlisting.v1.Variant.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 6: productlisting.v1.Variant.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 7: productlisting.v1.GetProductResponse.product:type_name -> productlisting.v1.Product
-	0,  // 8: productlisting.v1.ListProductsRequest.status:type_name -> productlisting.v1.ProductStatus
-	1,  // 9: productlisting.v1.ListProductsResponse.products:type_name -> productlisting.v1.Product
-	2,  // 10: productlisting.v1.ListVariantsResponse.variants:type_name -> productlisting.v1.Variant
-	3,  // 11: productlisting.v1.ProductListingService.GetProduct:input_type -> productlisting.v1.GetProductRequest
-	5,  // 12: productlisting.v1.ProductListingService.ListProducts:input_type -> productlisting.v1.ListProductsRequest
-	7,  // 13: productlisting.v1.ProductListingService.ListVariants:input_type -> productlisting.v1.ListVariantsRequest
-	4,  // 14: productlisting.v1.ProductListingService.GetProduct:output_type -> productlisting.v1.GetProductResponse
-	6,  // 15: productlisting.v1.ProductListingService.ListProducts:output_type -> productlisting.v1.ListProductsResponse
-	8,  // 16: productlisting.v1.ProductListingService.ListVariants:output_type -> productlisting.v1.ListVariantsResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	10, // 2: productlisting.v1.Product.created_at:type_name -> google.protobuf.Timestamp
+	10, // 3: productlisting.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 4: productlisting.v1.Product.projected_at:type_name -> google.protobuf.Timestamp
+	9,  // 5: productlisting.v1.Product.attributes:type_name -> productlisting.v1.Product.AttributesEntry
+	10, // 6: productlisting.v1.Variant.created_at:type_name -> google.protobuf.Timestamp
+	10, // 7: productlisting.v1.Variant.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 8: productlisting.v1.GetProductResponse.product:type_name -> productlisting.v1.Product
+	0,  // 9: productlisting.v1.ListProductsRequest.status:type_name -> productlisting.v1.ProductStatus
+	1,  // 10: productlisting.v1.ListProductsResponse.products:type_name -> productlisting.v1.Product
+	2,  // 11: productlisting.v1.ListVariantsResponse.variants:type_name -> productlisting.v1.Variant
+	3,  // 12: productlisting.v1.ProductListingService.GetProduct:input_type -> productlisting.v1.GetProductRequest
+	5,  // 13: productlisting.v1.ProductListingService.ListProducts:input_type -> productlisting.v1.ListProductsRequest
+	7,  // 14: productlisting.v1.ProductListingService.ListVariants:input_type -> productlisting.v1.ListVariantsRequest
+	4,  // 15: productlisting.v1.ProductListingService.GetProduct:output_type -> productlisting.v1.GetProductResponse
+	6,  // 16: productlisting.v1.ProductListingService.ListProducts:output_type -> productlisting.v1.ListProductsResponse
+	8,  // 17: productlisting.v1.ProductListingService.ListVariants:output_type -> productlisting.v1.ListVariantsResponse
+	15, // [15:18] is the sub-list for method output_type
+	12, // [12:15] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_productlisting_v1_listing_proto_init() }
@@ -854,7 +888,7 @@ func file_productlisting_v1_listing_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_productlisting_v1_listing_proto_rawDesc), len(file_productlisting_v1_listing_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

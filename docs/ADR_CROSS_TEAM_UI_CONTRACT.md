@@ -98,7 +98,7 @@ If a later fact changes this — a second runtime, independent deployment, or a 
 
 **2.** The owning team keeps full responsibility for its feature's UI implementation, behaviour, and evolution. Publishing a contract does not transfer ownership away from it.
 
-**3.** The platform team owns the design-system primitives and the agreed platform contracts. Primitives are not a composition authority and never decide what appears on a page.
+**3.** The platform team owns the design-system primitives and the agreed platform contracts. UI primitives are runtime-specific: `templ.Component` and HTML/CSS primitives serve web; mobile and desktop own native implementations. Shared semantic tokens may be introduced when a second implemented client consumes them. Primitives are not a composition authority and never decide what appears on a screen.
 
 **4.** Page composition — which features appear, in what order, with what page context — is the app composition layer's decision. It is the only such decision, and no feature team gets it.
 
@@ -110,7 +110,7 @@ If a later fact changes this — a second runtime, independent deployment, or a 
 
 ### 4.1 Shape of the contract in this codebase
 
-The platform unit is `templ.Component`. The public entry point should therefore be **an ordinary Go package that exposes components**, not a new interface type.
+For the web runtime, the platform unit is `templ.Component`. The public entry point should therefore be **an ordinary Go package that exposes components**, not a new interface type. This contract does not require native apps to embed web components or adopt a web-oriented abstraction.
 
 ```go
 // internal/modules/recommendation/public/public.go

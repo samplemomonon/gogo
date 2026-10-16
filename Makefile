@@ -1,4 +1,6 @@
-BINARY       := bin/gogo
+BINARY       := $(CURDIR)/bin/gogo
+APP_DIR      := apps/web
+GO           := go -C $(APP_DIR)
 PKG          := ./cmd/server
 
 IMAGE        ?= gogo
@@ -11,7 +13,7 @@ K8S_DIR      := deploy/k8s
 #
 # GOWORK=off is load-bearing, not hygiene. This repository ships a go.work, and
 # a directory that is not listed in it but lives inside the workspace tree does
-# not resolve to itself: a `go list ./...` run inside internal/services/… for
+# not resolve to itself: a `go list ./...` run inside services/… for
 # an unlisted service silently enumerates the *gateway's* packages. Measured:
 # aggregator, product and product-search all returned an identical package list
 # under workspace mode — the gateway's — which is how three services can look
@@ -19,7 +21,7 @@ K8S_DIR      := deploy/k8s
 # The six platform services. Keep in step with ports.txt, which the port gate
 # checks against every go.mod default and Dockerfile EXPOSE in here.
 SERVICES     := aggregator-service category-service media-service product-listing-service product-search-service product-service
-SERVICES_DIR := internal/services
+SERVICES_DIR := services
 
 .PHONY: services-vet services-test gofmt-check
 
@@ -45,22 +47,22 @@ all: build
 assets: templ css
 
 build: assets
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY) $(PKG)
+	$(GO) build -ldflags "$(LDFLAGS)" -o $(BINARY) $(PKG)
 
 run: build
-	./$(BINARY)
+	$(BINARY)
 
 # Development: watch templ + CSS changes and run the server.
 dev: templ css
-	@templ generate --watch & \
+	@cd $(APP_DIR) && templ generate --watch & \
 	bun run css:watch & \
-	go run $(PKG)
+	$(GO) run $(PKG)
 
 test: assets
-	go test ./... -race
+	$(GO) test ./... -race
 
 vet: assets
-	go vet ./...
+	$(GO) vet ./...
 
 # Static analysis for the platform services, on their own module graphs.
 services-vet:
@@ -96,7 +98,7 @@ services-test:
 # the tree — two devenv environments were 675 MB of Go module cache each, and
 # `gofmt -l ./internal` walked all of it on every run.
 gofmt-check:
-	@dirs="$$(go list -f '{{.Dir}}' ./... | sort -u)"; \
+	@dirs="$$($(GO) list -f '{{.Dir}}' ./... | sort -u)"; \
 	for svc in $(SERVICES); do \
 		dirs="$$dirs $$(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go list -f '{{.Dir}}' ./... | sort -u)"; \
 	done; \
@@ -105,9 +107,9 @@ gofmt-check:
 
 check: vet test services-vet services-test gofmt-check
 	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
-	@before="$$(git status --porcelain -- internal cmd)"; \
-	templ generate >/dev/null 2>&1; \
-	after="$$(git status --porcelain -- internal cmd)"; \
+	@before="$$(git status --porcelain -- apps/web)"; \
+	(cd $(APP_DIR) && templ generate) >/dev/null 2>&1; \
+	after="$$(git status --porcelain -- apps/web)"; \
 	if [ "$$before" = "$$after" ]; then \
 		echo "templates generated, up to date"; \
 	else \
@@ -131,10 +133,10 @@ check: vet test services-vet services-test gofmt-check
 		git diff --stat -- contracts; exit 1; \
 	fi
 	@$(MAKE) --no-print-directory buf-breaking
-	@before="$$(cat internal/architecture/import_graph.txt 2>/dev/null)"; \
-	go test ./internal/architecture/ -run ImportGraph >/dev/null 2>&1 || \
+	@before="$$(cat apps/web/internal/architecture/import_graph.txt 2>/dev/null)"; \
+	$(GO) test ./internal/architecture/ -run ImportGraph >/dev/null 2>&1 || \
 		(echo "check failed: the committed import graph is stale — run 'make arch-graph' and commit the result."; \
-		 go test ./internal/architecture/ -run ImportGraph 2>&1 | sed -n '2,20p'; exit 1); \
+		 $(GO) test ./internal/architecture/ -run ImportGraph 2>&1 | sed -n '2,20p'; exit 1); \
 	echo "import graph current"
 	@echo "check passed: gofmt clean, templates and contracts generated, import graph current, vet and tests green"
 
@@ -160,7 +162,7 @@ lint: vet buf-lint
 # Run after adding a Go package or changing an import. `make check` fails if the
 # committed copy is stale, so it cannot drift unnoticed.
 arch-graph:
-	go test ./internal/architecture/ -run ImportGraph -update
+	$(GO) test ./internal/architecture/ -run ImportGraph -update
 
 # ---- Contract (buf/protobuf) ----------------------------------------------
 
@@ -216,14 +218,14 @@ buf-generate: buf-lint
 buf: buf-generate
 
 fmt:
-	gofmt -w $$(go list -f '{{.Dir}}' ./... | sort -u)
+	gofmt -w $$($(GO) list -f '{{.Dir}}' ./... | sort -u)
 
 tidy:
-	go mod tidy
+	$(GO) mod tidy
 
 # Regenerate Templ *_templ.go files from .templ sources.
 templ:
-	templ generate
+	cd $(APP_DIR) && templ generate
 
 # Build the Tailwind stylesheet once or in watch mode.
 css:
@@ -235,7 +237,7 @@ css-watch:
 # Scaffold a new contract-compliant feature module:
 #   make module name=billing desc="Subscription billing and invoices"
 module:
-	go run ./cmd/modulegen $(name) "$(desc)"
+	$(GO) run ./cmd/modulegen $(name) "$(desc)"
 
 # ---- Container -----------------------------------------------------------
 

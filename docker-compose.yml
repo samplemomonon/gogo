@@ -63,6 +63,7 @@ services:
       PRODUCT_LISTING_ADDRESS: dns:///product-listing-app:9093
       PRODUCT_SEARCH_ADDRESS: dns:///product-search-app:9094
       CATEGORY_ADDRESS: dns:///category-app:9090
+      PRODUCT_PLATFORM_SERVICE_TOKEN: ${PRODUCT_PLATFORM_SERVICE_TOKEN:-local-dev-service-token-not-a-secret}
       # The product change feed. Optional — remove it and the gateway serves on its
       # island-cache TTLs alone (30s for the storefront grid) instead of dropping caches
       # the moment a product changes elsewhere.

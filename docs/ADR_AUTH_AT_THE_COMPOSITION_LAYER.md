@@ -4,7 +4,7 @@
 **Status:** Accepted.
 **Owner:** project owner.
 **Supersedes:** the "Belum ada authentication" entry in
-`internal/services/aggregator-service/README.md`.
+`services/aggregator-service/README.md`.
 
 ## The problem
 

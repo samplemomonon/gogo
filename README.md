@@ -9,7 +9,24 @@ Each module follows hexagonal architecture — `domain` (business rules), `appli
 For maintainers: the load-bearing dependency rules, the event contract
 boundary and the architectural decision log live in
 [`ARCHITECTURE.md`](ARCHITECTURE.md) and are enforced by
-`internal/architecture` (`go test ./internal/architecture`).
+[`apps/web/internal/architecture`](apps/web/internal/architecture) (`go -C apps/web test ./internal/architecture`).
+
+## Repository structure
+
+This is one Git monorepo organized by deployable application platform: the
+server-rendered web app is in `apps/web`, with mobile and desktop boundaries in
+`apps/mobile` and `apps/desktop`. Platform services live in `services/<name>`
+and protobuf contracts in `contracts`. Mobile and desktop currently have
+architecture notes, not runnable projects; their stacks are chosen with their
+first end-to-end feature. The root `go.work` supports local Go development; it
+does not combine modules into one deployable application. Each service keeps
+its own `go.mod` and can be built on its own. See
+[`docs/MONOREPO_STRUCTURE.md`](docs/MONOREPO_STRUCTURE.md) for the directory map
+and the rule for deciding when a service needs a separate repository.
+
+From the repository root, use `make build`, `make check`, and `make up` to work
+across the gateway and services. For a service-specific command, change into
+that service directory first.
 
 ## Features
 
@@ -18,6 +35,7 @@ boundary and the architectural decision log live in
 - 📡 **Module event bus**: mutations publish domain events; subscribers (e.g. island-cache invalidation, the billing activity feed) react through **contract-keyed subscriptions** (`SubscribeTypes`), each of which returns a cancellable `Subscription` — the server-side counterpart to htmx custom events
 - 🛒 **Product data lives in the platform, not here**: gogo owns no product rows. Writes go to `product-service` (`product.v1`), browse reads to `product-listing-service` (`productlisting.v1`), search to `product-search-service` (`productsearch.v1`), the category hierarchy to `category-service` (`category.v1`) — four required gRPC addresses, no in-process fallback. See [ARCHITECTURE.md D-018](ARCHITECTURE.md#d-018)
 - ✅ **Home storefront** as a page at `/`: a read-only product grid that **reads through the platform's contracts** (browse for the grid, search when `?q=` is 3+ characters) and renders it with its own views. A browse outage returns **503**; a search outage returns a working storefront with search off — the breakers are per-upstream, not global
+- ✅ Storefront product detail at `/catalog/{id}`: server-rendered product description, brand, price and stock from the listing projection; missing products return 404 and an unavailable catalog returns 503
 - ✅ **Seller console** as a page at `/seller`: product and category management against the platform, a stock ledger with full-form mutations, **point-of-sale** (`/seller/kasir`) and **sales history with void** (`/seller/transaksi`) — it never imports module runtime code, it consumes the **product platform contracts** plus **`inventory.v1`** and **`sales.v1`**. A dedicated **inventory module** owns stock and the atomic, idempotent adjustment ledger
 - 📡 **Product change feed**: `productevents` consumes the platform's Kafka topic `product.events.v1` and republishes it as `product.changed.*` on the in-process bus, so a product changed in *another* deployment still drops this one's island caches. Optional (`KAFKA_BROKERS`); without it the gateway serves on cache TTLs alone — correct, just staler
 - ✅ **Islands rendering engine**: component-level rendering strategy — SSG/ISR/SSR/CSR per island, contract-driven planner, revalidation TTL cache, page composer — see below
@@ -44,6 +62,7 @@ Each surface renders its own pages from its own read model.
 | Method   | Path                          | Module   | Area   | Description                                        |
 | -------- | ----------------------------- | -------- | ------ | -------------------------------------------------- |
 | `GET`    | `/`                           | home     | public | Storefront product grid (ISR island; paginated via `/?page=N`, searchable via `/?q=term` with 3+ characters). Browse and search have **separate breakers**: a browse outage returns 503, a search outage returns a working storefront with search off |
+| `GET`    | `/catalog/{id}`               | home     | public | Product detail page (SSR from `productlisting.v1`; 404 for missing products, 503 when the catalog is unavailable) |
 | `GET`    | `/login`                      | auth     | public | Sign-in form (consumes `auth.v1` Login; writes the session cookie) |
 | `POST`   | `/login`                      | auth     | public | Verify credentials and set the session cookie (Post/Redirect/Get) |
 | `POST`   | `/logout`                     | auth     | public | Clear the session cookie and return to the signed-out view |
@@ -201,7 +220,7 @@ bar ahead of the module-federated items.
 The gateway (`internal/shared/httpserver`) collects the modules into a `module.Registry`, mounts each module's routes and exposes the registry at `/module-registry` (JSON by default, an HTML page for browsers). Registering a new module is one line in the composition root — its **navigation appears in the shell top bar automatically**, because the gateway compiles the nav from the manifests and injects it into every request:
 
 ```go
-// cmd/server/main.go
+// apps/web/cmd/server/main.go
 // BuildGateway composes the whole gateway — the four platform connections,
 // registry, pages, feature modules — and returns one shutdown hook, so the
 // product connections and the pages that use them cannot drift.
@@ -321,7 +340,7 @@ invalidate its own grid island cache, never to publish.
 
 ```sh
 make module name=billing desc="Subscription billing, invoices and payments"
-# or: go run ./cmd/modulegen billing "Subscription billing, invoices and payments"
+# or: make module name=billing desc="Subscription billing, invoices and payments"
 ```
 
 This creates `internal/modules/billing/` with a manifest, a shell-rendered landing page, an HTMX fragment endpoint and a passing smoke test — no templ CLI required. Then register it with the gateway (one line in `cmd/server/main.go`); its nav item federates into the shell top bar and its manifest appears in `/module-registry` the moment the gateway boots.
@@ -340,6 +359,7 @@ PRODUCT_ADDRESS=dns:///product-app:9092
 PRODUCT_LISTING_ADDRESS=dns:///product-listing-app:9093
 PRODUCT_SEARCH_ADDRESS=dns:///product-search-app:9094
 CATEGORY_ADDRESS=dns:///category-app:9090
+PRODUCT_PLATFORM_SERVICE_TOKEN=change-this-to-a-shared-service-token
 KAFKA_BROKERS=kafka:19092   # optional — see below
 ```
 
@@ -506,6 +526,9 @@ References: [htmx — Requests & Responses](https://htmx.org/docs/#requests--res
 [The Case for HTMX](https://medium.com/@paulhoke/the-case-for-htmx-rethinking-modern-web-architecture-1e6772cf0c74).
 
 ## Project layout
+
+The repository layout is shown above. This tree is the gateway module's layout;
+its paths are relative to `apps/web/`:
 
 ```
 cmd/
@@ -772,6 +795,7 @@ Configuration is read from environment variables; a `.env` file is loaded if pre
 | `PRODUCT_LISTING_ADDRESS`  | **required** | gRPC target of `product-listing-service` (browse: `productlisting.v1`) |
 | `PRODUCT_SEARCH_ADDRESS`   | **required** | gRPC target of `product-search-service` (search: `productsearch.v1`) |
 | `CATEGORY_ADDRESS`         | **required** | gRPC target of `category-service` (`category.v1`) |
+| `PRODUCT_PLATFORM_SERVICE_TOKEN` | **required** | Bearer credential the gateway presents to authenticated product-platform gRPC services (at least 16 characters) |
 | `KAFKA_BROKERS`    | —       | Comma-separated `host:port` of the product change feed. When set, `productevents` consumes `product.events.v1` and republishes it as `product.changed.*`, so a product changed elsewhere still drops this process's island caches. When empty, caches expire on their TTLs (30s for the storefront grid) |
 
 **The four product addresses are required and have no default.** That is a
