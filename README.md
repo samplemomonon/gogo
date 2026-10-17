@@ -647,7 +647,6 @@ internal/
     ├── grpcx/             # shared gRPC transport: Dial (network) + InProcess (bufconn);
     │                      # consumers keep their own ports/error mapping
     ├── httpserver/        # gateway: router, middleware, module registry mount, lifecycle orchestration
-    ├── idgen/             # ID generation (UUID) behind a port
     ├── kernel/            # gateway kernel primitives
     ├── logging/           # structured logger factory (service/version/env on every record)
     ├── productconsumer/   # the ONLY package that may import a product-platform contract;

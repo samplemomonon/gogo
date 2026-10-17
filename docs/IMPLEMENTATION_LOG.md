@@ -222,7 +222,7 @@ working as intended.
 | # | Finding | Where | Severity |
 |---|---|---|---|
 | 1 | ~~`inventory` has no application service and duplicates the oversell policy~~ | `internal/modules/inventory` | **CLOSED by Phase 0 pilot work** — see §6.1 |
-| 2 | `bootstrap` reaches `sales/infrastructure` | `sales_connection.go:30` | design — §5.2 |
+| 2 | ~~`bootstrap` reaches `sales/infrastructure`~~ | `sales_connection.go:30` | **CLOSED.** `inventoryclient.New` moved into `sales/compose` as `compose.NewInventoryAdjuster`; `compositionExceptions` is now empty — see §31 |
 | 3 | ~~`aggregator-service` owns no persistence, and nothing checks it~~ | — | **CLOSED.** Tripwire written at `services/aggregator-service/internal/architecture/`. See §8 |
 | 4 | ~~`media.v1` has no breaker in the gateway~~ | — | **NOT A FINDING — verified and withdrawn.** `productconsumer.Connections` has exactly four upstreams: Write, Browse, Search, Category. The gateway never calls `media.v1`; `media-service` is reached by `aggregator-service`, a different binary. A breaker would guard a dependency that does not exist. The `units.yaml` comment already had this right; the log entry was wrong |
 | 5 | ~~`product-listing-service`'s usage string contains a `+event.Topic+` template artefact~~ | — | **CLOSED.** The `event` import existed only to support the dead placeholder — with the placeholder removed the import was unused and the package stopped compiling. `config.DefaultKafkaTopic` / `DefaultKafkaDeadLetterTopic` are now named constants, and `usage` uses `Fprintf` so the placeholders actually expand |
@@ -1085,3 +1085,38 @@ Deliberately unchanged: the two `products/{list,detail}` packages (aliased at
 import sites; trigger: a third `detail` package) and `views/pages` directory
 names (load-bearing in generated-code paths). A repository-wide search
 confirms no references to the old names remain.
+
+## 31. Follow-up pass — ledger emptied, kernel trimmed, guide trued up
+
+The `docs/FOLLOW_UP.md` backlog was worked end to end. The result, in the
+file's own order:
+
+- **Composition exception retired (finding #2, §5.2).** `inventoryclient.New`
+  is called from `sales/compose` now (`compose.NewInventoryAdjuster`); the
+  composition root composes the module with the raw connection, breaker and
+  capability and never names the module's infrastructure package.
+  `compositionExceptions` in `layers_test.go` is empty — the ledger stays as
+  the place a future exception is written down, not as debt.
+- **Kernel trimmed.** `internal/shared/kernel/interfaces.go` keeps only the six
+  interfaces with a live consumer (`EventBus`, `Event`, `EventHandler`,
+  `Subscription`, `Logger`, `Validator`); the unreferenced fourteen are
+  deleted, `EventPublisher`/`EventSubscriber` fold into `EventBus`, and the
+  unused `ServiceManager` lifecycle helper went with them. An interface
+  without a named consumer is a diagram, not a contract.
+- **ID generation consolidated.** `shared/idgen` deleted — it existed only for
+  the never-mounted `media` module, and no committed revision imported it — and
+  auth's hex `generateID` replaced with `uuid.NewString()`. The recorded
+  key-space split stays: product IDs are the platform's `int64` as decimal
+  strings, inventory and sales mint UUIDs — a seller never mints a product ID.
+- **`D-010` tombstoned.** No revision of `ARCHITECTURE.md` ever contained a
+  D-010 entry (`git log --all -S "D-010" -- ARCHITECTURE.md` returns nothing);
+  the number is now retired explicitly instead of silently skipped, satisfying
+  the prerequisite `TEAM_TOPOLOGIES_PRD.md` §0.4 records.
+- **`MIGRATION_GUIDE.md` trued up** against the working tree (real `di.go`
+  wiring, billing's subscription pattern, the island-name rule, `apps/web/...`
+  paths), with the one forward-looking snippet labelled as a shape. The guide
+  and `foundation/README.md` remain the pair; if they drift again, the guide
+  should be cut down to the README.
+
+`make arch-graph` was regenerated (the graph lost the `idgen` node and the
+bootstrap→sales/infrastructure edge), and the full `make check` gate passes.

@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc"
 
 	salescompose "gogo/internal/modules/sales/compose"
-	salesinventoryclient "gogo/internal/modules/sales/infrastructure/inventoryclient"
 	"gogo/internal/shared/breaker"
 	"gogo/internal/shared/config"
 	"gogo/internal/shared/grpcx"
@@ -32,7 +31,7 @@ func connectSales(
 	if len(security) > 0 {
 		moduleCfg = security[0]
 	}
-	stock := salesinventoryclient.New(inventoryConn, inventoryBreaker, moduleCfg.capability)
+	stock := salescompose.NewInventoryAdjuster(inventoryConn, inventoryBreaker, moduleCfg.capability)
 	module, closeModule, err := salescompose.Build(parent, cfg, stock, logger, moduleCfg.authorizer)
 	if err != nil {
 		return nil, nil, err

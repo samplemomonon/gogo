@@ -3,9 +3,7 @@ package application
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"time"
@@ -41,13 +39,6 @@ func NewService(employees ports.EmployeeStore, sessions ports.SessionStore, pinC
 		authz = authorization[0]
 	}
 	return &Service{employees: employees, sessions: sessions, authorization: authz, pinCost: pinCost, ttl: ttl}
-}
-
-// generateID generates a random ID.
-func generateID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 // hashPIN hashes a PIN using bcrypt.
@@ -174,7 +165,7 @@ func (s *Service) Login(ctx context.Context, tenant domain.Tenant, email, pin st
 		return nil, nil, domain.ErrInvalidCredentials
 	}
 
-	session, err := domain.NewSession(tenant, generateID(), employee.ID, s.ttl)
+	session, err := domain.NewSession(tenant, uuid.NewString(), employee.ID, s.ttl)
 	if err != nil {
 		return nil, nil, err
 	}

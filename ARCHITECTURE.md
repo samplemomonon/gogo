@@ -254,6 +254,18 @@ platform does, and gogo consumes its feed ([section 3](#3-events-and-the-kernel-
 Any module added here that publishes events should follow this decision's shape
 rather than re-deriving it.
 
+### D-010 · *(retired number — no entry was ever written here)*
+**Date:** — · **Status:** tombstone, number permanently vacant
+The log jumps D-009 → D-011. That gap is original, not a loss: no revision of
+this file ever contained a D-010 entry (`git log --all -S "D-010" --
+ARCHITECTURE.md` returns nothing; the string elsewhere is only paperwork about
+the gap — `docs/FOLLOW_UP.md` item 7, `docs/TEAM_TOPOLOGIES_PRD.md` §0.4), so
+there is no text to recover. The number is
+retired rather than reused — reusing it would make a decision un-findable under
+a number that already has a history elsewhere, and future readers would have to
+guess whether something was deleted. `docs/TEAM_TOPOLOGIES_PRD.md` §0.4 records
+this as the closure of that prerequisite.
+
 ### D-011 · Multi-tenancy: shared schema with tenant_id + RLS, tenant on event payload
 **Date:** 2026-09-27 · **Status:** accepted · **Carries a known gap: see [D-018](#d-018)**
 
@@ -293,14 +305,18 @@ covers the tables gogo still owns (`inventory_stock`, the movement ledger, sales
 history).
 
 > **Known gap (not a decision to defer — a fact about the platform).** The
-> product platform has **no tenant concept**: no `tenant_id` in its migrations,
-> no tenant field in its contracts. So gogo stamps a tenant on every outbound
-> product call, and the platform ignores it — product data is global, while
-> everything gogo owns is tenant-scoped. That is a real inconsistency, not a
-> stylistic one, and it is invisible at runtime: one tenant's products are
-> visible to all. Closing it is upstream work in the platform (add `tenant_id`,
-> make the contracts carry it), not something gogo can enforce. See
-> [D-018](#d-018) and `docs/FOLLOW_UP.md`.
+> platform's product data has **no tenant concept**: product-service's
+> migrations carry no `tenant_id`, and `product.v1` / `productlisting.v1` /
+> `productsearch.v1` carry no tenant field. So gogo stamps a tenant on every
+> outbound product call, and those services ignore it — product data is global,
+> while everything gogo owns is tenant-scoped. (category-service is the one
+> exception: merchant categories are tenant-scoped through the `x-tenant-id`
+> metadata gogo already sends — see its `0002_merchant_categories.sql` and
+> `internal/tenant`.) That is a real inconsistency, not a stylistic one, and it
+> is invisible at runtime: one tenant's products are visible to all. Closing it
+> is upstream work in the platform (add `tenant_id`, make the contracts carry
+> it), not something gogo can enforce. See [D-018](#d-018) and
+> `docs/FOLLOW_UP.md`.
 
 **Protobuf field addition:** Adding a scalar `tenant` field (next unused
 number, never reused) to `ProductEvent` is **wire-safe** per
@@ -564,9 +580,12 @@ have made every page 503 for any single outage, which is strictly worse.
   store in gogo would recreate the two-authority problem this decision exists to
   end; the honest move is to record the gap.
 - **No tenant isolation for product data.** gogo is multi-tenant
-  ([D-011](#d-011)); the platform has **no tenant concept at all** — no
-  `tenant_id` in its migrations, no tenant in its contracts. gogo stamps a tenant
-  on every product call and the platform ignores it. This is a real leak between
+  ([D-011](#d-011)); the platform's **product data** services have no tenant
+  concept — product-service's migrations carry no `tenant_id`, and no tenant
+  field exists in `product.v1` / `productlisting.v1` / `productsearch.v1`
+  (category-service is the exception: merchant categories are tenant-scoped via
+  the `x-tenant-id` metadata — see [D-011](#d-011)). gogo stamps a tenant on
+  every product call and those services ignore it. This is a real leak between
   tenants, it is invisible at runtime (one tenant's products are visible to all),
   and it **cannot be fixed in gogo** — it needs `tenant_id` added upstream. Tracked
   in `docs/FOLLOW_UP.md`.
