@@ -31,7 +31,7 @@ func NewListingRepository(db *sql.DB) *ListingRepository {
 
 const listingColumns = `product_id, category_id, name, slug, description, brand,
 	price_cents, currency, stock, status, primary_media_id, product_type_id, schema_version, attributes, created_at, updated_at,
-	projected_at`
+	projected_at, merchant_id`
 
 // scannedListing holds a row using the sql null types, which the driver needs for
 // scanning but which the model does not expose.
@@ -53,6 +53,7 @@ type scannedListing struct {
 	createdAt      time.Time
 	updatedAt      time.Time
 	projectedAt    time.Time
+	merchantID     string
 }
 
 func (s scannedListing) product() *model.Product {
@@ -71,6 +72,7 @@ func (s scannedListing) product() *model.Product {
 		CreatedAt:     s.createdAt,
 		UpdatedAt:     s.updatedAt,
 		ProjectedAt:   s.projectedAt,
+		MerchantID:    s.merchantID,
 	}
 	_ = json.Unmarshal(s.attributes, &p.Attributes)
 	if s.description.Valid {
@@ -113,6 +115,7 @@ func (s *scannedListing) scanDest() []any {
 		&s.createdAt,
 		&s.updatedAt,
 		&s.projectedAt,
+		&s.merchantID,
 	}
 }
 
@@ -213,6 +216,9 @@ func buildFilters(q *model.ListProductsQuery) ([]string, []any) {
 	}
 	if q.Status != nil {
 		add("status = $%d", string(*q.Status))
+	}
+	if q.MerchantID != "" {
+		add("merchant_id = $%d", q.MerchantID)
 	}
 	// The price bounds are tested for presence, not for being non-zero. A caller
 	// asking for products up to IDR 0 means exactly that, and comparing against 0

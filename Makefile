@@ -34,7 +34,7 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
                -X gogo/internal/shared/version.Commit=$(COMMIT) \
                -X gogo/internal/shared/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products docs-site-build docs-site-preview \
+.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products seed docs-site-build docs-site-preview \
 	module buf buf-lint buf-generate buf-check buf-breaking arch-graph \
 	arch-team-catalog \
 	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
@@ -256,6 +256,12 @@ css-watch:
 # Generate development categories and products through their owning services.
 faker-products:
 	bun run tools/product-faker/index.ts
+
+# Seed the two dummy identities the role model demo needs (a pembeli and a
+# pembeli+penjual who owns a merchant). Idempotent; targets the shared Postgres
+# store the gateway uses. Requires DATABASE_URL (or AUTHZ_DATABASE_URL).
+seed:
+	$(GO) run ./cmd/authseed
 
 # Scaffold a new contract-compliant feature module:
 #   make module name=billing desc="Subscription billing and invoices"

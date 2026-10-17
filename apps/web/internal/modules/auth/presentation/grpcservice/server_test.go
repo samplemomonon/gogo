@@ -47,6 +47,9 @@ type fakeService struct {
 	extendSession   func(ctx context.Context, sessionID string) (*domain.Session, error)
 	validateSession func(ctx context.Context, sessionID string) (*domain.Session, *domain.Employee, error)
 	checkPermission func(ctx context.Context, sessionID, permissionKey string) (bool, error)
+
+	openMerchant     func(ctx context.Context, sessionID, name string) (*domain.Merchant, error)
+	canManageProduct func(ctx context.Context, sessionID, merchantID string) (bool, error)
 }
 
 func unexpectedCall(method string) error {
@@ -88,6 +91,20 @@ func (f *fakeService) CheckPermission(ctx context.Context, sessionID, permission
 	return f.checkPermission(ctx, sessionID, permissionKey)
 }
 
+func (f *fakeService) OpenMerchant(ctx context.Context, sessionID, name string) (*domain.Merchant, error) {
+	if f.openMerchant == nil {
+		return nil, unexpectedCall("OpenMerchant")
+	}
+	return f.openMerchant(ctx, sessionID, name)
+}
+
+func (f *fakeService) CanManageProduct(ctx context.Context, sessionID, merchantID string) (bool, error) {
+	if f.canManageProduct == nil {
+		return false, unexpectedCall("CanManageProduct")
+	}
+	return f.canManageProduct(ctx, sessionID, merchantID)
+}
+
 // failingService answers every method under test with one error, so the
 // classification table can drive each domain sentinel through the adapter.
 type failingService struct {
@@ -107,6 +124,14 @@ func (f failingService) ExtendSession(context.Context, string) (*domain.Session,
 
 func (f failingService) ValidateSession(context.Context, string) (*domain.Session, *domain.Employee, error) {
 	return nil, nil, f.err
+}
+
+func (f failingService) OpenMerchant(context.Context, string, string) (*domain.Merchant, error) {
+	return nil, f.err
+}
+
+func (f failingService) CanManageProduct(context.Context, string, string) (bool, error) {
+	return false, f.err
 }
 
 // TestTenantResolution pins where the tenant comes from: the adapter resolves
@@ -198,6 +223,10 @@ func TestErrorClassification(t *testing.T) {
 		_, err := svc.ExtendSession(ctx, &authv1.ExtendSessionRequest{})
 		return err
 	}
+	viaOpenMerchant := func(ctx context.Context, svc *service) error {
+		_, err := svc.OpenMerchant(ctx, &authv1.OpenMerchantRequest{})
+		return err
+	}
 
 	tests := []struct {
 		name        string
@@ -250,6 +279,21 @@ func TestErrorClassification(t *testing.T) {
 			name: "an unknown failure is internal",
 			err:  errors.New("database down"), call: viaLogin,
 			wantCode: codes.Internal, wantMessage: "something went wrong",
+		},
+		{
+			name: "a merchant permission denial is forbidden",
+			err:  domain.ErrMerchantPermissionDenied, call: viaOpenMerchant,
+			wantCode: codes.PermissionDenied, wantMessage: "permission denied",
+		},
+		{
+			name: "an unknown merchant is not found",
+			err:  domain.ErrMerchantNotFound, call: viaOpenMerchant,
+			wantCode: codes.NotFound, wantMessage: "merchant not found",
+		},
+		{
+			name: "an expired invitation is failed precondition",
+			err:  domain.ErrInvitationExpired, call: viaOpenMerchant,
+			wantCode: codes.FailedPrecondition, wantMessage: "invitation has expired",
 		},
 	}
 
@@ -622,5 +666,77 @@ func TestLegacyEmployeeAdministrationIsClosed(t *testing.T) {
 				t.Errorf("message = %q, want the closed-administration message", got)
 			}
 		})
+	}
+}
+
+// TestMerchantMapping pins the merchant contract boundary: OpenMerchant maps the
+// domain merchant into the Merchant message (owner and timestamps included),
+// CanManageProduct forwards the session and merchant and returns the decision,
+// and a permission denial surfaces as PermissionDenied.
+func TestMerchantMapping(t *testing.T) {
+	t.Parallel()
+
+	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	stored := &domain.Merchant{
+		ID: "merchant-1", TenantID: "tenant-a", OwnerEmployeeID: "emp-9",
+		Name: "Toko Bunda", CreatedAt: created, UpdatedAt: created,
+	}
+
+	impl := newServiceUnderTest(&fakeService{
+		openMerchant: func(_ context.Context, sessionID, name string) (*domain.Merchant, error) {
+			if sessionID != "sess-1" {
+				t.Errorf("OpenMerchant session = %q, want sess-1", sessionID)
+			}
+			if name != "Toko Bunda" {
+				t.Errorf("OpenMerchant name = %q, want Toko Bunda", name)
+			}
+			return stored, nil
+		},
+		canManageProduct: func(_ context.Context, sessionID, merchantID string) (bool, error) {
+			if sessionID != "sess-1" || merchantID != "merchant-1" {
+				t.Errorf("CanManageProduct session/merchant = %q/%q, want sess-1/merchant-1", sessionID, merchantID)
+			}
+			return true, nil
+		},
+	})
+
+	resp, err := impl.OpenMerchant(context.Background(), &authv1.OpenMerchantRequest{SessionId: "sess-1", Name: "Toko Bunda"})
+	if err != nil {
+		t.Fatalf("OpenMerchant: %v", err)
+	}
+	got := resp.GetMerchant()
+	if got == nil {
+		t.Fatal("OpenMerchant returned no merchant")
+	}
+	if got.GetId() != "merchant-1" || got.GetTenantId() != "tenant-a" || got.GetOwnerEmployeeId() != "emp-9" {
+		t.Errorf("merchant identity = %q/%q/%q, want merchant-1/tenant-a/emp-9",
+			got.GetId(), got.GetTenantId(), got.GetOwnerEmployeeId())
+	}
+	if got.GetName() != "Toko Bunda" {
+		t.Errorf("merchant name = %q, want Toko Bunda", got.GetName())
+	}
+	if !got.GetCreatedAt().AsTime().Equal(created) {
+		t.Errorf("created_at = %v, want %v", got.GetCreatedAt().AsTime(), created)
+	}
+
+	decision, err := impl.CanManageProduct(context.Background(), &authv1.CanManageProductRequest{SessionId: "sess-1", MerchantId: "merchant-1"})
+	if err != nil {
+		t.Fatalf("CanManageProduct: %v", err)
+	}
+	if !decision.GetAllowed() {
+		t.Error("CanManageProduct allowed = false, want true")
+	}
+
+	denyImpl := newServiceUnderTest(&fakeService{
+		canManageProduct: func(context.Context, string, string) (bool, error) {
+			return false, nil
+		},
+	})
+	denied, err := denyImpl.CanManageProduct(context.Background(), &authv1.CanManageProductRequest{SessionId: "sess-1", MerchantId: "merchant-1"})
+	if err != nil {
+		t.Fatalf("CanManageProduct(denied): %v", err)
+	}
+	if denied.GetAllowed() {
+		t.Error("CanManageProduct allowed = true, want false")
 	}
 }

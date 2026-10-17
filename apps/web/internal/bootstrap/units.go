@@ -81,26 +81,42 @@ const (
 	pagesDir   = "internal/pages"
 )
 
+// upstream is one dependency the gateway calls, with its readiness class
+// attached.
+type upstream struct {
+	name string
+
+	// optional is the readiness class: true means an open breaker on this
+	// upstream degrades the surfaces that need it without taking the gateway
+	// out of rotation. Declaring it here and nowhere else is what keeps the
+	// classification visible in one table.
+	optional bool
+}
+
 // breakerUpstreams lists every upstream the gateway calls, in the order its
 // breakers are contributed.
 //
 // Every entry is both a named breaker and a member of the contributed breaker
 // group that the ops readiness probe reads, so an upstream cannot be added
-// without becoming visible to the load balancer. Reading the map for metrics
-// off that same group is what makes a new upstream automatic there too.
+// without becoming visible to the load balancer and classified for readiness.
+// Reading the map for metrics off that same group is what makes a new upstream
+// automatic there too.
 //
 // inventory, sales and auth are reached in-process through grpcx.InProcess, but
 // they are still real dependencies that can fail, so they get breakers on the
 // same terms as the remote ones. The product-platform four are separate breakers
-// on purpose: the storefront must keep serving browse while search is down.
-var breakerUpstreams = []string{
-	upstreamProduct,
-	upstreamProductListing,
-	upstreamProductSearch,
-	upstreamCategory,
-	upstreamInventory,
-	upstreamSales,
-	upstreamAuth,
+// on purpose: the storefront must keep serving browse while search is down —
+// which is why search is the one upstream readiness does not gate on. A browse
+// outage still fails readiness: without the grid there is no storefront left to
+// keep serving (see TestBrowseOutageIsReportedRatherThanRenderedAsEmpty).
+var breakerUpstreams = []upstream{
+	{name: upstreamProduct},
+	{name: upstreamProductListing},
+	{name: upstreamProductSearch, optional: true},
+	{name: upstreamCategory},
+	{name: upstreamInventory},
+	{name: upstreamSales},
+	{name: upstreamAuth},
 }
 
 // registerUnits contributes every declared unit to the container.
@@ -112,9 +128,26 @@ func registerUnits(b *fdi.Builder) {
 
 // registerUpstreamBreakers gives every declared upstream a breaker.
 func registerUpstreamBreakers(b *fdi.Builder) {
-	for _, upstream := range breakerUpstreams {
-		contributeBreaker(b, upstream)
+	for _, u := range breakerUpstreams {
+		contributeBreaker(b, u.name)
 	}
+}
+
+// ReadinessPolicy is this root's classification of the declared upstreams,
+// derived from the table so the two cannot drift: an optional upstream is one
+// the gateway keeps serving without.
+//
+// Exported because the integration fakestack mirrors the composition root by
+// hand and must apply the same classification, not a copy of it that can
+// silently drift from the table.
+func ReadinessPolicy() ops.ReadinessPolicy {
+	var optional []string
+	for _, u := range breakerUpstreams {
+		if u.optional {
+			optional = append(optional, u.name)
+		}
+	}
+	return ops.ReadinessPolicy{Optional: optional}
 }
 
 // moduleUnits returns the units that must be added to the module registry, in

@@ -22,6 +22,10 @@ type CreateProductRequest struct {
 	Status         Status                 `json:"status"`
 	PrimaryMediaID *int64                 `json:"primary_media_id"`
 	Variants       []CreateVariantRequest `json:"variants"`
+	// MerchantID scopes the product to a merchant owned by the calling tenant.
+	// Empty means unowned, which is how products created before merchants
+	// existed remain representable.
+	MerchantID string `json:"merchant_id"`
 }
 
 // CreateVariantRequest is the input for creating a variant.

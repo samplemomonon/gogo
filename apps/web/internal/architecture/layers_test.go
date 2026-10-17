@@ -211,15 +211,14 @@ func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
 	// added silently, and each one says why it exists and what would retire it.
 	// A rule with a quiet exception is worse than no rule, because the next
 	// person cannot tell which edges were checked.
-	compositionExceptions := map[string]string{
-		"gogo/internal/modules/sales/infrastructure/inventoryclient": "the sales module " +
-			"applies a sale's stock effect through inventory, and its compose.Build takes the " +
-			"StockAdjuster port — the composition root supplies the gRPC adapter that satisfies " +
-			"it. auth and inventory build their own adapters inside compose, so sales is the " +
-			"outlier. Retiring this means moving inventoryclient.New into sales/compose, which " +
-			"changes that module's API and its integration tests — a design change, not a lint " +
-			"fix. Owner: T2 (Merchant Console).",
-	}
+	//
+	// It is empty. The last entry — bootstrap importing the sales module's
+	// inventoryclient adapter — was retired by moving inventoryclient.New into
+	// sales/compose as compose.NewInventoryAdjuster, so bootstrap now reaches
+	// sales only through its composition root, exactly as it reaches auth and
+	// inventory. The ledger stays so the next exception is written down where
+	// its rule is enforced, not so it can be filled again.
+	compositionExceptions := map[string]string{}
 
 	// These are the layers that carry a module's business: rules in domain, use
 	// cases in application, rules again in the adapters that implement them.

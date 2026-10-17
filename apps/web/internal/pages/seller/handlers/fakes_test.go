@@ -199,14 +199,28 @@ type fakeSales struct {
 	lastVoid     voidCall
 }
 
-type fakeEmployeeSessions struct{}
+type fakeEmployeeSessions struct {
+	merchants  []results.Merchant
+	denyManage bool
+}
 
-func (fakeEmployeeSessions) Current(context.Context, string) (*results.Employee, error) {
+func (f fakeEmployeeSessions) Current(context.Context, string) (*results.Employee, error) {
 	return &results.Employee{ID: "employee-1", Name: "Budi", Role: "seller"}, nil
 }
 
-func (fakeEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+func (f fakeEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
 	return true, nil
+}
+
+func (f fakeEmployeeSessions) ListMyMerchants(context.Context, string) ([]results.Merchant, error) {
+	if f.merchants != nil {
+		return f.merchants, nil
+	}
+	return []results.Merchant{{ID: "merchant-1", OwnerEmployeeID: "employee-1", Name: "Toko Budi"}}, nil
+}
+
+func (f fakeEmployeeSessions) CanManageProduct(context.Context, string, string) (bool, error) {
+	return !f.denyManage, nil
 }
 
 type checkoutCall struct {
@@ -261,15 +275,22 @@ func (f *fakeSales) Void(_ context.Context, id, by, reason string) (*results.Tra
 // one transaction.
 func newConsole(t *testing.T) (*chi.Mux, *fakeCatalog, *fakeInventory, *fakeSales) {
 	t.Helper()
+	return newConsoleWithSessions(t, fakeEmployeeSessions{})
+}
+
+// newConsoleWithSessions wires the console with an explicit employee-session
+// fake, so a test can vary the merchant PDP (deny a karyawan, list merchants).
+func newConsoleWithSessions(t *testing.T, sessions fakeEmployeeSessions) (*chi.Mux, *fakeCatalog, *fakeInventory, *fakeSales) {
+	t.Helper()
 
 	catalog := &fakeCatalog{
 		products: []*results.Product{
 			{ID: "1", Name: "Kopi Susu", Slug: "kopi-susu", Brand: "Gogo",
-				CategoryID: "10", Price: 25000, Currency: "IDR", Status: "active"},
+				CategoryID: "10", Price: 25000, Currency: "IDR", Status: "active", MerchantID: "merchant-1"},
 			{ID: "2", Name: "Produk Draf", Slug: "produk-draf",
-				CategoryID: "10", Price: 15000, Currency: "IDR", Status: "draft"},
+				CategoryID: "10", Price: 15000, Currency: "IDR", Status: "draft", MerchantID: "merchant-1"},
 			{ID: "3", Name: "Teh", Slug: "teh",
-				CategoryID: "10", Price: 8000, Currency: "IDR", Status: "active"},
+				CategoryID: "10", Price: 8000, Currency: "IDR", Status: "active", MerchantID: "merchant-1"},
 		},
 		categories: []*results.Category{{ID: "10", Name: "Minuman"}},
 	}
@@ -287,7 +308,7 @@ func newConsole(t *testing.T) (*chi.Mux, *fakeCatalog, *fakeInventory, *fakeSale
 		PaymentMethod: "Tunai", Cashier: "Budi", CreatedAt: time.Now(),
 	}}}
 
-	handler := handlers.NewHandler(catalog, inventory, sales, fakeEmployeeSessions{}, discardLogger())
+	handler := handlers.NewHandler(catalog, inventory, sales, sessions, discardLogger())
 	router := chi.NewRouter()
 	router.Route("/seller", func(r chi.Router) {
 		r.Use(handler.RequireEmployee)

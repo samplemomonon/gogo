@@ -24,10 +24,12 @@ type Module struct {
 }
 
 // NewModule wires the auth module around an explicit employee/session store.
-// ping backs the health report; pass nil for the in-memory store.
-func NewModule(store ports.EmployeeStore, sessionStore ports.SessionStore, ping func(context.Context) error, logger *slog.Logger, authorization ...ports.AuthorizationStore) *Module {
+// ping backs the health report; pass nil for the in-memory store. merchantStore
+// powers the merchant relationship use cases; the tenant-scoped RBAC surface
+// works without it.
+func NewModule(store ports.EmployeeStore, sessionStore ports.SessionStore, merchantStore ports.MerchantStore, ping func(context.Context) error, logger *slog.Logger, authorization ...ports.AuthorizationStore) *Module {
 	return &Module{
-		svc:    application.NewService(store, sessionStore, 0, 0, authorization...),
+		svc:    application.NewService(store, sessionStore, 0, 0, merchantStore, authorization...),
 		logger: logger,
 		ping:   ping,
 	}

@@ -13,6 +13,7 @@ import (
 
 var _ ports.EmployeeStore = (*Store)(nil)
 var _ ports.SessionStore = (*Store)(nil)
+var _ ports.MerchantStore = (*Store)(nil)
 
 // Store is the in-memory auth store.
 type Store struct {
@@ -20,13 +21,24 @@ type Store struct {
 	employees map[string]*domain.Employee
 	sessions  map[string]*domain.Session
 	byEmail   map[string]string // email -> employeeID
+
+	merchants     map[string]*domain.Merchant           // tenant:merchantID
+	memberships   map[string]*domain.Membership         // tenant:merchantID:employeeID
+	invitations   map[string]*domain.Invitation         // tenant:invitationID
+	invitationTok map[string]string                     // token -> tenant:invitationID
+	merchantPerms map[string]*domain.MerchantPermission // tenant:merchantID:employeeID:permissionKey
 }
 
 func NewStore() *Store {
 	return &Store{
-		employees: make(map[string]*domain.Employee),
-		sessions:  make(map[string]*domain.Session),
-		byEmail:   make(map[string]string),
+		employees:     make(map[string]*domain.Employee),
+		sessions:      make(map[string]*domain.Session),
+		byEmail:       make(map[string]string),
+		merchants:     make(map[string]*domain.Merchant),
+		memberships:   make(map[string]*domain.Membership),
+		invitations:   make(map[string]*domain.Invitation),
+		invitationTok: make(map[string]string),
+		merchantPerms: make(map[string]*domain.MerchantPermission),
 	}
 }
 

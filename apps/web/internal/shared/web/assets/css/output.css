@@ -3385,6 +3385,62 @@
     }
   }
   @layer daisyui.l1.l2.l3 {
+    .rating {
+      position: relative;
+      display: inline-flex;
+      vertical-align: middle;
+      --size: var(--size-selector, 0.25rem) * 6;
+    }
+    .rating input {
+      cursor: pointer;
+      appearance: none;
+    }
+    .rating * {
+      border-radius: 0;
+      background-color: var(--color-base-content);
+      opacity: 20%;
+      width: calc(var(--size) * 1);
+      height: calc(var(--size));
+    }
+    @media (forced-colors: active) {
+      .rating * {
+        background-color: CanvasText;
+        forced-color-adjust: none;
+      }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .rating * {
+        animation: rating 0.25s ease-out;
+      }
+    }
+    .rating .rating-hidden {
+      width: calc(0.25rem * 2);
+      background-color: transparent;
+    }
+    .rating :checked {
+      opacity: 100%;
+    }
+    .rating [aria-checked="true"] {
+      opacity: 100%;
+    }
+    .rating [aria-current="true"] {
+      opacity: 100%;
+    }
+    .rating :has( ~ :checked,  ~ [aria-checked="true"],  ~ [aria-current="true"]) {
+      opacity: 100%;
+    }
+    .rating :focus-visible {
+      scale: 1.1;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .rating :focus-visible {
+        transition: scale 0.2s ease-out;
+      }
+    }
+    .rating :active:focus {
+      animation: none;
+      scale: 1.1;
+    }
     .navbar {
       display: flex;
       width: 100%;

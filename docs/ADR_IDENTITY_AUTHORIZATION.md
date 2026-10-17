@@ -192,9 +192,16 @@ depth.
    audited transactionally.
 4. ✅ Add PDP decisions and route PEP checks. Add the same decision at
    application mutation boundaries in owning services before production use.
-5. Add relationship providers only when seller/store membership data has an
-   agreed owner and source of truth. Consider an external engine only when
-   measured policy complexity or cross-service policy governance justifies it.
+5. ✅ Add the relationship provider. The merchant relationship now has an agreed
+   owner and source of truth — the auth module's `merchant`,
+   `merchant_memberships` and `merchant_invitations` tables
+   ([D-022](../ARCHITECTURE.md#d-022)) — so the deferred ReBAC step is taken
+   natively rather than with an external engine: `CanManageProduct` allows a
+   merchant's owner always and a `karyawan` only under an owner-granted
+   merchant-scoped `seller.catalog.manage`. Products carry `merchant_id`, and the
+   seller console's create/update/delete enforce the decision before the write
+   reaches the platform. Still deferred: narrowing product *visibility* to the
+   member's merchant, and an employee's own credential-management lifecycle.
 6. Add durable decision/audit evidence and bounded caching only after the event
    scope is approved and the performance baseline supplies a cache budget.
 

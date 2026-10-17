@@ -168,6 +168,7 @@ func toInput(input results.ProductInput) productconsumer.Input {
 		Stock:         input.Stock,
 		Status:        productconsumer.Status(input.Status),
 		CategoryID:    input.CategoryID,
+		MerchantID:    input.MerchantID,
 	}
 }
 
@@ -193,6 +194,7 @@ func toProduct(core productconsumer.Core) *results.Product {
 		Currency:      core.Currency,
 		Status:        string(core.Status),
 		CategoryID:    core.CategoryID,
+		MerchantID:    core.MerchantID,
 	}
 }
 

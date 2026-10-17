@@ -35,6 +35,9 @@ func (uc *CreateProductUseCase) Execute(ctx context.Context, req *product.Create
 	if err := product.ValidateAttributes(req.ProductTypeID, req.SchemaVersion, req.Attributes); err != nil {
 		return nil, err
 	}
+	if err := product.ValidateMerchantID(req.MerchantID); err != nil {
+		return nil, err
+	}
 	// Validate and prepare variants
 	variants, err := uc.prepareVariants(ctx, req.Variants, req.Currency)
 	if err != nil {
@@ -94,6 +97,7 @@ func (uc *CreateProductUseCase) Execute(ctx context.Context, req *product.Create
 	p.ProductTypeID = req.ProductTypeID
 	p.SchemaVersion = req.SchemaVersion
 	p.Attributes = cloneAttributeValues(req.Attributes)
+	p.MerchantID = strings.TrimSpace(req.MerchantID)
 
 	// Persist in transaction with events
 	created, err := uc.persistProduct(ctx, p, variants)

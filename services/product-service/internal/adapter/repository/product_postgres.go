@@ -18,7 +18,7 @@ import (
 
 const productColumns = `id, category_id, name, slug, description, brand,
 	price_cents, currency, stock, status, primary_media_id, product_type_id,
-	schema_version, attributes, created_at, updated_at`
+	schema_version, attributes, created_at, updated_at, merchant_id`
 
 const variantColumns = `id, product_id, sku, name, price_cents, currency, stock, media_id, created_at, updated_at`
 
@@ -109,9 +109,9 @@ func (r *ProductPostgres) CreateProduct(ctx context.Context, p *product.Product,
 		INSERT INTO products (
 			category_id, name, slug, description, brand,
 			price_cents, currency, stock, status, primary_media_id,
-			product_type_id, schema_version, attributes
+			product_type_id, schema_version, attributes, merchant_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING ` + productColumns
 
 	row := scannedProduct{}
@@ -129,6 +129,7 @@ func (r *ProductPostgres) CreateProduct(ctx context.Context, p *product.Product,
 		p.ProductTypeID,
 		p.SchemaVersion,
 		marshalAttributes(p.Attributes),
+		p.MerchantID,
 	).Scan(row.scanDest()...)
 	if err != nil {
 		return nil, translateWriteError("create product", err, p.Slug)
@@ -437,6 +438,7 @@ type scannedProduct struct {
 	attributes     []byte
 	createdAt      time.Time
 	updatedAt      time.Time
+	merchantID     string
 }
 
 func (s scannedProduct) product() *product.Product {
@@ -452,10 +454,11 @@ func (s scannedProduct) product() *product.Product {
 			Amount:   s.priceCents,
 			Currency: product.Currency(strings.TrimSpace(s.currency)),
 		},
-		Stock:     s.stock,
-		Status:    product.Status(s.status),
-		CreatedAt: s.createdAt,
-		UpdatedAt: s.updatedAt,
+		Stock:      s.stock,
+		Status:     product.Status(s.status),
+		CreatedAt:  s.createdAt,
+		UpdatedAt:  s.updatedAt,
+		MerchantID: s.merchantID,
 	}
 	_ = json.Unmarshal(s.attributes, &p.Attributes)
 	if s.description.Valid {
@@ -491,6 +494,7 @@ func (s *scannedProduct) scanDest() []any {
 		&s.attributes,
 		&s.createdAt,
 		&s.updatedAt,
+		&s.merchantID,
 	}
 }
 

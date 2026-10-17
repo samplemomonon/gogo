@@ -391,3 +391,29 @@ func TestReadinessReflectsAnOpenPlatformBreaker(t *testing.T) {
 		t.Errorf("readyz with an open browse breaker = %d, want 503", resp.StatusCode)
 	}
 }
+
+// Search is classified optional, so its outage must not take the instance out of
+// rotation: the load balancer would otherwise drain a gateway that still serves
+// browse, which is exactly what the separate breakers exist to avoid
+// (TestSearchOutageDoesNotBlankTheStorefront pins the page-level half).
+func TestReadinessIgnoresAnOptionalUpstream(t *testing.T) {
+	t.Parallel()
+
+	gateway := newTestGateway(t, config.TenantConfig{})
+	gateway.platform.mu.Lock()
+	gateway.platform.searchFails = true
+	gateway.platform.mu.Unlock()
+
+	// Trip the search breaker the way repeated transport failures would: a term
+	// at or above the search contract's minimum routes to search, not browse.
+	for range 6 {
+		request(t, http.MethodGet, gateway.server.URL, "/?q=aurora", "", nil, nil)
+	}
+
+	if state := gateway.breakers.Search.State(); state != breaker.StateOpen {
+		t.Fatalf("search breaker = %v, want open after repeated failures", state)
+	}
+	if resp, _ := request(t, http.MethodGet, gateway.server.URL, "/readyz", "", nil, nil); resp.StatusCode != http.StatusOK {
+		t.Errorf("readyz with an open search breaker = %d, want 200 (search is optional)", resp.StatusCode)
+	}
+}

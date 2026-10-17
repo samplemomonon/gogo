@@ -60,7 +60,7 @@ func TestReadinessNamesTheUnreachableUpstream(t *testing.T) {
 
 	probe := Readiness(registry, []fdi.Member[*breaker.Breaker]{
 		{Name: "catalog", Value: tripOpen(t)},
-	})
+	}, ReadinessPolicy{})
 
 	err := probe(context.Background())
 	if err == nil {
@@ -68,6 +68,42 @@ func TestReadinessNamesTheUnreachableUpstream(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "catalog") {
 		t.Errorf("error %q does not name the unreachable upstream", err)
+	}
+}
+
+// TestReadinessSkipsOptionalUpstreams pins the classification: an open breaker
+// on an optional upstream degrades the surfaces that need it without taking the
+// instance out of rotation, while a required upstream's open breaker still
+// fails readiness and is named in the error.
+func TestReadinessSkipsOptionalUpstreams(t *testing.T) {
+	t.Parallel()
+
+	registry := module.NewRegistry("gogo", "test")
+	registry.Add(reportedModule{
+		moduleName: "catalog",
+		health:     module.Health{Module: "catalog", Status: module.StatusOK},
+	})
+
+	policy := ReadinessPolicy{Optional: []string{"search"}}
+
+	probe := Readiness(registry, []fdi.Member[*breaker.Breaker]{
+		{Name: "browse", Value: breaker.NewDefault()},
+		{Name: "search", Value: tripOpen(t)},
+	}, policy)
+	if err := probe(context.Background()); err != nil {
+		t.Errorf("Readiness = %v, want ready while only an optional upstream is down", err)
+	}
+
+	probe = Readiness(registry, []fdi.Member[*breaker.Breaker]{
+		{Name: "browse", Value: tripOpen(t)},
+		{Name: "search", Value: tripOpen(t)},
+	}, policy)
+	err := probe(context.Background())
+	if err == nil {
+		t.Fatal("Readiness reported ready while a required upstream breaker was open")
+	}
+	if !strings.Contains(err.Error(), "browse") {
+		t.Errorf("error %q does not name the required upstream", err)
 	}
 }
 
@@ -86,7 +122,7 @@ func TestReadinessPassesWhenEveryUpstreamIsClosed(t *testing.T) {
 	probe := Readiness(registry, []fdi.Member[*breaker.Breaker]{
 		{Name: "catalog", Value: breaker.NewDefault()},
 		{Name: "listing", Value: breaker.NewDefault()},
-	})
+	}, ReadinessPolicy{})
 
 	if err := probe(context.Background()); err != nil {
 		t.Errorf("Readiness = %v, want ready with closed breakers", err)
@@ -99,7 +135,7 @@ func TestReadinessPassesWhenEveryUpstreamIsClosed(t *testing.T) {
 func TestReadinessPassesWithNoUpstreams(t *testing.T) {
 	t.Parallel()
 
-	probe := Readiness(module.NewRegistry("gogo", "test"), nil)
+	probe := Readiness(module.NewRegistry("gogo", "test"), nil, ReadinessPolicy{})
 
 	if err := probe(context.Background()); err != nil {
 		t.Errorf("Readiness = %v, want ready with no upstreams", err)
@@ -117,7 +153,7 @@ func TestReadinessExcludesOpsOwnReport(t *testing.T) {
 		return errors.New("ops is down")
 	}))
 
-	probe := Readiness(registry, nil)
+	probe := Readiness(registry, nil, ReadinessPolicy{})
 
 	if err := probe(context.Background()); err != nil {
 		t.Errorf("Readiness = %v, want the probe to exclude ops from its own aggregation", err)
@@ -138,7 +174,7 @@ func TestReadinessFailsWhenAnotherModuleIsDown(t *testing.T) {
 
 	probe := Readiness(registry, []fdi.Member[*breaker.Breaker]{
 		{Name: "catalog", Value: breaker.NewDefault()},
-	})
+	}, ReadinessPolicy{})
 
 	if err := probe(context.Background()); err == nil {
 		t.Error("Readiness reported ready while another module was down")

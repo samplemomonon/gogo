@@ -12,6 +12,13 @@ type Employee struct {
 	Role string
 }
 
+// Merchant is a merchant the seller belongs to.
+type Merchant struct {
+	ID              string
+	OwnerEmployeeID string
+	Name            string
+}
+
 // Product is the console's product read model.
 //
 // Field notes, because the platform's contracts do not carry everything this shape
@@ -45,6 +52,9 @@ type Product struct {
 	Currency      string
 	Status        string
 	CategoryID    string
+	// MerchantID names the merchant that owns this product. It drives the
+	// console's write gate: only the owning merchant's members may change it.
+	MerchantID string
 }
 
 // ProductInput is what a product write carries. It is a separate type from Product
@@ -70,6 +80,8 @@ type ProductInput struct {
 	Stock         int
 	Status        string
 	CategoryID    string
+	// MerchantID scopes a created product to a merchant owned by the caller.
+	MerchantID string
 }
 
 type ProductType struct {

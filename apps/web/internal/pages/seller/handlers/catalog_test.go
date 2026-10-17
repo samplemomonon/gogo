@@ -35,6 +35,7 @@ func TestProductCreateForwardsTheTrimmedFormAndRedirects(t *testing.T) {
 		Name: "Kopi Susu", Slug: "kopi-susu", Description: "Enak", Brand: "Gogo",
 		Price: 25000, Currency: "IDR", Stock: 3, Status: "active", CategoryID: "10",
 		ProductTypeID: "general", SchemaVersion: 1, Attributes: map[string]string{},
+		MerchantID: "merchant-1",
 	}
 	if !reflect.DeepEqual(catalog.lastCreate, want) {
 		t.Errorf("create input = %+v, want %+v", catalog.lastCreate, want)
@@ -88,14 +89,14 @@ func TestProductUpdateReadsTheIDFromThePath(t *testing.T) {
 
 	router, catalog, _, _ := newConsole(t)
 
-	rec := do(t, router, postReq("/seller/produk/42",
-		"id=1&name=Kopi+Susu&slug=kopi-susu&price=26000&stock=9&status=active&categoryId=10"))
+	rec := do(t, router, postReq("/seller/produk/1",
+		"id=99&name=Kopi+Susu&slug=kopi-susu&price=26000&stock=9&status=active&categoryId=10"))
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("update status = %d, want 303", rec.Code)
 	}
-	if catalog.lastUpdateID != "42" {
-		t.Errorf("update id = %q, want the path's 42, not the form's id", catalog.lastUpdateID)
+	if catalog.lastUpdateID != "1" {
+		t.Errorf("update id = %q, want the path's 1, not the form's id", catalog.lastUpdateID)
 	}
 	if got := rec.Header().Get("Location"); got != "/seller/produk" {
 		t.Errorf("Location = %q, want /seller/produk", got)
@@ -108,7 +109,7 @@ func TestProductUpdateFailureReRendersWithTheMappedMessage(t *testing.T) {
 	router, catalog, _, _ := newConsole(t)
 	catalog.updateErr = productconsumer.ErrInvalid
 
-	rec := do(t, router, postReq("/seller/produk/42", "name=Kopi&price=26000&status=active"))
+	rec := do(t, router, postReq("/seller/produk/1", "name=Kopi&price=26000&status=active"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (the form re-renders)", rec.Code)
@@ -123,30 +124,58 @@ func TestProductDeleteForwardsTheIDAndRedirects(t *testing.T) {
 
 	router, catalog, _, _ := newConsole(t)
 
-	rec := do(t, router, postReq("/seller/produk/42/delete", ""))
+	rec := do(t, router, postReq("/seller/produk/1/delete", ""))
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("delete status = %d, want 303", rec.Code)
 	}
-	if catalog.lastDeleteID != "42" {
-		t.Errorf("delete id = %q, want 42 from the path", catalog.lastDeleteID)
+	if catalog.lastDeleteID != "1" {
+		t.Errorf("delete id = %q, want 1 from the path", catalog.lastDeleteID)
 	}
 	if got := rec.Header().Get("Location"); got != "/seller/produk" {
 		t.Errorf("Location = %q, want /seller/produk", got)
 	}
 }
 
-// TestProductDeleteOfAnAlreadyGoneRowShowsNotFound pins the adapter's "deleted:
-// false" answer rendered through the write path: the delete raced someone else and
-// lost, so the cashier is told the product is not found at 200 (the form
-// re-renders) rather than being sent to a 404 page.
+// TestProductMutationForbiddenForNonOwner pins the merchant write gate: an
+// employee who is not a member of the product's merchant (or who holds no
+// merchant-scoped grant) is refused 403 before the write reaches the platform.
+func TestProductMutationForbiddenForNonOwner(t *testing.T) {
+	t.Parallel()
+
+	router, catalog, _, _ := newConsoleWithSessions(t, fakeEmployeeSessions{denyManage: true})
+
+	rec := do(t, router, postReq("/seller/produk", "productTypeId=general&schemaVersion=1&name=Kopi&price=1000&status=active"))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("create status = %d, want 403", rec.Code)
+	}
+	if catalog.lastCreate.Name != "" {
+		t.Errorf("create reached the catalog despite a deny: %q", catalog.lastCreate.Name)
+	}
+
+	rec = do(t, router, postReq("/seller/produk/1", "name=Kopi&price=1000&status=active"))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("update status = %d, want 403", rec.Code)
+	}
+	if catalog.lastUpdateID != "" {
+		t.Errorf("update reached the catalog despite a deny: id = %q", catalog.lastUpdateID)
+	}
+
+	rec = do(t, router, postReq("/seller/produk/1/delete", ""))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("delete status = %d, want 403", rec.Code)
+	}
+	if catalog.lastDeleteID != "" {
+		t.Errorf("delete reached the catalog despite a deny: id = %q", catalog.lastDeleteID)
+	}
+}
 func TestProductDeleteOfAnAlreadyGoneRowShowsNotFound(t *testing.T) {
 	t.Parallel()
 
 	router, catalog, _, _ := newConsole(t)
 	catalog.deleteErr = productconsumer.ErrNotFound
 
-	rec := do(t, router, postReq("/seller/produk/42/delete", ""))
+	rec := do(t, router, postReq("/seller/produk/1/delete", ""))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)

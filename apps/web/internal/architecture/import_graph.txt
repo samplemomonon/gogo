@@ -8,6 +8,7 @@
 # main-repo imports>. Test-only imports are excluded; external and
 # standard-library imports are omitted. Derived from `go list`.
 #
+gogo/cmd/authseed	gogo/internal/modules/auth/application,gogo/internal/modules/auth/domain,gogo/internal/modules/auth/infrastructure/postgres
 gogo/cmd/authzbootstrap	gogo/internal/modules/auth/infrastructure/postgres
 gogo/cmd/modulegen
 gogo/cmd/server	gogo/internal/bootstrap,gogo/internal/shared/config,gogo/internal/shared/logging
@@ -19,7 +20,7 @@ gogo/contracts/product/v1
 gogo/contracts/productlisting/v1
 gogo/contracts/productsearch/v1
 gogo/contracts/sales/v1
-gogo/internal/bootstrap	gogo/internal/modules/auth/compose,gogo/internal/modules/billing,gogo/internal/modules/inventory,gogo/internal/modules/inventory/compose,gogo/internal/modules/ops,gogo/internal/modules/sales/compose,gogo/internal/modules/sales/infrastructure/inventoryclient,gogo/internal/pages/auth,gogo/internal/pages/auth/application/ports,gogo/internal/pages/auth/infrastructure/authclient,gogo/internal/pages/contentcms,gogo/internal/pages/home,gogo/internal/pages/home/application/ports,gogo/internal/pages/home/infrastructure/listingclient,gogo/internal/pages/profile,gogo/internal/pages/profile/application/ports,gogo/internal/pages/profile/infrastructure/authclient,gogo/internal/pages/seller,gogo/internal/pages/seller/application/ports,gogo/internal/pages/seller/infrastructure/authclient,gogo/internal/pages/seller/infrastructure/catalogclient,gogo/internal/pages/seller/infrastructure/inventoryclient,gogo/internal/pages/seller/infrastructure/salesclient,gogo/internal/shared/authconsumer,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/events,gogo/internal/shared/foundation/adapter,gogo/internal/shared/foundation/di,gogo/internal/shared/grpcx,gogo/internal/shared/httpserver,gogo/internal/shared/kernel,gogo/internal/shared/module,gogo/internal/shared/productconsumer,gogo/internal/shared/productevents,gogo/internal/shared/web/session
+gogo/internal/bootstrap	gogo/internal/modules/auth/compose,gogo/internal/modules/billing,gogo/internal/modules/inventory,gogo/internal/modules/inventory/compose,gogo/internal/modules/ops,gogo/internal/modules/sales/compose,gogo/internal/pages/auth,gogo/internal/pages/auth/application/ports,gogo/internal/pages/auth/infrastructure/authclient,gogo/internal/pages/contentcms,gogo/internal/pages/home,gogo/internal/pages/home/application/ports,gogo/internal/pages/home/infrastructure/listingclient,gogo/internal/pages/profile,gogo/internal/pages/profile/application/ports,gogo/internal/pages/profile/infrastructure/authclient,gogo/internal/pages/seller,gogo/internal/pages/seller/application/ports,gogo/internal/pages/seller/infrastructure/authclient,gogo/internal/pages/seller/infrastructure/catalogclient,gogo/internal/pages/seller/infrastructure/inventoryclient,gogo/internal/pages/seller/infrastructure/salesclient,gogo/internal/shared/authconsumer,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/events,gogo/internal/shared/foundation/adapter,gogo/internal/shared/foundation/di,gogo/internal/shared/grpcx,gogo/internal/shared/httpserver,gogo/internal/shared/kernel,gogo/internal/shared/module,gogo/internal/shared/productconsumer,gogo/internal/shared/productevents,gogo/internal/shared/web/session
 gogo/internal/modules/auth	gogo/internal/modules/auth/application,gogo/internal/modules/auth/application/ports,gogo/internal/modules/auth/presentation/grpcservice,gogo/internal/shared/module
 gogo/internal/modules/auth/application	gogo/internal/modules/auth/application/ports,gogo/internal/modules/auth/domain
 gogo/internal/modules/auth/application/ports	gogo/internal/modules/auth/domain
@@ -44,7 +45,7 @@ gogo/internal/modules/ops	gogo/internal/shared/breaker,gogo/internal/shared/foun
 gogo/internal/modules/sales	gogo/internal/modules/sales/application,gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/presentation/grpcservice,gogo/internal/shared/module
 gogo/internal/modules/sales/application	gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/domain
 gogo/internal/modules/sales/application/ports	gogo/internal/modules/sales/domain
-gogo/internal/modules/sales/compose	gogo/internal/modules/sales,gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/infrastructure,gogo/internal/modules/sales/infrastructure/postgres,gogo/internal/modules/sales/presentation/grpcservice,gogo/internal/shared/config
+gogo/internal/modules/sales/compose	gogo/internal/modules/sales,gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/infrastructure,gogo/internal/modules/sales/infrastructure/inventoryclient,gogo/internal/modules/sales/infrastructure/postgres,gogo/internal/modules/sales/presentation/grpcservice,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/config
 gogo/internal/modules/sales/domain
 gogo/internal/modules/sales/infrastructure	gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/domain
 gogo/internal/modules/sales/infrastructure/inventoryclient	gogo/contracts/inventory/v1,gogo/internal/modules/sales/application/ports,gogo/internal/modules/sales/domain,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/tenant
@@ -97,7 +98,6 @@ gogo/internal/shared/foundation/validation	gogo/internal/shared/kernel
 gogo/internal/shared/grpcconsumer	gogo/internal/shared/breaker,gogo/internal/shared/tenant
 gogo/internal/shared/grpcx	gogo/internal/shared/authn,gogo/internal/shared/tenant
 gogo/internal/shared/httpserver	gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/module,gogo/internal/shared/netutil,gogo/internal/shared/tenant,gogo/internal/shared/web/assets,gogo/internal/shared/web/navigation,gogo/internal/shared/web/render,gogo/internal/shared/web/shell
-gogo/internal/shared/idgen
 gogo/internal/shared/kernel
 gogo/internal/shared/keyset
 gogo/internal/shared/logging	gogo/internal/shared/config

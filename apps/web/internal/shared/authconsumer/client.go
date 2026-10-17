@@ -69,6 +69,13 @@ type AuthorizationAdminEvent struct {
 	OccurredAt                                          time.Time
 }
 
+// Merchant is the shared, neutral merchant representation.
+type Merchant struct {
+	ID              string
+	OwnerEmployeeID string
+	Name            string
+}
+
 // Credentials is a login attempt.
 type Credentials struct {
 	TenantID string
@@ -210,6 +217,44 @@ func (c *Client) Authorize(ctx context.Context, sessionID, permissionKey string)
 		return Principal{}, false, err
 	}
 	return principal, allowed, nil
+}
+
+// CanManageProduct is the merchant-scoped PDP: may the employee holding the
+// session modify products in the merchant? An absent, expired or unauthorized
+// session yields allowed=false; infrastructure failures remain errors.
+func (c *Client) CanManageProduct(ctx context.Context, sessionID, merchantID string) (bool, error) {
+	if sessionID == "" || merchantID == "" {
+		return false, nil
+	}
+	resp, err := grpcconsumer.Do(c.caller, ctx, "check merchant product access", func(ctx context.Context) (*authv1.CanManageProductResponse, error) {
+		return c.auth.CanManageProduct(ctx, &authv1.CanManageProductRequest{
+			SessionId: sessionID, MerchantId: merchantID,
+		})
+	})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetAllowed(), nil
+}
+
+// ListMyMerchants returns the merchants the session employee belongs to. An
+// absent or unauthorized session yields an empty list; infrastructure failures
+// remain errors.
+func (c *Client) ListMyMerchants(ctx context.Context, sessionID string) ([]Merchant, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	resp, err := grpcconsumer.Do(c.caller, ctx, "list my merchants", func(ctx context.Context) (*authv1.ListMyMerchantsResponse, error) {
+		return c.auth.ListMyMerchants(ctx, &authv1.ListMyMerchantsRequest{SessionId: sessionID})
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Merchant, 0, len(resp.GetMerchants()))
+	for _, m := range resp.GetMerchants() {
+		out = append(out, Merchant{ID: m.GetId(), OwnerEmployeeID: m.GetOwnerEmployeeId(), Name: m.GetName()})
+	}
+	return out, nil
 }
 
 // ListEmployees returns a bounded tenant employee roster for authorized access

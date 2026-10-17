@@ -63,6 +63,11 @@ message Product {
   string product_type_id = 15;
   int32 schema_version = 16;
   map<string, string> attributes = 17;
+  // merchant_id names the merchant that owns this product, within the calling
+  // tenant. It references gogo's identity module, so there is no foreign key to
+  // enforce it. Empty means unowned: products stored before merchants existed,
+  // and products created without a merchant context, remain representable.
+  string merchant_id = 18;
 }
 
 message ListProductTypesRequest {}
@@ -111,6 +116,11 @@ message CreateProductRequest {
   string product_type_id = 12;
   int32 schema_version = 13;
   map<string, string> attributes = 14;
+  // Merchant_id scopes the product to a merchant owned by the calling tenant.
+  // Empty means unowned. Ownership is set at creation and carried by every
+  // event, which is what lets gogo's seller console enforce that only the
+  // owning merchant's members may change the product.
+  string merchant_id = 15;
 }
 
 // VariantSpec describes a variant to create alongside the product. It has no id

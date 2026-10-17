@@ -56,6 +56,11 @@ message Product {
   string product_type_id = 16;
   int32 schema_version = 17;
   map<string, string> attributes = 18;
+  // merchant_id names the merchant that owns this product, within the calling
+  // tenant. Empty means unowned. It is carried by the events product-service
+  // publishes, so a browse result can be scoped to one merchant without
+  // another service lookup.
+  string merchant_id = 19;
 }
 
 // Variant is a purchasable size or colour of a product.
@@ -99,6 +104,10 @@ message ListProductsRequest {
   int32 limit = 6;
   int32 offset = 7;
   bool include_variants = 8;
+  // Merchant_id filters to one merchant's products. Empty means unfiltered,
+  // which is what the storefront browse sends; the seller console sends the
+  // merchant it is scoped to.
+  string merchant_id = 9;
 }
 
 message ListProductsResponse {

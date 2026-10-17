@@ -66,6 +66,11 @@ type Product struct {
 	// same as UpdatedAt: an event can republish a product without changing it.
 	// It is exposed so a caller can tell how current its data is.
 	ProjectedAt time.Time `json:"projected_at"`
+	// MerchantID names the merchant that owns this product, inside gogo's
+	// identity module. Empty means unowned. It is projected from the write
+	// side's events, so the seller console can list and verify ownership
+	// without a synchronous call on every read.
+	MerchantID string `json:"merchant_id"`
 }
 
 // Variant is a purchasable size, colour or bundle of a product.
@@ -110,6 +115,10 @@ type ListProductsQuery struct {
 	Limit           int
 	Offset          int
 	IncludeVariants bool
+	// MerchantID filters to one merchant's products. Empty means unfiltered,
+	// which is what the storefront browse sends; the seller console sends the
+	// merchant it is scoped to.
+	MerchantID string
 }
 
 // ListProductsResult is a page of products together with the unpaged total.

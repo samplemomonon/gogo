@@ -12,9 +12,10 @@ ketika satu module (misal `catalog`) dihapus:
 | `httpserver`     | Gateway: router, middleware stack, injeksi nav federated + view HTML registry |
 | `grpcx`          | Transport gRPC: `Dial` (network) dan `InProcess` (bufconn) untuk koneksi swapable |
 | `grpcconsumer`   | Jalur panggilan gRPC terpusat: breaker + tenant + mapping status→error; menjaga sentinel outage tidak hilang |
-| `catalogconsumer`| Kit remote-client catalog: wrap catalog.v1, map wire→Core, satu kosakata error konsumen |
-| `listingconsumer`| Kit remote-client listing: wrap listing.v1, map wire→Core, keadaan breaker dan sentinel konsumen |
+| `productconsumer`| Satu-satunya paket yang boleh meng-import kontrak platform produk; memetakan empat wire shape → satu `Core` netral + status→error |
+| `productevents`  | Konsumen Kafka `product.events.v1` → republish `product.changed.*` di bus in-process (invalidasi cache + billing) |
 | `authconsumer`   | Kit remote-client auth: wrap auth.v1, satu kosakata error shared oleh auth dan profile |
+| `authn`          | Identitas request terautentikasi yang dibawa melintasi batas RPC internal |
 | `breaker`        | Circuit breaker untuk upstream gRPC yang dipakai oleh kit konsumen |
 | `config`         | Konfigurasi dari environment (startup validation)         |
 | `money`          | Format Rupiah (dipakai lintas view)                       |
@@ -27,7 +28,6 @@ ketika satu module (misal `catalog`) dihapus:
 | `version`        | Versi service yang di-inject linker saat build container (`-X …version.Version`), fallback ke placeholder dev |
 | `foundation`     | Kernel gateway: context, DI, logger dan kontrak module     |
 | `kernel`         | Primitif kernel gateway                                   |
-| `idgen`          | Generator ID (UUID) di belakang port                       |
 | `keyset`         | Encode/decode keyset cursor untuk path listing             |
 | `logging`        | Factory logger terstruktur (service/version/env)          |
 | `netutil`        | Parsing trusted proxies untuk RealIP middleware           |

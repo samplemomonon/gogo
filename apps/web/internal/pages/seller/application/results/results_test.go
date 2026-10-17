@@ -99,7 +99,7 @@ func TestProductReadModelFieldList(t *testing.T) {
 	t.Parallel()
 
 	product := reflect.TypeOf(results.Product{})
-	want := []string{"ID", "ProductTypeID", "SchemaVersion", "Attributes", "Name", "Slug", "Description", "Brand", "Price", "Currency", "Status", "CategoryID"}
+	want := []string{"ID", "ProductTypeID", "SchemaVersion", "Attributes", "Name", "Slug", "Description", "Brand", "Price", "Currency", "Status", "CategoryID", "MerchantID"}
 	assertExportedFields(t, product, want)
 
 	// The doc names these as gone from the platform's contracts. A field that
@@ -114,7 +114,7 @@ func TestProductReadModelFieldList(t *testing.T) {
 	// Money travels as minor units, and the write model is a distinct full-form
 	// shape: it carries Stock (once, at creation) and defaults nothing else.
 	input := reflect.TypeOf(results.ProductInput{})
-	assertExportedFields(t, input, []string{"ProductTypeID", "SchemaVersion", "Attributes", "Name", "Slug", "Description", "Brand", "Price", "Currency", "Stock", "Status", "CategoryID"})
+	assertExportedFields(t, input, []string{"ProductTypeID", "SchemaVersion", "Attributes", "Name", "Slug", "Description", "Brand", "Price", "Currency", "Stock", "Status", "CategoryID", "MerchantID"})
 	inputPrice, _ := input.FieldByName("Price")
 	if got := inputPrice.Type.Kind(); got != reflect.Int64 {
 		t.Errorf("ProductInput.Price is %s, want int64 minor units", got)

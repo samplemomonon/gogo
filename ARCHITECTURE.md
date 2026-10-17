@@ -254,6 +254,18 @@ platform does, and gogo consumes its feed ([section 3](#3-events-and-the-kernel-
 Any module added here that publishes events should follow this decision's shape
 rather than re-deriving it.
 
+### D-010 · *(retired number — no entry was ever written here)*
+**Date:** — · **Status:** tombstone, number permanently vacant
+The log jumps D-009 → D-011. That gap is original, not a loss: no revision of
+this file ever contained a D-010 entry (`git log --all -S "D-010" --
+ARCHITECTURE.md` returns nothing; the string elsewhere is only paperwork about
+the gap — `docs/FOLLOW_UP.md` item 7, `docs/TEAM_TOPOLOGIES_PRD.md` §0.4), so
+there is no text to recover. The number is
+retired rather than reused — reusing it would make a decision un-findable under
+a number that already has a history elsewhere, and future readers would have to
+guess whether something was deleted. `docs/TEAM_TOPOLOGIES_PRD.md` §0.4 records
+this as the closure of that prerequisite.
+
 ### D-011 · Multi-tenancy: shared schema with tenant_id + RLS, tenant on event payload
 **Date:** 2026-09-27 · **Status:** accepted · **Carries a known gap: see [D-018](#d-018)**
 
@@ -293,14 +305,18 @@ covers the tables gogo still owns (`inventory_stock`, the movement ledger, sales
 history).
 
 > **Known gap (not a decision to defer — a fact about the platform).** The
-> product platform has **no tenant concept**: no `tenant_id` in its migrations,
-> no tenant field in its contracts. So gogo stamps a tenant on every outbound
-> product call, and the platform ignores it — product data is global, while
-> everything gogo owns is tenant-scoped. That is a real inconsistency, not a
-> stylistic one, and it is invisible at runtime: one tenant's products are
-> visible to all. Closing it is upstream work in the platform (add `tenant_id`,
-> make the contracts carry it), not something gogo can enforce. See
-> [D-018](#d-018) and `docs/FOLLOW_UP.md`.
+> platform's product data has **no tenant concept**: product-service's
+> migrations carry no `tenant_id`, and `product.v1` / `productlisting.v1` /
+> `productsearch.v1` carry no tenant field. So gogo stamps a tenant on every
+> outbound product call, and those services ignore it — product data is global,
+> while everything gogo owns is tenant-scoped. (category-service is the one
+> exception: merchant categories are tenant-scoped through the `x-tenant-id`
+> metadata gogo already sends — see its `0002_merchant_categories.sql` and
+> `internal/tenant`.) That is a real inconsistency, not a stylistic one, and it
+> is invisible at runtime: one tenant's products are visible to all. Closing it
+> is upstream work in the platform (add `tenant_id`, make the contracts carry
+> it), not something gogo can enforce. See [D-018](#d-018) and
+> `docs/FOLLOW_UP.md`.
 
 **Protobuf field addition:** Adding a scalar `tenant` field (next unused
 number, never reused) to `ProductEvent` is **wire-safe** per
@@ -564,9 +580,12 @@ have made every page 503 for any single outage, which is strictly worse.
   store in gogo would recreate the two-authority problem this decision exists to
   end; the honest move is to record the gap.
 - **No tenant isolation for product data.** gogo is multi-tenant
-  ([D-011](#d-011)); the platform has **no tenant concept at all** — no
-  `tenant_id` in its migrations, no tenant in its contracts. gogo stamps a tenant
-  on every product call and the platform ignores it. This is a real leak between
+  ([D-011](#d-011)); the platform's **product data** services have no tenant
+  concept — product-service's migrations carry no `tenant_id`, and no tenant
+  field exists in `product.v1` / `productlisting.v1` / `productsearch.v1`
+  (category-service is the exception: merchant categories are tenant-scoped via
+  the `x-tenant-id` metadata — see [D-011](#d-011)). gogo stamps a tenant on
+  every product call and those services ignore it. This is a real leak between
   tenants, it is invisible at runtime (one tenant's products are visible to all),
   and it **cannot be fixed in gogo** — it needs `tenant_id` added upstream. Tracked
   in `docs/FOLLOW_UP.md`.
@@ -696,3 +715,83 @@ ADR, `TestCompositionLayerReachesNoModuleInternals` extends the forbidden set to
 cannot be distinguished from a broken parser, both predicates and the `public`
 grant are pinned on synthetic graphs in
 `internal/architecture/ui_contract_test.go`.
+
+### D-022 · The auth module owns the merchant relationship; only a merchant's members may change its products
+**Date:** 2026-10-17 · **Status:** accepted
+
+**Problem:** The authorization model is tenant-scoped RBAC
+([ADR_IDENTITY_AUTHORIZATION.md](docs/ADR_IDENTITY_AUTHORIZATION.md)), and
+tenant scope cannot answer "may this employee change *this* product?". Products
+belong to a merchant, but no authoritative store-relationship model existed: no
+aggregate recorded which employee owns which merchant or who its staff are. That
+ADR deferred ReBAC until exactly that model had an owner and a lifecycle —
+without it, "only the owning merchant's members" is unenforceable, and the
+seller console's `seller.catalog.manage` check answers the wrong question
+(tenant-wide) for a resource that is merchant-scoped.
+
+**Decision:** the auth module owns three aggregates
+(`internal/modules/auth/domain`), and their tables are the store relationship
+the ADR reserved:
+
+| Aggregate | Answers | Lifecycle |
+| --------- | ------- | --------- |
+| `Merchant` | which shop, and which employee owns it | opened by an authenticated employee |
+| `Membership` | that employee's role in the merchant: `owner` or `karyawan` | created with the merchant (owner) or on accepting an invitation (karyawan) |
+| `MerchantInvitation` | an owner's offer to add a karyawan | pending → accepted \| revoked \| expired, one-time token, 7-day TTL |
+
+Products in the platform carry `merchant_id` referencing these rows. There is
+deliberately **no** foreign key to the auth database from product-service, for
+the same reason `category_id` has none: a cross-service constraint couples two
+deployables' migration order. Auth validates a merchant over `auth.v1` instead.
+
+**The authority is merchant-scoped, and the PDP answers one question.**
+`CanManageProduct(session, merchant)` allows the merchant's **owner** always, and
+a **karyawan** only while the owner holds an active merchant-scoped
+`seller.catalog.manage` grant. `grantableMerchantPermissions` in the auth
+application layer is a code-owned allowlist that deliberately excludes the three
+`authz.*` administrative keys, so a merchant owner can delegate selling work and
+cannot delegate tenant policy administration through this path.
+
+**Account roles are derived, never stored.** `ReservedRole`
+(`pembeli` / `penjual` / `karyawan`) is a vocabulary, not a column: owning a
+merchant *is* being a `penjual`, being a non-owner member *is* being a `karyawan`,
+and every account is a `pembeli`. `domain.ReservedRoles` computes the labels
+from the relationship data, so the account a customer registers with carries no
+role row and granting a karyawan's permission changes no profile field. A
+second role column would be a third authority that could disagree with the
+relationships it summarizes.
+
+**Enforcement sits at the seller console's write boundary.** Product create,
+update and delete each resolve the target merchant and ask the PDP *before* the
+write reaches the platform (`internal/pages/seller/handlers`). A deny is 403; an
+auth outage is 503, so a failure is never read as a permission decision. Create
+is additionally scoped to a merchant the employee may manage and stamps that
+`merchant_id` on the new product; update and delete read the product's existing
+`merchant_id` from the browse read model, because ownership is fixed at creation
+(`UpdateProductRequest` carries no `merchant_id` — changing a product's merchant
+is a separate, unbuilt operation).
+
+**Two gaps recorded rather than hidden.** The seller console still *lists* the
+whole tenant's browse page: product visibility was not narrowed to the member's
+merchant, so the write gate is stricter than the read gate. And a karyawan's
+merchant-scoped grant does not by itself open the console's tenant-level routes,
+which still require a tenant RBAC capability (`make seed` grants one to the demo
+`penjual`). Both are follow-ups, not claims.
+
+**Verification found a shipped defect.** Running the seed against a live
+database — the first time these `authorization_employee_roles` writes were
+executed outside a unit test — failed with `column "revoked_by" does not exist`
+(SQLSTATE 42703). `AssignRole` and `RevokeRoleAssignment` have always written a
+column no migration created, so both PAP RPCs were broken against Postgres while
+their in-memory and hermetic tests passed. Migration `0011` adds it. The same
+exercise showed `merchant_memberships` had no employee foreign key while its
+sibling `authorization_employee_roles` does, so a membership could outlive its
+employee; migration `0012` adds it. Both are the argument for exercising an
+adapter against a real database at least once: the unit tests could not see
+either, and a green suite was not evidence.
+
+**`make seed` provisions the two identities the model needs:** `pembeli@toko.com`
+(a `pembeli`, no merchant) and `penjual@toko.com` (a `pembeli` **and** `penjual`,
+owning `Toko Bunda`), both with PIN `123456`. It is idempotent, and it refuses
+to run with `APP_ENV=production` because it creates a known-credential account
+and a policy administrator.

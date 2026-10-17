@@ -10,19 +10,23 @@ request flows.
 One breaker **per upstream** — `product`, `product-listing`, `product-search`,
 `category`, plus the in-process `inventory`, `sales` and `auth`. After 5
 consecutive *transport* failures a breaker opens, rejects calls without dialing,
-and its gateway leaves the load balancer. After a 5-second cooldown one probe is
-admitted; success closes it, failure reopens.
+and — for a required upstream — its gateway leaves the load balancer. After a
+5-second cooldown one probe is admitted; success closes it, failure reopens.
 
 Three things that are true here and usually are not:
 
 1. **Business rejections never trip a breaker.** A `NotFound` is the dependency
    working. `grpcconsumer` makes the transport-vs-business split structural
    rather than a convention anyone has to remember.
-2. **Readiness aggregates every breaker.** One open breaker means 503 on
-   `/readyz`, so the instance stops receiving traffic.
+2. **Readiness gates on every required breaker.** An open breaker on a required
+   upstream means 503 on `/readyz`, so the instance stops receiving traffic.
+   `search` is classified optional (the root's readiness policy), so its outage
+   degrades search without draining the instance.
 3. **A search outage does not take browse down.** The four product upstreams have
-   separate breakers, so `/` still serves when search fails — and returns 503
-   rather than a blank grid when browse fails.
+   separate breakers, so `/` still serves when search fails — at the page level
+   and at the traffic level, because search is the one optional readiness
+   upstream. When browse fails, `/` returns 503 rather than a blank grid, and
+   readiness drains the instance.
 
 ## Metrics
 

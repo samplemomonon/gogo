@@ -1,8 +1,10 @@
 # Migration Guide: Adopting the Foundation Packages
 
 How to bring a new module or page up to the foundation conventions the codebase
-already follows. Every "after" snippet here is copied from working code, so if
-one does not compile, that is a bug in this guide rather than in the example.
+already follows. Every "after" snippet that describes the tree's current wiring
+is copied from working code; the one forward-looking snippet (Step 4, publishing)
+is labelled as a shape rather than a copy, because no module in the tree
+publishes product events any more — the platform owns that write path (D-018).
 
 **What this is not:** a description of the current state. The previous version
 of this file was written against an earlier API (`AddSingleton` with string
@@ -12,7 +14,7 @@ was actively misleading. This version describes what is in the tree.
 Companion docs: [`ARCHITECTURE.md`](ARCHITECTURE.md) (the rules these steps
 serve — read the decision log first), [`docs/FOLLOW_UP.md`](docs/FOLLOW_UP.md)
 (what is deliberately *not* adopted), and
-[`internal/shared/foundation/README.md`](internal/shared/foundation/README.md)
+[`apps/web/internal/shared/foundation/README.md`](apps/web/internal/shared/foundation/README.md)
 (inventory of the foundation packages).
 
 ## What the foundation actually provides
@@ -26,7 +28,7 @@ useful as ideas, but each is implemented where its data lives.
 | `foundation/di` | the name- and type-keyed DI container | **yes** — every module and page |
 | `foundation/eventbus` | `MemoryBus` / `AsyncBus`, kernel-shaped subscriptions | **yes** — `adapter.EventBusAdapter` wraps the shared bus |
 | `foundation/adapter` | `EventBusAdapter` (shared bus → `kernel.EventBus`), `LoggerAdapter` | **yes** |
-| `kernel` | `EventBus`, `Event`, `EventHandler`, `Subscription`, `Logger` | **yes** — consumer-side |
+| `kernel` | `EventBus`, `Event`, `EventHandler`, `Subscription`, `Logger`, `Validator` | **yes** — consumer-side; `Validator` only via `validation` |
 | `foundation/audit` | structured audit log | no — see FOLLOW_UP item 3 |
 | `foundation/specification` | predicate composition | no — see item 3 |
 | `foundation/validation` | rule/struct-tag validator | no — the codebase validates in domain constructors |
@@ -42,17 +44,21 @@ and a second, unused owner for a concept is worse than no owner at all.
 
 ## Step 1: Declare the graph, type-keyed
 
-The container is built in the composition root (`internal/bootstrap/di.go`) and
-built once. Use `ProvideType` — keying by *type* is what lets a caller say
-`ResolveType[ports.Inventory]` without naming a service string, so renaming a
-service is a one-line change instead of a search across the tree.
+The container is built in the composition root (`apps/web/internal/bootstrap/di.go`)
+and built once. Process primitives — the config, the bus, the logger — are
+declared by name with `ProvideInstance`; the capabilities units consume are
+declared under their interface with `ProvideType`. Keying an interface by *type*
+is what lets a page say `ResolveType[ports.Inventory]` without naming a service
+string, so renaming a service is a one-line change instead of a search across
+the tree.
 
 ```go
-// internal/bootstrap/di.go — the composition root declares the whole graph
+// apps/web/internal/bootstrap/di.go — the composition root declares the graph
 b := fdi.NewBuilder()
-fdi.ProvideType[config.Config](b, func(*fdi.Container) (config.Config, error) {
-    return cfg, nil
-})
+fdi.ProvideInstance(b, serviceConfig, cfg)          // *config.AppConfig, name-keyed
+fdi.ProvideInstanceType[events.Bus](b, bus)         // the shared bus, resolved by type
+
+// A capability a page consumes, published under the page's own port type.
 fdi.ProvideType[sellerports.Inventory](b, func(c *fdi.Container) (sellerports.Inventory, error) {
     return fdi.ResolveAs[*sellerinventoryclient.Client](c, serviceSellerInventoryClient)
 })
@@ -72,21 +78,54 @@ Nothing names a module or a page. That is what lets `home.Register(b)` and
 `seller.Register(b)` each declare only the capabilities they need: the graph
 grows without the composition root knowing which surface will use what.
 
-## Step 3: Build a module: infrastructure → ports → use cases → HTTP
+## Step 3: Build a module: infrastructure → ports → use cases → transport
 
-In the module's `module.go`:
+A module has one construction path, in its own `compose` package, and one
+wiring shape chosen by how the gateway reaches it.
+
+A module reached over a gRPC contract (auth, inventory, sales) is built by its
+`compose.Build`, which owns backend selection, migrations and the close hook.
+The composition root supplies the module's outbound inputs — for sales that
+means adapting the inventory connection, its breaker and the capability sales
+presents with `compose.NewInventoryAdjuster`, then passing the resulting
+`ports.StockAdjuster` in:
 
 ```go
-func Register(b *fdi.Builder) error {
-    repo, err := postgres.NewRepository(pool)          // infrastructure
-    if err != nil {
-        return err
-    }
-    svc := application.NewService(repo, clock)          // owns the event contract
-    handlers.RegisterRoutes(r, svc, composer, logger)   // presentation
-    return nil
+// apps/web/internal/modules/sales/compose/compose.go
+func Build(
+	parent context.Context,
+	cfg *config.AppConfig,
+	stock ports.StockAdjuster,
+	logger *slog.Logger,
+	authorizers ...grpcservice.Authorizer,
+) (*sales.Module, func(), error) {
+	if cfg.DatabaseURL == "" {
+		return sales.NewModule(infrastructure.NewStore(), stock, nil, logger, authorizers...), func() {}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(parent, cfg.DBPingTimeout+10*time.Second)
+	defer cancel()
+
+	pool, err := salespostgres.Connect(ctx, cfg.DatabaseURL, cfg.DBMinConns, cfg.DBMaxConns)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := salespostgres.Migrate(ctx, pool); err != nil {
+		pool.Close()
+		return nil, nil, err
+	}
+
+	store := salespostgres.NewStore(pool)
+	logger.Info("sales backed by postgres")
+	return sales.NewModule(store, stock, store.Ping, logger, authorizers...), func() { pool.Close() }, nil
 }
 ```
+
+A unit that owns a browsable HTTP surface (billing, ops, the pages) instead
+offers `func Register(*fdi.Builder)` and is listed in `apps/web/internal/bootstrap/units.go`;
+`units_test.go` fails if a package offers `Register` and is not declared (or is
+declared and does not exist), so a module that compiles but never runs is a test
+failure rather than a silent absence.
 
 The `application.Service` facade wires the use cases, owns the event contract,
 and exposes only narrow reader/writer ports to presentation. Each use case
@@ -95,18 +134,22 @@ repository.
 
 ## Step 4: Publish events from the application layer, not the handler
 
+**Shape, not a copy.** No module in the tree publishes product events any more
+— the platform owns the product write path and gogo consumes its feed
+(`productevents`, D-018). A module added later that owns its own writes should
+follow [D-009](ARCHITECTURE.md#d-009): the mutation and its event record commit
+in one transaction, and an accepted mutation produces exactly one event.
+
 ```go
 func (s *Service) Adjust(ctx context.Context, in ports.AdjustInput) (results.Adjustment, error) {
     out, err := s.stock.AdjustStock(ctx, in)
     if err != nil {
         return results.Adjustment{}, err   // no event on a rejected mutation
     }
-    if err := s.events.Publish(ctx, events.Event{
+    s.events.Publish(ctx, events.Event{
         Type:    applicationevents.StockAdjustedType,
         Payload: applicationevents.StockAdjusted{TenantID: in.TenantID, ProductID: in.ProductID},
-    }); err != nil {
-        return results.Adjustment{}, err
-    }
+    })
     return out, nil
 }
 ```
@@ -114,7 +157,9 @@ func (s *Service) Adjust(ctx context.Context, in ports.AdjustInput) (results.Adj
 Exactly one event per accepted mutation, none on failure — and the invariant is
 testable without a transport. Publishing from `presentation` instead would mean
 a new transport (a queue consumer, a second endpoint) silently drops the event
-contract.
+contract. Note the bus API: `events.Bus.Publish` is fire-and-forget and returns
+nothing; reliability comes from the outbox write in the same transaction, not
+from the publish call.
 
 **Tenant on the payload, not in context.** The tenant is a field on every event
 payload, never read from the ambient request context by a subscriber. A
@@ -124,13 +169,17 @@ tenant-scoped.
 
 ## Step 5: Subscribe with a cancellable, contract-keyed subscription
 
+A module subscribes through the kernel contract (`kernel.EventBus`), so its
+handler receives `kernel.Event` and returns an error; the event types it names
+are the only ones it sees. `billing` is the worked example:
+
 ```go
-added := bus.SubscribeTypes(
-    func(ctx context.Context, e events.Event) {
-        composer.Invalidate(islandkeys.ProductGrid)
-    },
-    productevents.UpdatedType,
-)
+// apps/web/internal/modules/billing/module.go
+sub, err := bus.SubscribeTypes(ctx, handler(feed.OnEvent), productevents.Types()...)
+if err != nil {
+    return nil, fmt.Errorf("billing: subscribe to product events: %w", err)
+}
+module.cancel = sync.OnceFunc(func() { _ = sub.Unsubscribe() })
 ```
 
 `SubscribeTypes` only delivers the declared types, so the type assertion inside a
@@ -138,9 +187,18 @@ handler is a contract check rather than a blind cast.
 
 **Hold the subscription and cancel it.** If a module keeps subscribing without
 keeping the `Subscription`, the feed outlives the module and a subscription
-failure is silent. `billing` is the worked example: `NewModule` returns an error
-if a subscription fails, and `Stop` (via `module.Lifer`) cancels it — the gateway
-drains `Lifer`s in reverse order on shutdown.
+failure is silent. `billing`'s `NewModule` returns an error if a subscription
+fails, and `Stop` (via `module.Lifer`) cancels it — the gateway drains `Lifer`s
+in reverse order on shutdown.
+
+A **page** that needs to drop an island when an event arrives goes through the
+shared bus and `pagekit`, which subscribe and invalidate in one call:
+`pagekit.InvalidateOnEvents(bus, composer, types, islands...)` for fixed keys,
+`pagekit.InvalidatePrefixOnEvents(...)` for a paged list. The storefront grid
+does **not** subscribe today, and that is deliberate: its writer is another
+process, so the in-process feed can only say *that* something changed, and the
+grid's staleness is bounded by the rendering TTL instead
+(see `apps/web/internal/pages/home/islandkeys/islandkeys.go`).
 
 ## Step 6: Consume remote contracts through the shared kit
 
@@ -151,7 +209,7 @@ wrapping — and the contract kits add their own vocabulary and wire→core mapp
 
 ```go
 // Wrong: every call site re-implements the convention, and forgets one of them.
-resp, err := catalogClient.GetProduct(ctx, &catalogv1.GetProductRequest{Id: id})
+resp, err := productClient.GetProduct(ctx, &productv1.GetProductRequest{Id: id})
 
 // Right: the kit owns the mechanics; you own your read model.
 core, err := c.product.Get(ctx, id, true)
@@ -188,16 +246,28 @@ the user cannot distinguish from a real answer.
 ## Step 8: Name your islands, and let events invalidate them
 
 ```go
-// internal/modules/<m>/presentation/http/islandkeys/islandkeys.go
-func ProductGrid() string { return "m.product-grid" }
+// apps/web/internal/pages/home/islandkeys/islandkeys.go — the key lives with
+// the surface that owns it.
+package islandkeys
+
+// HomeGrid is the cache-key prefix of the public product grid on "/".
+// The grid is paginated (/?page=N), so each page caches under
+// HomeGrid + ":p" + N.
+const HomeGrid = "home.product-grid"
 ```
 
-Each surface owns its own island keys — a module's and a page's must not
-collide, because invalidation is by prefix. Invalidation is a **subscriber**,
-never a call into the composer from a handler: a handler that reaches into the
-composer forgets to invalidate the day it is rewritten.
+An island key is `"<owner>.<island>"` (the `/` separator is also accepted), and
+the rule is enforced rather than conventional — decided in
+`docs/DECISION_UI_OWNERSHIP.md` §5: `render.ValidateIslandName` runs inside
+`render.Island` / `ClientIsland` and eagerly in `pagekit.NewPagedListPage`, so
+an unnamespaced key panics at wiring time instead of aliasing another unit's
+cache namespace. Each surface owns its own keys — a module's and a page's must
+not collide, because invalidation is by prefix.
 
-Invalidate family-wide (`InvalidatePrefix`). Over-invalidating costs a re-render;
+Invalidation is a **subscriber**, never a call into the composer from a handler:
+a handler that reaches into the composer forgets to invalidate the day it is
+rewritten. `pagekit`'s helpers (Step 5) are the subscription. Invalidate
+family-wide (`InvalidatePrefix`): over-invalidating costs a re-render;
 under-invalidating serves stale HTML.
 
 ## Step 9: Declare response intent once
@@ -215,31 +285,44 @@ Put it in `pagekit` (the generic `ListPage`) or in a shared handler helper
 
 ## Testing after migration
 
-The container is built once in production and per-test in tests. Two patterns
-are worth copying.
+The container is built once, in production. Unit tests exercise the layer
+below it, and the tree has two real page-testing shapes to copy:
 
-**A page against a fake peer.** Build the container with the fake, register the
-page, resolve the handler and drive it over `httptest`:
+- **Port-level**: `handlers/products/list/handler_test.go` stubs the page's
+  port, records the query it was asked for, and drives the handler straight
+  over `httptest` (`handler.Handle(rec, httptest.NewRequest(...))`).
+- **Page-level, wired as production**: `pages/home/page_test.go` stands the
+  platform's read contracts up as real gRPC servers on a bufconn listener and
+  builds the page exactly the way the composition root does:
 
 ```go
-func TestHomeGridReadsThroughTheKit(t *testing.T) {
-    b := fdi.NewBuilder()
-    require.NoError(t, home.Register(b))
-    c, err := b.Build()
-    require.NoError(t, err)
-    h, err := fdi.ResolveType[http.Handler](c)
-    require.NoError(t, err)
+// apps/web/internal/pages/home/page_test.go (abridged) — page-level wiring
+browse := &stubBrowse{}
+search := &stubSearch{}
 
-    rec := httptest.NewRecorder()
-    h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-    require.Equal(t, http.StatusOK, rec.Code)
-}
+homePage := home.New(
+	listingclient.New(
+		productconsumer.Connections{
+			Browse: dialStub(t, func(s grpc.ServiceRegistrar) {
+				productlistingv1.RegisterProductListingServiceServer(s, browse)
+			}),
+			Search: dialStub(t, func(s grpc.ServiceRegistrar) {
+				productsearchv1.RegisterProductSearchServiceServer(s, search)
+			}),
+		},
+		productconsumer.Breakers{Browse: breaker.NewDefault(), Search: breaker.NewDefault()},
+	),
+	discardLogger(),
+)
+
+router := chi.NewRouter()
+homePage.RegisterRoutes(router)
 ```
 
-**The real thing over a bufconn.** `internal/bootstrap/fakestack_test.go` stands
-up the *actual* gRPC servers (the generated stubs, not a hand-written fake) on an
-in-memory listener and points the real client kit at them. That covers the
-tenant stamp, the breaker classification, the `Core` mapping and cache
+**The real thing over a bufconn.** `apps/web/internal/bootstrap/fakestack_test.go`
+stands up the *actual* gRPC servers (the generated stubs, not a hand-written
+fake) on an in-memory listener and points the real client kit at them. That
+covers the tenant stamp, the breaker classification, the `Core` mapping and cache
 invalidation across the event feed — the parts a hand-rolled fake would skip,
 and the parts most likely to be wrong.
 

@@ -38,7 +38,7 @@ func newRouter(t *testing.T) (*chi.Mux, string, string) {
 	t.Helper()
 
 	store := authinfra.NewStore()
-	module := authmod.NewModule(store, store, nil, discardLogger())
+	module := authmod.NewModule(store, store, store, nil, discardLogger())
 
 	employee, err := authdomain.NewEmployee("default", "emp-1", "Budi Santoso", "budi@toko.com", "123456", authdomain.RoleSeller)
 	if err != nil {

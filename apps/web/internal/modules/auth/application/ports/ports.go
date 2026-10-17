@@ -59,6 +59,32 @@ type AuthorizationAdminEvent struct {
 	OccurredAt                                          time.Time
 }
 
+// MerchantStore is the merchant/membership/invitation persistence surface. It is
+// the auth module's authoritative store-relationship model — the PIP the ADR
+// reserves for a domain with a real owner and lifecycle (employee-to-merchant
+// membership, delegated seller access).
+type MerchantStore interface {
+	CreateMerchant(ctx context.Context, merchant *domain.Merchant) error
+	GetMerchant(ctx context.Context, tenant domain.Tenant, id string) (*domain.Merchant, error)
+	ListMerchantsForEmployee(ctx context.Context, tenant domain.Tenant, employeeID string) ([]*domain.Merchant, error)
+	CountOwnedMerchants(ctx context.Context, tenant domain.Tenant, employeeID string) (int, error)
+
+	CreateMembership(ctx context.Context, membership *domain.Membership) error
+	GetMembership(ctx context.Context, tenant domain.Tenant, merchantID, employeeID string) (*domain.Membership, error)
+	ListMembers(ctx context.Context, tenant domain.Tenant, merchantID string) ([]*domain.Membership, error)
+	CountEmployeeMemberships(ctx context.Context, tenant domain.Tenant, employeeID string) (int, error)
+
+	CreateInvitation(ctx context.Context, invitation *domain.Invitation) error
+	GetInvitation(ctx context.Context, tenant domain.Tenant, id string) (*domain.Invitation, error)
+	GetInvitationByToken(ctx context.Context, tenant domain.Tenant, token string) (*domain.Invitation, error)
+	UpdateInvitation(ctx context.Context, invitation *domain.Invitation) error
+
+	GrantMerchantPermission(ctx context.Context, permission *domain.MerchantPermission) error
+	RevokeMerchantPermission(ctx context.Context, tenant domain.Tenant, merchantID, employeeID, permissionKey string) error
+	HasMerchantPermission(ctx context.Context, tenant domain.Tenant, merchantID, employeeID, permissionKey string) (bool, error)
+	ListMerchantPermissions(ctx context.Context, tenant domain.Tenant, merchantID, employeeID string) ([]string, error)
+}
+
 // AuthService is the auth application surface. The gRPC adapter and pages depend on it.
 type AuthService interface {
 	RegisterEmployee(ctx context.Context, tenant domain.Tenant, id, name, email, pin string, role domain.Role) (*domain.Employee, error)
@@ -84,4 +110,19 @@ type AuthService interface {
 	ListRoleAssignments(ctx context.Context, sessionID, employeeID string, includeHistory bool) ([]RoleAssignment, error)
 	ListTenantRoleAssignments(ctx context.Context, sessionID string, pageSize int, pageToken string) ([]RoleAssignment, string, error)
 	ListAuthorizationAdminEvents(ctx context.Context, sessionID string, pageSize int, pageToken string) ([]AuthorizationAdminEvent, string, error)
+
+	// Merchant relationship use cases. These are the ReBAC provider the
+	// tenant-scoped RBAC model delegates merchant ownership to.
+	RegisterAccount(ctx context.Context, tenant domain.Tenant, name, email, pin string) (*domain.Employee, error)
+	OpenMerchant(ctx context.Context, sessionID, name string) (*domain.Merchant, error)
+	ListMyMerchants(ctx context.Context, sessionID string) ([]*domain.Merchant, error)
+	GetMerchant(ctx context.Context, sessionID, merchantID string) (*domain.Merchant, error)
+	ListMembers(ctx context.Context, sessionID, merchantID string) ([]*domain.Membership, error)
+	InviteMember(ctx context.Context, sessionID, merchantID, email string, role domain.MerchantRole) (*domain.Invitation, error)
+	AcceptInvitation(ctx context.Context, sessionID, token string) (*domain.Membership, error)
+	RevokeInvitation(ctx context.Context, sessionID, invitationID string) error
+	GrantMerchantPermission(ctx context.Context, sessionID, merchantID, employeeID, permissionKey string) error
+	RevokeMerchantPermission(ctx context.Context, sessionID, merchantID, employeeID, permissionKey string) error
+	ListMerchantPermissions(ctx context.Context, sessionID, merchantID, employeeID string) ([]string, error)
+	CanManageProduct(ctx context.Context, sessionID, merchantID string) (bool, error)
 }

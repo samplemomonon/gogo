@@ -173,9 +173,9 @@ func (p *writer) UpsertProduct(ctx context.Context, snapshot *event.ProductSnaps
 			product_id, category_id, name, slug, description, brand,
 			price_cents, currency, stock, status, primary_media_id,
 			product_type_id, schema_version, attributes,
-			created_at, updated_at, projected_at, last_event_id
+			created_at, updated_at, projected_at, last_event_id, merchant_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, $17)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, $17, $18)
 		ON CONFLICT (product_id) DO UPDATE SET
 			category_id      = EXCLUDED.category_id,
 			name             = EXCLUDED.name,
@@ -193,7 +193,8 @@ func (p *writer) UpsertProduct(ctx context.Context, snapshot *event.ProductSnaps
 			created_at       = EXCLUDED.created_at,
 			updated_at       = EXCLUDED.updated_at,
 			projected_at     = CURRENT_TIMESTAMP,
-			last_event_id    = EXCLUDED.last_event_id`
+			last_event_id    = EXCLUDED.last_event_id,
+			merchant_id      = EXCLUDED.merchant_id`
 
 	attributes, err := json.Marshal(productAttributes)
 	if err != nil {
@@ -205,6 +206,7 @@ func (p *writer) UpsertProduct(ctx context.Context, snapshot *event.ProductSnaps
 		snapshot.Description, snapshot.Brand, snapshot.PriceCents, snapshot.Currency,
 		snapshot.Stock, snapshot.Status, snapshot.PrimaryMediaID, productTypeID,
 		schemaVersion, attributesJSON, snapshot.CreatedAt, snapshot.UpdatedAt, eventID,
+		snapshot.MerchantID,
 	); err != nil {
 		return fmt.Errorf("upsert product %d: %w", snapshot.ID, err)
 	}

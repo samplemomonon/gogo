@@ -78,9 +78,13 @@ type Core struct {
 	Status        Status
 	CategoryID    string
 	MediaID       string
-	Variants      []Variant
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// MerchantID names the merchant that owns this product. It references the
+	// auth module's merchant aggregate; the seller console enforces that only
+	// the owning merchant's members may change a product.
+	MerchantID string
+	Variants   []Variant
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // Variant is a purchasable size or colour of a product.
@@ -479,6 +483,7 @@ func (c *Client) Create(ctx context.Context, in Input) (Core, error) {
 			Stock:          int32(in.Stock),
 			Status:         in.wireStatus(),
 			PrimaryMediaId: in.numericMediaID(),
+			MerchantId:     in.MerchantID,
 			Variants:       in.wireVariants(),
 		})
 	})

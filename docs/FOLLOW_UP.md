@@ -15,41 +15,28 @@ item 6), [`FOUNDATION_SUMMARY.md`](../FOUNDATION_SUMMARY.md).
 
 ---
 
-## 1. `media` module — scaffold, not mounted
+## 1. ~~`media` module — scaffold, not mounted~~ — **Resolved**
 
-`internal/modules/media` has a domain entity, application ports/use cases, and
-Postgres + filesystem adapters, but **no presentation layer and no composition
-root wiring**; `RegisterRoutes` is a TODO. The gateway serves no media surface.
+*Closed by [D-018](ARCHITECTURE.md#d-018).* The module and its scaffold were
+deleted — it duplicated the external `media-service` (the same
+two-authorities-for-one-row problem D-018 cured for product), was never
+mounted, and no contract or consumer depended on it. The `internal/modules/media`
+path can never return: the architecture test refuses the package name outright
+(`TestNoPlatformAggregateIsOwnedInProcess`, extended from product to media,
+category and search).
 
-- **Exit:** either wire it end to end (a page or module that uploads/lists/
-  deletes media, registered in `internal/bootstrap`), or delete the module.
-- **Note:** it is the only user of `shared/idgen` and `database/sql` (every
-  other adapter uses pgx). If it is wired, align it with `pgxkit` and the
-  `idgen` decision in item 4.
-- **New consideration after D-018:** product images are the obvious thing to
-  hang a media surface on, but the products now live in the platform and
-  `product.v1` carries no media list. Wiring `media` here means building a
-  media surface with no product to attach media to — which may settle the
-  delete option rather than the wire-it option.
+## 2. ~~`reporting` module — scaffold, not mounted~~ — **Resolved**
 
-## 2. `reporting` module — scaffold, not mounted
-
-`internal/modules/reporting` has a dashboard read model, application service, a
-Postgres adapter, `reporting.v1` proto and gRPC service, but **nothing composes
-it**; no page consumes `reporting.v1`.
-
-- **Exit:** either build the reporting page that consumes `reporting.v1` over
-  gRPC (mirroring how home consumes the product platform's browse contract), or
-  delete the module + its contract.
-- **Related:** the dashboard metrics (totals, low stock, top products) overlap
-  the sales/inventory read models; decide whether reporting composes them or
-  reads its own projection. Note that "top products" now needs product names
-  from the platform, so reporting composes `productconsumer` for the label and
-  keeps the numbers itself — the same split home uses.
+*Closed by [D-018](ARCHITECTURE.md#d-018).* The module and `reporting.v1` were
+deleted. It derived `dashboard_stats`, `low_stock_items` and `top_products`
+across three contexts in its own migration, written and read by nobody — a read
+model no single stream team can own. Whatever team needs those numbers rebuilds
+them where the data is.
 
 ## 3. Foundation packages awaiting adoption
 
-After D-017 retired the superseded generics, three packages remain unwired:
+After [D-017](ARCHITECTURE.md#d-017) retired the superseded generics, three
+packages remain unwired:
 
 | Package | Capability | Decision needed |
 | --- | --- | --- |
@@ -57,45 +44,42 @@ After D-017 retired the superseded generics, three packages remain unwired:
 | `foundation/specification` | Predicate composition for business rules | Adopt for storefront/seller filters, or delete (YAGNI). |
 | `foundation/validation` | Rule/struct-tag validator | The codebase validates in domain constructors (e.g. `domain.NewEmployee`). Adopt, or delete in favour of that style. |
 
-Also: `kernel` still exports ~15 interfaces (`Repository`, `UnitOfWork`,
-`CacheProvider`, `Validator`, `IDGenerator`, …) whose former implementors were
-retired. Only `EventBus`, `Event`, `EventHandler`, `Subscription`, `Logger`
-(and `Validator`, via `validation`) have consumers. **Exit:** trim
-`internal/shared/kernel/interfaces.go` to the interfaces with a live consumer.
+**Kernel trimming — done.** `internal/shared/kernel/interfaces.go` now declares
+only the interfaces with a live consumer: `EventBus`, `Event`, `EventHandler`,
+`Subscription`, `Logger` and `Validator` (consumed via `validation`). The
+unimplemented remainder — `Repository`, `UnitOfWork`, `Transaction`,
+`EventPublisher`, `EventSubscriber`, `CacheProvider`, `Serializer`,
+`IDGenerator`, `TimeProvider`, `MetricsCollector`, `Factory`, `Provider`,
+`Closer`, `HealthChecker` — is deleted, and the unused `ServiceManager`
+lifecycle helper went with the `Service` interface. Re-adding an interface means
+naming its consumer in the same change.
 
-D-018 removed one more implementor without touching this list: the catalog's
-unit-of-work `ports.Transaction` went with the module, and no surviving module
-adopted it. Sales and inventory still get atomicity from a single conditional
-`UPDATE` rather than from a unit-of-work, which is the better shape for their
-one-statement mutations — so `UnitOfWork` has no implementor and no near-term
-buyer.
+`UnitOfWork` in particular has no implementor and no near-term buyer: the
+catalog's `ports.Transaction` went with the module (D-018), and sales and
+inventory get atomicity from a single conditional `UPDATE` rather than from a
+unit-of-work — the better shape for their one-statement mutations.
 
-## 4. Consolidate ID generation
+## 4. ~~Consolidate ID generation~~ — **Resolved**
 
-ID generation has drifted into three places:
+*Closed by the follow-up pass.* ID generation had drifted into four places;
+with the catalog and media modules gone it was three: `shared/idgen`
+(base64 crypto/rand), `modules/auth/application.generateID` (hex crypto/rand),
+and `google/uuid` directly in inventory and sales.
 
-- `shared/idgen` (base64 crypto/rand) — used only by the unmounted `media`
-  module.
-- `modules/auth/application.generateID` (hex crypto/rand), used for session IDs.
-- `modules/inventory` and `modules/sales` call `google/uuid` directly for
-  movement and transaction IDs.
+The convention is now **`google/uuid` everywhere**: `shared/idgen` was deleted
+— it existed only for the never-mounted `media` module that item 1 records, and
+no committed revision ever imported it (`git grep` over `15cf32e` returns only
+the package itself) — and auth's hand-rolled `generateID` was replaced with
+`uuid.NewString()` (inventory and sales already used that directly). One
+library, no bespoke generator to maintain.
 
-*(The catalog's UUID generator port was the fourth site; it went with the
-product domain, D-018.)*
-
-**Exit:** pick one convention and route the rest through it — either
-`shared/idgen` behind its `Generator` port, or plain `google/uuid` everywhere
-and delete `shared/idgen`. Do this together with item 1 so `media` lands on the
-same convention.
-
-Note the collision this creates with product IDs, which is worth deciding
-rather than inheriting by accident: product IDs arrive from the platform as
-`int64` and `productconsumer` carries them as **decimal strings**
+The key-space note this item carried is worth keeping as a recorded decision,
+not an accident: product IDs arrive from the platform as `int64` and
+`productconsumer` carries them as **decimal strings**
 ([D-018](ARCHITECTURE.md#d-018)), while inventory and sales generate their own
-IDs as **UUIDs**. That is fine — they are different key spaces — but the
-decision should be deliberate, because the first thing anyone will want next is
-to let a seller mint a product ID locally, which would break the platform's
-`int64` contract.
+IDs as **UUIDs**. They are different key spaces, and that is deliberate — a
+seller must not mint a product ID locally, because the platform's contract is
+`int64`.
 
 ## 5. ~~Billing subscription lifecycle~~ — **Resolved**
 
@@ -105,46 +89,66 @@ construction if a subscription fails, stores the `Subscription`, and exposes
 shutdown. A subscription failure is now a boot failure instead of a silently
 dead feed; the activity package's tests pin the event→read-model mapping.
 
-The same pattern is what `productevents` follows: the Kafka consumer runs under
-`module.Lifer` semantics and an undecodable record is skipped, not fatal.
+The feed side carries the same discipline without being a module: the Kafka
+consumer's poll loop is started with a stop function the composition root wires
+into the lifecycle — cancel the run context, wait for the loop to drain
+(`bootstrap/product_connection.go`, `startProductChangeFeed`) — and an
+undecodable record is logged, committed and skipped rather than replayed
+forever (`productevents/kafka.go`, `dispatch`).
 
-## 6. `MIGRATION_GUIDE.md` is stale
+## 6. ~~`MIGRATION_GUIDE.md` is stale~~ — **Resolved**
 
-It still teaches `di.NewBuilder().AddSingleton("name", …)` with string keys,
-`kernel.Logger`, `events.TypedBus` and an `order` module — none of which exist.
-It is referenced as "the single roadmap" by `ARCHITECTURE.md`.
+*Closed by the follow-up pass.* The guide now describes the tree: the DI excerpt
+is copied from `apps/web/internal/bootstrap/di.go` (`ProvideInstance` for
+process primitives, `ProvideType` for ports), the subscription step shows
+billing's real `kernel.EventBus.SubscribeTypes` pattern, the island step shows
+`render.ValidateIslandName`'s owner-namespaced rule, and every path is
+`apps/web/...` after the monorepo reorganisation. The one forward-looking
+snippet (publishing) is labelled as a shape rather than a copy, because no
+module publishes product events any more (D-018).
 
-- **Exit:** rewrite it to the current foundation (`ProvideType`/`ProvideNamed`/
-  `Contribute`, `kernel.EventBus`, the module contract), or fold the useful
-  parts into `internal/shared/foundation/README.md` and delete it.
-- **Extra work now:** D-018 removed the catalog and listing services from
-  `MIGRATION_GUIDE.md`'s examples, so its deployment walkthrough no longer
-  matches the repository. That widens the gap — it is no longer only the DI API
-  that is out of date.
+`ARCHITECTURE.md` still names it the single roadmap; if its snippets ever drift
+again, the honest move is to delete the guide and keep
+`apps/web/internal/shared/foundation/README.md`, not to let it teach a shape
+that does not build.
 
-## 7. Decision log gap: `D-010`
+## 7. ~~Decision log gap: `D-010`~~ — **Resolved**
 
-The decision log jumps D-009 → D-011. If the missing entry is recoverable from
-git history, restore it; otherwise add a one-line tombstone explaining the gap
-so future readers do not assume a lost decision.
+*Closed by the follow-up pass.* No revision of `ARCHITECTURE.md` ever contained
+a `D-010` entry (`git log --all -S "D-010" -- ARCHITECTURE.md` returns
+nothing), so there was nothing to restore — the only occurrences of the string
+are documents recording the gap. The number is now retired with a tombstone
+entry in [`ARCHITECTURE.md`](../ARCHITECTURE.md) so a future reader does not
+mistake the skip for a deleted decision, satisfying the prerequisite
+`docs/TEAM_TOPOLOGIES_PRD.md` §0.4 records.
 
-## 8. The platform has no tenant concept — **cannot be fixed in this repo**
+## 8. Product data has no tenant concept upstream — **cannot be fixed in this repo**
 
 gogo is multi-tenant: `tenant_id` on every table, RLS as a second enforcement
-layer, tenant stamped on every outbound gRPC call ([D-011](ARCHITECTURE.md#d-011)).
-The product platform has **no tenant concept at all** — no `tenant_id` in its
-migrations, no tenant field in `product.v1`, `productlisting.v1`,
-`productsearch.v1` or `category.v1`. So gogo stamps a tenant on every product
-call and the platform ignores it: **one tenant's products are visible to all
-tenants.**
+layer, tenant stamped on every outbound gRPC call
+([D-011](ARCHITECTURE.md#d-011); the stamp is `X-Tenant-ID` metadata, sent by
+`grpcx`'s outgoing interceptor). What the platform does with the stamp is
+per-service, and the split is verified file by file:
 
-- **Why it is here and not silently absorbed:** it is a real cross-tenant leak.
-  It is invisible at runtime (there is no error to observe) and gogo cannot
-  enforce it — filtering happens in a process that never receives the tenant.
-- **Exit:** upstream, in the platform. Add `tenant_id` to the product tables,
-  put it on the contract messages, and index the read models by it. The gateway
-  already sends it, so no gogo change is needed beyond a test that asserts the
-  stamp reaches the wire.
+- **`product-service`, `product-listing-service` and `product-search-service`
+  ignore it.** None of the three has a tenant column in its migrations or a
+  tenant field in its contract, so product writes, browse and search are
+  global: **one tenant's products are visible to all tenants.**
+- **`category-service` honors it.** Merchant categories are tenant-scoped —
+  `0002_merchant_categories.sql` adds `tenant_id`, `internal/tenant` reads the
+  `x-tenant-id` metadata through an incoming interceptor wired in
+  `cmd/server/main.go`, and admin-managed global categories stay `NULL`
+  (`category_repository.go`). This is the one merchant-owned surface upstream
+  that is actually isolated.
+
+- **Why it is here and not silently absorbed:** the product-data leak is
+  invisible at runtime (there is no error to observe) and gogo cannot enforce
+  it — filtering happens in a process that receives the tenant and drops it.
+- **Exit:** upstream, in the product data services. Add `tenant_id` to their
+  tables and read models, carry it on the contract messages, and index the read
+  models by it. The gateway already sends the metadata, and the feed decoder
+  already tolerates a `tenant_id` on a product event payload
+  (`productevents.decodePayload`) — the producer sends none today.
 - **Interim:** document it in any deployment that serves more than one tenant.
   A single-tenant deployment (the default `TENANT_DEFAULT`) is unaffected.
 

@@ -47,7 +47,7 @@ func testLogger() *slog.Logger {
 // compose.Build uses when no database is configured.
 func newModule(ping func(context.Context) error) *auth.Module {
 	store := infrastructure.NewStore()
-	return auth.NewModule(store, store, ping, testLogger())
+	return auth.NewModule(store, store, store, ping, testLogger())
 }
 
 // TestManifest pins the module's federated identity: the shell routes to Entry
@@ -225,7 +225,7 @@ func TestRegisterGRPCRoundTripsAnEmployee(t *testing.T) {
 		t.Fatalf("seed store: %v", err)
 	}
 
-	client := dialAuth(t, auth.NewModule(store, store, nil, testLogger()))
+	client := dialAuth(t, auth.NewModule(store, store, store, nil, testLogger()))
 
 	login, err := client.Login(context.Background(), &authv1.LoginRequest{Email: "budi@toko.com", Pin: "123456"})
 	if err != nil {

@@ -236,6 +236,11 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	// a write outage must not stop the console reading what it needs to diagnose it.
 	registerUpstreamBreakers(b)
 
+	// The same separation at the traffic level: the readiness classification of
+	// those upstreams, keyed by type so the ops module consumes it without
+	// importing this package. Search is the optional one; see units.go.
+	fdi.ProvideInstanceType(b, ReadinessPolicy())
+
 	// productPlatformBreakers resolves the four platform breakers as one value, so a
 	// surface that needs the whole set takes it as a bundle instead of resolving four
 	// names and risking a mismatch between the connections and the breakers it hands
@@ -367,8 +372,8 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 
 	// Top-level pages and feature modules own their own graphs: each Register
 	// declares the unit keyed by type, so the composition root stays a list of
-	// units. The list itself lives in units.yaml and is generated into
-	// units_gen.go — see make arch-units.
+	// units. The list itself lives in units.go, enforced by units_test.go —
+	// including that every unit in the tree offering a Register is declared.
 	//
 	// Billing adopts the kernel bus contract; ops derives readiness from the
 	// registry plus the contributed breaker group, so an instance that cannot

@@ -1,8 +1,11 @@
-// Package islandkeys centralizes the name of the home page island so that
-// the navigation handler (which renders it) and the page's bus subscriber
-// (which invalidates its cached HTML) agree on the key without duplicating
-// a magic string. The home page owns this island — it was lifted out of the
-// catalog module along with the page, so catalog must not know about it.
+// Package islandkeys centralizes the cache-key prefixes of the home page's
+// islands, so the handler that renders an island and the cache keys derived
+// from its name (page number or product id suffixes) agree on the same string
+// without duplicating a magic value. The home page owns these islands — they
+// were lifted out of the catalog module along with the page, so catalog must
+// not know about them. Nothing invalidates them on events: the write side
+// lives in another process, so staleness is bounded by the rendering
+// contract's TTL (see home.New).
 package islandkeys
 
 // HomeGrid is the cache-key prefix of the public product grid on "/". The

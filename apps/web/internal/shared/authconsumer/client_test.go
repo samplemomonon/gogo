@@ -28,6 +28,10 @@ type fakeAuth struct {
 	err      error
 	logins   int
 	tenant   string
+
+	canManage      bool
+	canManageCalls int
+	merchants      *authv1.ListMyMerchantsResponse
 }
 
 func (f *fakeAuth) Login(_ context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
@@ -52,6 +56,21 @@ func (f *fakeAuth) ValidateSession(_ context.Context, _ *authv1.ValidateSessionR
 		return nil, f.err
 	}
 	return f.validate, nil
+}
+
+func (f *fakeAuth) CanManageProduct(_ context.Context, _ *authv1.CanManageProductRequest) (*authv1.CanManageProductResponse, error) {
+	f.canManageCalls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &authv1.CanManageProductResponse{Allowed: f.canManage}, nil
+}
+
+func (f *fakeAuth) ListMyMerchants(_ context.Context, _ *authv1.ListMyMerchantsRequest) (*authv1.ListMyMerchantsResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.merchants, nil
 }
 
 func newClient(t *testing.T, fake *fakeAuth, b *breaker.Breaker) *authconsumer.Client {
@@ -207,5 +226,101 @@ func TestLogoutOnAnAlreadyRevokedSessionIsAnsweredNotFailed(t *testing.T) {
 
 	if err := client.Logout(context.Background(), "s-gone"); !errors.Is(err, authconsumer.ErrNotFound) {
 		t.Errorf("Logout = %v, want %v", err, authconsumer.ErrNotFound)
+	}
+}
+
+// TestCanManageProductSurfacesTheDecision pins the merchant-scoped PDP as the
+// kit exposes it: the decision crosses the wire unchanged, and a missing session
+// or merchant is answered locally as a deny without a round trip — the seller
+// console's write gate must never be skippable because a field was empty.
+func TestCanManageProductSurfacesTheDecision(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a granted decision crosses the wire", func(t *testing.T) {
+		t.Parallel()
+
+		fake := &fakeAuth{canManage: true}
+		client := newClient(t, fake, breaker.NewDefault())
+
+		allowed, err := client.CanManageProduct(context.Background(), "s-1", "merchant-1")
+		if err != nil {
+			t.Fatalf("CanManageProduct: %v", err)
+		}
+		if !allowed {
+			t.Error("allowed = false, want the decision the wire returned")
+		}
+		if fake.canManageCalls != 1 {
+			t.Errorf("wire calls = %d, want exactly 1", fake.canManageCalls)
+		}
+	})
+
+	t.Run("a denied decision is false, not an error", func(t *testing.T) {
+		t.Parallel()
+
+		fake := &fakeAuth{canManage: false}
+		client := newClient(t, fake, breaker.NewDefault())
+
+		allowed, err := client.CanManageProduct(context.Background(), "s-1", "merchant-1")
+		if err != nil {
+			t.Fatalf("CanManageProduct: %v", err)
+		}
+		if allowed {
+			t.Error("allowed = true, want a deny")
+		}
+	})
+
+	t.Run("a missing session or merchant denies without calling", func(t *testing.T) {
+		t.Parallel()
+
+		fake := &fakeAuth{canManage: true}
+		client := newClient(t, fake, breaker.NewDefault())
+
+		for _, tc := range []struct{ session, merchant string }{
+			{"", "merchant-1"},
+			{"s-1", ""},
+		} {
+			allowed, err := client.CanManageProduct(context.Background(), tc.session, tc.merchant)
+			if err != nil {
+				t.Errorf("CanManageProduct(%q,%q): %v", tc.session, tc.merchant, err)
+			}
+			if allowed {
+				t.Errorf("CanManageProduct(%q,%q) allowed, want a deny", tc.session, tc.merchant)
+			}
+		}
+		if fake.canManageCalls != 0 {
+			t.Errorf("wire calls = %d, want 0 for empty inputs", fake.canManageCalls)
+		}
+	})
+}
+
+// TestListMyMerchantsMapsTheWire pins the merchant list mapping and the
+// signed-out answer: an absent session is an empty list, not an error, because
+// every caller is asking "which shops am I in?".
+func TestListMyMerchantsMapsTheWire(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAuth{merchants: &authv1.ListMyMerchantsResponse{Merchants: []*authv1.Merchant{
+		{Id: "merchant-1", OwnerEmployeeId: "emp-9", Name: "Toko Bunda"},
+		{Id: "merchant-2", OwnerEmployeeId: "emp-3", Name: "Toko Kecil"},
+	}}}
+	client := newClient(t, fake, breaker.NewDefault())
+
+	got, err := client.ListMyMerchants(context.Background(), "s-1")
+	if err != nil {
+		t.Fatalf("ListMyMerchants: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("merchants = %d, want 2", len(got))
+	}
+	if got[0].ID != "merchant-1" || got[0].OwnerEmployeeID != "emp-9" || got[0].Name != "Toko Bunda" {
+		t.Errorf("first merchant = %+v, want merchant-1/emp-9/Toko Bunda", got[0])
+	}
+
+	empty, err := client.ListMyMerchants(context.Background(), "")
+	if err != nil {
+		t.Fatalf("ListMyMerchants with no session: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("merchants = %d, want none without a session", len(empty))
 	}
 }

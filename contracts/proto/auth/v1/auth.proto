@@ -276,6 +276,133 @@ message ListAuthorizationAdminEventsResponse {
   string next_page_token = 2;
 }
 
+// Merchant is a seller's shop, owned by one employee (the penjual). Products in
+// the product platform carry a merchant_id that references these rows; the auth
+// module is the authority for who owns a merchant and who may manage its
+// products.
+message Merchant {
+  string id = 1;
+  string tenant_id = 2;
+  string owner_employee_id = 3;
+  string name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// MerchantMembership is an employee's role inside one merchant. role is
+// "owner" (penjual) or "karyawan"; a karyawan holds no product authority until
+// the owner grants one.
+message MerchantMembership {
+  string tenant_id = 1;
+  string merchant_id = 2;
+  string employee_id = 3;
+  string role = 4;
+  string granted_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+// MerchantInvitation is how an owner adds a karyawan. It carries a one-time
+// token and expires.
+message MerchantInvitation {
+  string id = 1;
+  string tenant_id = 2;
+  string merchant_id = 3;
+  string email = 4;
+  string role = 5;
+  string status = 6;
+  string token = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  string invited_by = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp accepted_at = 11;
+  google.protobuf.Timestamp revoked_at = 12;
+}
+
+// RegisterAccountRequest creates a pembeli account.
+message RegisterAccountRequest {
+  string tenant_id = 1;
+  string name = 2;
+  string email = 3;
+  string pin = 4;
+}
+message RegisterAccountResponse { Employee employee = 1; }
+
+// OpenMerchantRequest opens a merchant owned by the session employee.
+message OpenMerchantRequest {
+  string session_id = 1;
+  string name = 2;
+}
+message OpenMerchantResponse { Merchant merchant = 1; }
+
+message ListMyMerchantsRequest { string session_id = 1; }
+message ListMyMerchantsResponse { repeated Merchant merchants = 1; }
+
+message GetMerchantRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+}
+message GetMerchantResponse { Merchant merchant = 1; }
+
+message ListMembersRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+}
+message ListMembersResponse { repeated MerchantMembership members = 1; }
+
+// InviteMemberRequest invites a karyawan to a merchant. Only the owner may.
+message InviteMemberRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+  string email = 3;
+  string role = 4;
+}
+message InviteMemberResponse { MerchantInvitation invitation = 1; }
+
+message AcceptInvitationRequest {
+  string session_id = 1;
+  string token = 2;
+}
+message AcceptInvitationResponse { MerchantMembership membership = 1; }
+
+message RevokeInvitationRequest {
+  string session_id = 1;
+  string invitation_id = 2;
+}
+message RevokeInvitationResponse {}
+
+// GrantMerchantPermissionRequest delegates a supported capability to a
+// karyawan member of a merchant. Only the owner may.
+message GrantMerchantPermissionRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+  string employee_id = 3;
+  string permission_key = 4;
+}
+message GrantMerchantPermissionResponse {}
+
+message RevokeMerchantPermissionRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+  string employee_id = 3;
+  string permission_key = 4;
+}
+message RevokeMerchantPermissionResponse {}
+
+message ListMerchantPermissionsRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+  string employee_id = 3;
+}
+message ListMerchantPermissionsResponse { repeated string permission_keys = 1; }
+
+// CanManageProductRequest asks the merchant-scoped PDP whether the session
+// employee may modify products in the merchant.
+message CanManageProductRequest {
+  string session_id = 1;
+  string merchant_id = 2;
+}
+message CanManageProductResponse { bool allowed = 1; }
+
 service AuthService {
   rpc RegisterEmployee(RegisterEmployeeRequest) returns (RegisterEmployeeResponse);
   rpc GetEmployee(GetEmployeeRequest) returns (GetEmployeeResponse);
@@ -299,4 +426,16 @@ service AuthService {
   rpc ListRoleAssignments(ListRoleAssignmentsRequest) returns (ListRoleAssignmentsResponse);
   rpc ListTenantRoleAssignments(ListTenantRoleAssignmentsRequest) returns (ListTenantRoleAssignmentsResponse);
   rpc ListAuthorizationAdminEvents(ListAuthorizationAdminEventsRequest) returns (ListAuthorizationAdminEventsResponse);
+  rpc RegisterAccount(RegisterAccountRequest) returns (RegisterAccountResponse);
+  rpc OpenMerchant(OpenMerchantRequest) returns (OpenMerchantResponse);
+  rpc ListMyMerchants(ListMyMerchantsRequest) returns (ListMyMerchantsResponse);
+  rpc GetMerchant(GetMerchantRequest) returns (GetMerchantResponse);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+  rpc InviteMember(InviteMemberRequest) returns (InviteMemberResponse);
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
+  rpc RevokeInvitation(RevokeInvitationRequest) returns (RevokeInvitationResponse);
+  rpc GrantMerchantPermission(GrantMerchantPermissionRequest) returns (GrantMerchantPermissionResponse);
+  rpc RevokeMerchantPermission(RevokeMerchantPermissionRequest) returns (RevokeMerchantPermissionResponse);
+  rpc ListMerchantPermissions(ListMerchantPermissionsRequest) returns (ListMerchantPermissionsResponse);
+  rpc CanManageProduct(CanManageProductRequest) returns (CanManageProductResponse);
 }
