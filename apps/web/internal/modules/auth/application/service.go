@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -17,17 +18,36 @@ import (
 
 var _ ports.AuthService = (*Service)(nil)
 
+// invitationTTL is how long a merchant invitation stays valid before a
+// karyawan must re-request one.
+const invitationTTL = 7 * 24 * time.Hour
+
+// grantableMerchantPermissions is the code-owned allowlist of capabilities a
+// merchant owner may delegate to a karyawan. It is deliberately a subset of the
+// tenant permission catalog: a karyawan is scoped to one merchant, not to the
+// whole tenant, and is never granted administrative authority.
+var grantableMerchantPermissions = map[string]bool{
+	"seller.catalog.manage":   true,
+	"seller.inventory.manage": true,
+	"seller.category.manage":  true,
+	"seller.sales.checkout":   true,
+	"seller.sales.void":       true,
+}
+
 // Service implements ports.AuthService.
 type Service struct {
 	employees     ports.EmployeeStore
 	sessions      ports.SessionStore
 	authorization ports.AuthorizationStore
+	merchants     ports.MerchantStore
 	pinCost       int
 	ttl           time.Duration
 }
 
-// NewService creates a new auth service.
-func NewService(employees ports.EmployeeStore, sessions ports.SessionStore, pinCost int, ttl time.Duration, authorization ...ports.AuthorizationStore) *Service {
+// NewService creates a new auth service. merchants is the merchant relationship
+// store; pass nil when merchant use cases are not wired (the tenant-scoped
+// RBAC surface still works without it).
+func NewService(employees ports.EmployeeStore, sessions ports.SessionStore, pinCost int, ttl time.Duration, merchants ports.MerchantStore, authorization ...ports.AuthorizationStore) *Service {
 	if pinCost <= 0 {
 		pinCost = bcrypt.DefaultCost
 	}
@@ -38,7 +58,7 @@ func NewService(employees ports.EmployeeStore, sessions ports.SessionStore, pinC
 	if len(authorization) > 0 {
 		authz = authorization[0]
 	}
-	return &Service{employees: employees, sessions: sessions, authorization: authz, pinCost: pinCost, ttl: ttl}
+	return &Service{employees: employees, sessions: sessions, authorization: authz, merchants: merchants, pinCost: pinCost, ttl: ttl}
 }
 
 // hashPIN hashes a PIN using bcrypt.
@@ -438,4 +458,249 @@ func optionalAdminEventTime(cursor adminEventCursor) *time.Time {
 		return nil
 	}
 	return &cursor.OccurredAt
+}
+
+// ---- merchant relationship use cases --------------------------------------
+
+// RegisterAccount creates a pembeli account: a customer who can browse and buy
+// but owns no merchant. The account is the default reserved role "pembeli"; it
+// becomes a penjual when it opens a merchant and a karyawan when an owner
+// accepts it into theirs.
+func (s *Service) RegisterAccount(ctx context.Context, tenant domain.Tenant, name, email, pin string) (*domain.Employee, error) {
+	return s.RegisterEmployee(ctx, tenant, uuid.NewString(), name, email, pin, domain.RoleViewer)
+}
+
+// merchantAdministrator resolves the session to an employee and verifies they
+// own the merchant. It is the owner-only guard for merchant administration.
+func (s *Service) merchantAdministrator(ctx context.Context, sessionID, merchantID string) (*domain.Session, *domain.Employee, *domain.Membership, error) {
+	if s.merchants == nil {
+		return nil, nil, nil, domain.ErrMerchantPermissionDenied
+	}
+	session, employee, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	membership, err := s.merchants.GetMembership(ctx, domain.Tenant(session.TenantID), merchantID, employee.ID)
+	if err != nil {
+		// A stranger or non-member must not learn their membership status: the
+		// only answer is that the operation is forbidden.
+		if errors.Is(err, domain.ErrMembershipNotFound) {
+			return nil, nil, nil, domain.ErrMerchantPermissionDenied
+		}
+		return nil, nil, nil, err
+	}
+	if !membership.IsOwner() {
+		return nil, nil, nil, domain.ErrMerchantPermissionDenied
+	}
+	return session, employee, membership, nil
+}
+
+// OpenMerchant creates a merchant owned by the session employee, making them a
+// penjual. An owner membership is created in the same operation.
+func (s *Service) OpenMerchant(ctx context.Context, sessionID, name string) (*domain.Merchant, error) {
+	if s.merchants == nil {
+		return nil, domain.ErrMerchantPermissionDenied
+	}
+	session, employee, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	tenant := domain.Tenant(session.TenantID)
+	merchant, err := domain.NewMerchant(tenant, uuid.NewString(), employee.ID, name)
+	if err != nil {
+		return nil, err
+	}
+	membership, err := domain.NewMembership(tenant, merchant.ID, employee.ID, employee.ID, domain.MerchantRoleOwner)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.merchants.CreateMerchant(ctx, merchant); err != nil {
+		return nil, err
+	}
+	if err := s.merchants.CreateMembership(ctx, membership); err != nil {
+		return nil, err
+	}
+	return merchant, nil
+}
+
+// ListMyMerchants returns the merchants the session employee is a member of
+// (owned as a penjual, or joined as a karyawan).
+func (s *Service) ListMyMerchants(ctx context.Context, sessionID string) ([]*domain.Merchant, error) {
+	if s.merchants == nil {
+		return nil, domain.ErrMerchantPermissionDenied
+	}
+	session, _, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return s.merchants.ListMerchantsForEmployee(ctx, domain.Tenant(session.TenantID), session.EmployeeID)
+}
+
+// GetMerchant returns a merchant the session employee is a member of.
+func (s *Service) GetMerchant(ctx context.Context, sessionID, merchantID string) (*domain.Merchant, error) {
+	if s.merchants == nil {
+		return nil, domain.ErrMerchantPermissionDenied
+	}
+	session, _, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	tenant := domain.Tenant(session.TenantID)
+	if _, err := s.merchants.GetMembership(ctx, tenant, merchantID, session.EmployeeID); err != nil {
+		return nil, err
+	}
+	return s.merchants.GetMerchant(ctx, tenant, merchantID)
+}
+
+// ListMembers returns a merchant's roster. Only the owner may read it.
+func (s *Service) ListMembers(ctx context.Context, sessionID, merchantID string) ([]*domain.Membership, error) {
+	session, _, _, err := s.merchantAdministrator(ctx, sessionID, merchantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.merchants.ListMembers(ctx, domain.Tenant(session.TenantID), merchantID)
+}
+
+// InviteMember creates an invitation for a karyawan. Only the merchant owner
+// (penjual) may invite, and an owner cannot invite a second owner.
+func (s *Service) InviteMember(ctx context.Context, sessionID, merchantID, email string, role domain.MerchantRole) (*domain.Invitation, error) {
+	session, _, _, err := s.merchantAdministrator(ctx, sessionID, merchantID)
+	if err != nil {
+		return nil, err
+	}
+	if role == domain.MerchantRoleOwner {
+		return nil, domain.ErrInvalidMerchant
+	}
+	tenant := domain.Tenant(session.TenantID)
+	invitation, err := domain.NewInvitation(tenant, uuid.NewString(), merchantID, email, role, uuid.NewString(), invitationTTL, session.EmployeeID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.merchants.CreateInvitation(ctx, invitation); err != nil {
+		return nil, err
+	}
+	return invitation, nil
+}
+
+// AcceptInvitation accepts a pending invitation on behalf of the session
+// employee, creating a karyawan membership. The accepting employee's email
+// must match the invited email, so a token cannot be redeemed by a stranger.
+func (s *Service) AcceptInvitation(ctx context.Context, sessionID, token string) (*domain.Membership, error) {
+	if s.merchants == nil {
+		return nil, domain.ErrMerchantPermissionDenied
+	}
+	session, employee, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	tenant := domain.Tenant(session.TenantID)
+	invitation, err := s.merchants.GetInvitationByToken(ctx, tenant, strings.TrimSpace(token))
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(strings.TrimSpace(invitation.Email), strings.TrimSpace(employee.Email)) {
+		return nil, domain.ErrInvalidMerchant
+	}
+	if err := invitation.Accept(); err != nil {
+		return nil, err
+	}
+	if err := s.merchants.UpdateInvitation(ctx, invitation); err != nil {
+		return nil, err
+	}
+	membership, err := domain.NewMembership(tenant, invitation.MerchantID, employee.ID, invitation.InvitedBy, invitation.Role)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.merchants.CreateMembership(ctx, membership); err != nil {
+		return nil, err
+	}
+	return membership, nil
+}
+
+// RevokeInvitation withdraws a pending invitation. Only the merchant owner may.
+func (s *Service) RevokeInvitation(ctx context.Context, sessionID, invitationID string) error {
+	if s.merchants == nil {
+		return domain.ErrMerchantPermissionDenied
+	}
+	session, _, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	invitation, err := s.merchants.GetInvitation(ctx, domain.Tenant(session.TenantID), invitationID)
+	if err != nil {
+		return err
+	}
+	if _, _, _, err := s.merchantAdministrator(ctx, sessionID, invitation.MerchantID); err != nil {
+		return err
+	}
+	if err := invitation.Revoke(); err != nil {
+		return err
+	}
+	return s.merchants.UpdateInvitation(ctx, invitation)
+}
+
+// GrantMerchantPermission delegates a supported capability to a karyawan
+// member of a merchant. Only the merchant owner may grant.
+func (s *Service) GrantMerchantPermission(ctx context.Context, sessionID, merchantID, employeeID, permissionKey string) error {
+	session, _, _, err := s.merchantAdministrator(ctx, sessionID, merchantID)
+	if err != nil {
+		return err
+	}
+	if !grantableMerchantPermissions[permissionKey] {
+		return domain.ErrInvalidMerchant
+	}
+	tenant := domain.Tenant(session.TenantID)
+	if _, err := s.merchants.GetMembership(ctx, tenant, merchantID, employeeID); err != nil {
+		return err
+	}
+	permission, err := domain.NewMerchantPermission(tenant, merchantID, employeeID, permissionKey, session.EmployeeID)
+	if err != nil {
+		return err
+	}
+	return s.merchants.GrantMerchantPermission(ctx, permission)
+}
+
+// RevokeMerchantPermission withdraws a karyawan's merchant-scoped capability.
+func (s *Service) RevokeMerchantPermission(ctx context.Context, sessionID, merchantID, employeeID, permissionKey string) error {
+	session, _, _, err := s.merchantAdministrator(ctx, sessionID, merchantID)
+	if err != nil {
+		return err
+	}
+	return s.merchants.RevokeMerchantPermission(ctx, domain.Tenant(session.TenantID), merchantID, employeeID, permissionKey)
+}
+
+// ListMerchantPermissions returns a member's granted merchant-scoped
+// capabilities. Only the merchant owner may read another member's grants.
+func (s *Service) ListMerchantPermissions(ctx context.Context, sessionID, merchantID, employeeID string) ([]string, error) {
+	session, _, _, err := s.merchantAdministrator(ctx, sessionID, merchantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.merchants.ListMerchantPermissions(ctx, domain.Tenant(session.TenantID), merchantID, employeeID)
+}
+
+// CanManageProduct is the merchant-scoped PDP: may the employee holding session
+// modify products in merchantID? The merchant owner (penjual) always may; a
+// karyawan may only with an explicit seller.catalog.manage grant from the owner.
+// An absent, expired or unauthorized session is a deny, never an error.
+func (s *Service) CanManageProduct(ctx context.Context, sessionID, merchantID string) (bool, error) {
+	if s.merchants == nil {
+		return false, nil
+	}
+	session, employee, err := s.ValidateSession(ctx, sessionID)
+	if err != nil {
+		return false, nil
+	}
+	tenant := domain.Tenant(session.TenantID)
+	membership, err := s.merchants.GetMembership(ctx, tenant, merchantID, employee.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrMembershipNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	if membership.IsOwner() {
+		return true, nil
+	}
+	return s.merchants.HasMerchantPermission(ctx, tenant, merchantID, employee.ID, "seller.catalog.manage")
 }

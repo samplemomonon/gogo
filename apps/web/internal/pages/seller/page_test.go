@@ -38,13 +38,26 @@ var (
 	_ ports.EmployeeSessions = pageEmployeeSessions{}
 )
 
-type pageEmployeeSessions struct{}
+type pageEmployeeSessions struct {
+	merchants []results.Merchant
+}
 
 func (pageEmployeeSessions) Current(context.Context, string) (*results.Employee, error) {
 	return &results.Employee{ID: "employee-1", Name: "Budi", Role: "seller"}, nil
 }
 
 func (pageEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+
+func (p pageEmployeeSessions) ListMyMerchants(context.Context, string) ([]results.Merchant, error) {
+	if p.merchants != nil {
+		return p.merchants, nil
+	}
+	return []results.Merchant{{ID: "merchant-1", OwnerEmployeeID: "employee-1", Name: "Toko Budi"}}, nil
+}
+
+func (pageEmployeeSessions) CanManageProduct(context.Context, string, string) (bool, error) {
 	return true, nil
 }
 

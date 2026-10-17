@@ -41,6 +41,18 @@ const (
 	AuthService_ListRoleAssignments_FullMethodName          = "/auth.v1.AuthService/ListRoleAssignments"
 	AuthService_ListTenantRoleAssignments_FullMethodName    = "/auth.v1.AuthService/ListTenantRoleAssignments"
 	AuthService_ListAuthorizationAdminEvents_FullMethodName = "/auth.v1.AuthService/ListAuthorizationAdminEvents"
+	AuthService_RegisterAccount_FullMethodName              = "/auth.v1.AuthService/RegisterAccount"
+	AuthService_OpenMerchant_FullMethodName                 = "/auth.v1.AuthService/OpenMerchant"
+	AuthService_ListMyMerchants_FullMethodName              = "/auth.v1.AuthService/ListMyMerchants"
+	AuthService_GetMerchant_FullMethodName                  = "/auth.v1.AuthService/GetMerchant"
+	AuthService_ListMembers_FullMethodName                  = "/auth.v1.AuthService/ListMembers"
+	AuthService_InviteMember_FullMethodName                 = "/auth.v1.AuthService/InviteMember"
+	AuthService_AcceptInvitation_FullMethodName             = "/auth.v1.AuthService/AcceptInvitation"
+	AuthService_RevokeInvitation_FullMethodName             = "/auth.v1.AuthService/RevokeInvitation"
+	AuthService_GrantMerchantPermission_FullMethodName      = "/auth.v1.AuthService/GrantMerchantPermission"
+	AuthService_RevokeMerchantPermission_FullMethodName     = "/auth.v1.AuthService/RevokeMerchantPermission"
+	AuthService_ListMerchantPermissions_FullMethodName      = "/auth.v1.AuthService/ListMerchantPermissions"
+	AuthService_CanManageProduct_FullMethodName             = "/auth.v1.AuthService/CanManageProduct"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -69,6 +81,18 @@ type AuthServiceClient interface {
 	ListRoleAssignments(ctx context.Context, in *ListRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListRoleAssignmentsResponse, error)
 	ListTenantRoleAssignments(ctx context.Context, in *ListTenantRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListTenantRoleAssignmentsResponse, error)
 	ListAuthorizationAdminEvents(ctx context.Context, in *ListAuthorizationAdminEventsRequest, opts ...grpc.CallOption) (*ListAuthorizationAdminEventsResponse, error)
+	RegisterAccount(ctx context.Context, in *RegisterAccountRequest, opts ...grpc.CallOption) (*RegisterAccountResponse, error)
+	OpenMerchant(ctx context.Context, in *OpenMerchantRequest, opts ...grpc.CallOption) (*OpenMerchantResponse, error)
+	ListMyMerchants(ctx context.Context, in *ListMyMerchantsRequest, opts ...grpc.CallOption) (*ListMyMerchantsResponse, error)
+	GetMerchant(ctx context.Context, in *GetMerchantRequest, opts ...grpc.CallOption) (*GetMerchantResponse, error)
+	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	InviteMember(ctx context.Context, in *InviteMemberRequest, opts ...grpc.CallOption) (*InviteMemberResponse, error)
+	AcceptInvitation(ctx context.Context, in *AcceptInvitationRequest, opts ...grpc.CallOption) (*AcceptInvitationResponse, error)
+	RevokeInvitation(ctx context.Context, in *RevokeInvitationRequest, opts ...grpc.CallOption) (*RevokeInvitationResponse, error)
+	GrantMerchantPermission(ctx context.Context, in *GrantMerchantPermissionRequest, opts ...grpc.CallOption) (*GrantMerchantPermissionResponse, error)
+	RevokeMerchantPermission(ctx context.Context, in *RevokeMerchantPermissionRequest, opts ...grpc.CallOption) (*RevokeMerchantPermissionResponse, error)
+	ListMerchantPermissions(ctx context.Context, in *ListMerchantPermissionsRequest, opts ...grpc.CallOption) (*ListMerchantPermissionsResponse, error)
+	CanManageProduct(ctx context.Context, in *CanManageProductRequest, opts ...grpc.CallOption) (*CanManageProductResponse, error)
 }
 
 type authServiceClient struct {
@@ -299,6 +323,126 @@ func (c *authServiceClient) ListAuthorizationAdminEvents(ctx context.Context, in
 	return out, nil
 }
 
+func (c *authServiceClient) RegisterAccount(ctx context.Context, in *RegisterAccountRequest, opts ...grpc.CallOption) (*RegisterAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterAccountResponse)
+	err := c.cc.Invoke(ctx, AuthService_RegisterAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OpenMerchant(ctx context.Context, in *OpenMerchantRequest, opts ...grpc.CallOption) (*OpenMerchantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OpenMerchantResponse)
+	err := c.cc.Invoke(ctx, AuthService_OpenMerchant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListMyMerchants(ctx context.Context, in *ListMyMerchantsRequest, opts ...grpc.CallOption) (*ListMyMerchantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMyMerchantsResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListMyMerchants_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GetMerchant(ctx context.Context, in *GetMerchantRequest, opts ...grpc.CallOption) (*GetMerchantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMerchantResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetMerchant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMembersResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) InviteMember(ctx context.Context, in *InviteMemberRequest, opts ...grpc.CallOption) (*InviteMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InviteMemberResponse)
+	err := c.cc.Invoke(ctx, AuthService_InviteMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) AcceptInvitation(ctx context.Context, in *AcceptInvitationRequest, opts ...grpc.CallOption) (*AcceptInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AcceptInvitationResponse)
+	err := c.cc.Invoke(ctx, AuthService_AcceptInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) RevokeInvitation(ctx context.Context, in *RevokeInvitationRequest, opts ...grpc.CallOption) (*RevokeInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeInvitationResponse)
+	err := c.cc.Invoke(ctx, AuthService_RevokeInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) GrantMerchantPermission(ctx context.Context, in *GrantMerchantPermissionRequest, opts ...grpc.CallOption) (*GrantMerchantPermissionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GrantMerchantPermissionResponse)
+	err := c.cc.Invoke(ctx, AuthService_GrantMerchantPermission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) RevokeMerchantPermission(ctx context.Context, in *RevokeMerchantPermissionRequest, opts ...grpc.CallOption) (*RevokeMerchantPermissionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeMerchantPermissionResponse)
+	err := c.cc.Invoke(ctx, AuthService_RevokeMerchantPermission_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListMerchantPermissions(ctx context.Context, in *ListMerchantPermissionsRequest, opts ...grpc.CallOption) (*ListMerchantPermissionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMerchantPermissionsResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListMerchantPermissions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CanManageProduct(ctx context.Context, in *CanManageProductRequest, opts ...grpc.CallOption) (*CanManageProductResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CanManageProductResponse)
+	err := c.cc.Invoke(ctx, AuthService_CanManageProduct_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -325,6 +469,18 @@ type AuthServiceServer interface {
 	ListRoleAssignments(context.Context, *ListRoleAssignmentsRequest) (*ListRoleAssignmentsResponse, error)
 	ListTenantRoleAssignments(context.Context, *ListTenantRoleAssignmentsRequest) (*ListTenantRoleAssignmentsResponse, error)
 	ListAuthorizationAdminEvents(context.Context, *ListAuthorizationAdminEventsRequest) (*ListAuthorizationAdminEventsResponse, error)
+	RegisterAccount(context.Context, *RegisterAccountRequest) (*RegisterAccountResponse, error)
+	OpenMerchant(context.Context, *OpenMerchantRequest) (*OpenMerchantResponse, error)
+	ListMyMerchants(context.Context, *ListMyMerchantsRequest) (*ListMyMerchantsResponse, error)
+	GetMerchant(context.Context, *GetMerchantRequest) (*GetMerchantResponse, error)
+	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	InviteMember(context.Context, *InviteMemberRequest) (*InviteMemberResponse, error)
+	AcceptInvitation(context.Context, *AcceptInvitationRequest) (*AcceptInvitationResponse, error)
+	RevokeInvitation(context.Context, *RevokeInvitationRequest) (*RevokeInvitationResponse, error)
+	GrantMerchantPermission(context.Context, *GrantMerchantPermissionRequest) (*GrantMerchantPermissionResponse, error)
+	RevokeMerchantPermission(context.Context, *RevokeMerchantPermissionRequest) (*RevokeMerchantPermissionResponse, error)
+	ListMerchantPermissions(context.Context, *ListMerchantPermissionsRequest) (*ListMerchantPermissionsResponse, error)
+	CanManageProduct(context.Context, *CanManageProductRequest) (*CanManageProductResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -400,6 +556,42 @@ func (UnimplementedAuthServiceServer) ListTenantRoleAssignments(context.Context,
 }
 func (UnimplementedAuthServiceServer) ListAuthorizationAdminEvents(context.Context, *ListAuthorizationAdminEventsRequest) (*ListAuthorizationAdminEventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAuthorizationAdminEvents not implemented")
+}
+func (UnimplementedAuthServiceServer) RegisterAccount(context.Context, *RegisterAccountRequest) (*RegisterAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterAccount not implemented")
+}
+func (UnimplementedAuthServiceServer) OpenMerchant(context.Context, *OpenMerchantRequest) (*OpenMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OpenMerchant not implemented")
+}
+func (UnimplementedAuthServiceServer) ListMyMerchants(context.Context, *ListMyMerchantsRequest) (*ListMyMerchantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMyMerchants not implemented")
+}
+func (UnimplementedAuthServiceServer) GetMerchant(context.Context, *GetMerchantRequest) (*GetMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMerchant not implemented")
+}
+func (UnimplementedAuthServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedAuthServiceServer) InviteMember(context.Context, *InviteMemberRequest) (*InviteMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InviteMember not implemented")
+}
+func (UnimplementedAuthServiceServer) AcceptInvitation(context.Context, *AcceptInvitationRequest) (*AcceptInvitationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AcceptInvitation not implemented")
+}
+func (UnimplementedAuthServiceServer) RevokeInvitation(context.Context, *RevokeInvitationRequest) (*RevokeInvitationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeInvitation not implemented")
+}
+func (UnimplementedAuthServiceServer) GrantMerchantPermission(context.Context, *GrantMerchantPermissionRequest) (*GrantMerchantPermissionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GrantMerchantPermission not implemented")
+}
+func (UnimplementedAuthServiceServer) RevokeMerchantPermission(context.Context, *RevokeMerchantPermissionRequest) (*RevokeMerchantPermissionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeMerchantPermission not implemented")
+}
+func (UnimplementedAuthServiceServer) ListMerchantPermissions(context.Context, *ListMerchantPermissionsRequest) (*ListMerchantPermissionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMerchantPermissions not implemented")
+}
+func (UnimplementedAuthServiceServer) CanManageProduct(context.Context, *CanManageProductRequest) (*CanManageProductResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CanManageProduct not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -818,6 +1010,222 @@ func _AuthService_ListAuthorizationAdminEvents_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_RegisterAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RegisterAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RegisterAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RegisterAccount(ctx, req.(*RegisterAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OpenMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OpenMerchantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OpenMerchant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OpenMerchant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OpenMerchant(ctx, req.(*OpenMerchantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListMyMerchants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMyMerchantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListMyMerchants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListMyMerchants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListMyMerchants(ctx, req.(*ListMyMerchantsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GetMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMerchantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetMerchant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetMerchant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetMerchant(ctx, req.(*GetMerchantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_InviteMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InviteMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).InviteMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_InviteMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).InviteMember(ctx, req.(*InviteMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_AcceptInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcceptInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).AcceptInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_AcceptInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).AcceptInvitation(ctx, req.(*AcceptInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_RevokeInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RevokeInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RevokeInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RevokeInvitation(ctx, req.(*RevokeInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_GrantMerchantPermission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GrantMerchantPermissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GrantMerchantPermission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GrantMerchantPermission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GrantMerchantPermission(ctx, req.(*GrantMerchantPermissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_RevokeMerchantPermission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeMerchantPermissionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RevokeMerchantPermission(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RevokeMerchantPermission_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RevokeMerchantPermission(ctx, req.(*RevokeMerchantPermissionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListMerchantPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMerchantPermissionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListMerchantPermissions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListMerchantPermissions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListMerchantPermissions(ctx, req.(*ListMerchantPermissionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CanManageProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CanManageProductRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CanManageProduct(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CanManageProduct_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CanManageProduct(ctx, req.(*CanManageProductRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -912,6 +1320,54 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAuthorizationAdminEvents",
 			Handler:    _AuthService_ListAuthorizationAdminEvents_Handler,
+		},
+		{
+			MethodName: "RegisterAccount",
+			Handler:    _AuthService_RegisterAccount_Handler,
+		},
+		{
+			MethodName: "OpenMerchant",
+			Handler:    _AuthService_OpenMerchant_Handler,
+		},
+		{
+			MethodName: "ListMyMerchants",
+			Handler:    _AuthService_ListMyMerchants_Handler,
+		},
+		{
+			MethodName: "GetMerchant",
+			Handler:    _AuthService_GetMerchant_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _AuthService_ListMembers_Handler,
+		},
+		{
+			MethodName: "InviteMember",
+			Handler:    _AuthService_InviteMember_Handler,
+		},
+		{
+			MethodName: "AcceptInvitation",
+			Handler:    _AuthService_AcceptInvitation_Handler,
+		},
+		{
+			MethodName: "RevokeInvitation",
+			Handler:    _AuthService_RevokeInvitation_Handler,
+		},
+		{
+			MethodName: "GrantMerchantPermission",
+			Handler:    _AuthService_GrantMerchantPermission_Handler,
+		},
+		{
+			MethodName: "RevokeMerchantPermission",
+			Handler:    _AuthService_RevokeMerchantPermission_Handler,
+		},
+		{
+			MethodName: "ListMerchantPermissions",
+			Handler:    _AuthService_ListMerchantPermissions_Handler,
+		},
+		{
+			MethodName: "CanManageProduct",
+			Handler:    _AuthService_CanManageProduct_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

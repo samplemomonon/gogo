@@ -6,6 +6,7 @@ package ops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -29,11 +30,12 @@ type Probe func(ctx context.Context) error
 // Register declares the ops module's graph with the composition root, keyed by
 // its type, mirroring the pages' Register.
 //
-// Readiness is derived from two capabilities rather than from concrete page
-// clients: the registry's aggregated health, and the group of contributed
-// upstream breakers. Depending on the group is what keeps this module honest —
-// it reports on every upstream the root wired, so adding one needs no edit
-// here, and ops never imports the page adapters that own them.
+// Readiness is derived from capabilities rather than from concrete page
+// clients: the registry's aggregated health, the group of contributed upstream
+// breakers, and the optional ReadinessPolicy (absent means "gate on
+// everything"). Depending on the group is what keeps this module honest — it
+// reports on every upstream the root wired, so adding one needs no edit here,
+// and ops never imports the page adapters that own them.
 func Register(b *fdi.Builder) {
 	fdi.ProvideType(b, func(c *fdi.Container) (*Module, error) {
 		registry, err := fdi.ResolveType[*module.Registry](c)
@@ -44,21 +46,57 @@ func Register(b *fdi.Builder) {
 		if err != nil {
 			return nil, fmt.Errorf("ops: resolve upstream breakers: %w", err)
 		}
-		return NewModuleWithProbe(Readiness(registry, upstreams)), nil
+		policy, err := fdi.ResolveType[ReadinessPolicy](c)
+		if err != nil {
+			if !errors.Is(err, fdi.ErrServiceNotFound) {
+				return nil, fmt.Errorf("ops: resolve readiness policy: %w", err)
+			}
+			policy = ReadinessPolicy{}
+		}
+		return NewModuleWithProbe(Readiness(registry, upstreams, policy)), nil
 	})
 }
 
-// Readiness reports whether every module and every contributed upstream the
-// gateway depends on can serve traffic: the registry's health across all
-// modules except ops itself (whose probe would otherwise recurse), then each
-// upstream breaker. A breaker carries the upstream's name, so the failure says
-// which dependency is unreachable.
-func Readiness(registry *module.Registry, upstreams []fdi.Member[*breaker.Breaker]) Probe {
+// ReadinessPolicy tells the readiness probe which upstreams are optional.
+//
+// An optional upstream may be down without taking the gateway out of rotation:
+// the surfaces that need it degrade, everything else keeps serving. That is a
+// deliberate classification recorded by the composition root, not a failure
+// mode — a search outage must not drain a gateway that still serves browse.
+// Every upstream not named here is required, and an open breaker on one of
+// those still fails readiness: without browse, for example, the storefront has
+// nothing to serve.
+//
+// The zero value gates on every upstream, the conservative verdict for a root
+// that has not classified its dependencies.
+type ReadinessPolicy struct {
+	Optional []string
+}
+
+func (p ReadinessPolicy) optional(upstream string) bool {
+	for _, name := range p.Optional {
+		if name == upstream {
+			return true
+		}
+	}
+	return false
+}
+
+// Readiness reports whether every module and every required contributed
+// upstream the gateway depends on can serve traffic: the registry's health
+// across all modules except ops itself (whose probe would otherwise recurse),
+// then each upstream breaker the policy does not mark optional. A breaker
+// carries the upstream's name, so the failure says which dependency is
+// unreachable.
+func Readiness(registry *module.Registry, upstreams []fdi.Member[*breaker.Breaker], policy ReadinessPolicy) Probe {
 	return func(ctx context.Context) error {
 		if err := registry.ReadyExcluding(ctx, name); err != nil {
 			return err
 		}
 		for _, upstream := range upstreams {
+			if policy.optional(upstream.Name) {
+				continue
+			}
 			if upstream.Value.State() == breaker.StateOpen {
 				return fmt.Errorf("%s circuit breaker is open", upstream.Name)
 			}

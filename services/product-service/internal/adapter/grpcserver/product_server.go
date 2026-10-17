@@ -88,6 +88,7 @@ func (s *ProductServer) CreateProduct(
 		Status:         status,
 		PrimaryMediaID: primaryMediaID,
 		Variants:       variants,
+		MerchantID:     req.GetMerchantId(),
 	})
 	if err != nil {
 		return nil, toStatus(err)
@@ -212,6 +213,7 @@ func productToProto(p *productdomain.Product) *productpb.Product {
 		Status:        statusFromString(p.Status),
 		CreatedAt:     timestamppb.New(p.CreatedAt),
 		UpdatedAt:     timestamppb.New(p.UpdatedAt),
+		MerchantId:    p.MerchantID,
 	}
 	if p.Description != nil {
 		proto.Description = *p.Description

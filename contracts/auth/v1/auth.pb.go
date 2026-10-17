@@ -2816,6 +2816,1514 @@ func (x *ListAuthorizationAdminEventsResponse) GetNextPageToken() string {
 	return ""
 }
 
+// Merchant is a seller's shop, owned by one employee (the penjual). Products in
+// the product platform carry a merchant_id that references these rows; the auth
+// module is the authority for who owns a merchant and who may manage its
+// products.
+type Merchant struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId        string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	OwnerEmployeeId string                 `protobuf:"bytes,3,opt,name=owner_employee_id,json=ownerEmployeeId,proto3" json:"owner_employee_id,omitempty"`
+	Name            string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Merchant) Reset() {
+	*x = Merchant{}
+	mi := &file_auth_v1_auth_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Merchant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Merchant) ProtoMessage() {}
+
+func (x *Merchant) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Merchant.ProtoReflect.Descriptor instead.
+func (*Merchant) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *Merchant) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Merchant) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *Merchant) GetOwnerEmployeeId() string {
+	if x != nil {
+		return x.OwnerEmployeeId
+	}
+	return ""
+}
+
+func (x *Merchant) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Merchant) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Merchant) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+// MerchantMembership is an employee's role inside one merchant. role is
+// "owner" (penjual) or "karyawan"; a karyawan holds no product authority until
+// the owner grants one.
+type MerchantMembership struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	EmployeeId    string                 `protobuf:"bytes,3,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	GrantedBy     string                 `protobuf:"bytes,5,opt,name=granted_by,json=grantedBy,proto3" json:"granted_by,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MerchantMembership) Reset() {
+	*x = MerchantMembership{}
+	mi := &file_auth_v1_auth_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MerchantMembership) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MerchantMembership) ProtoMessage() {}
+
+func (x *MerchantMembership) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MerchantMembership.ProtoReflect.Descriptor instead.
+func (*MerchantMembership) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *MerchantMembership) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *MerchantMembership) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *MerchantMembership) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *MerchantMembership) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *MerchantMembership) GetGrantedBy() string {
+	if x != nil {
+		return x.GrantedBy
+	}
+	return ""
+}
+
+func (x *MerchantMembership) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+// MerchantInvitation is how an owner adds a karyawan. It carries a one-time
+// token and expires.
+type MerchantInvitation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,3,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	Role          string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
+	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	Token         string                 `protobuf:"bytes,7,opt,name=token,proto3" json:"token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	InvitedBy     string                 `protobuf:"bytes,9,opt,name=invited_by,json=invitedBy,proto3" json:"invited_by,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	AcceptedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=accepted_at,json=acceptedAt,proto3" json:"accepted_at,omitempty"`
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MerchantInvitation) Reset() {
+	*x = MerchantInvitation{}
+	mi := &file_auth_v1_auth_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MerchantInvitation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MerchantInvitation) ProtoMessage() {}
+
+func (x *MerchantInvitation) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MerchantInvitation.ProtoReflect.Descriptor instead.
+func (*MerchantInvitation) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *MerchantInvitation) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *MerchantInvitation) GetInvitedBy() string {
+	if x != nil {
+		return x.InvitedBy
+	}
+	return ""
+}
+
+func (x *MerchantInvitation) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *MerchantInvitation) GetAcceptedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AcceptedAt
+	}
+	return nil
+}
+
+func (x *MerchantInvitation) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+// RegisterAccountRequest creates a pembeli account.
+type RegisterAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Pin           string                 `protobuf:"bytes,4,opt,name=pin,proto3" json:"pin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterAccountRequest) Reset() {
+	*x = RegisterAccountRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterAccountRequest) ProtoMessage() {}
+
+func (x *RegisterAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterAccountRequest.ProtoReflect.Descriptor instead.
+func (*RegisterAccountRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *RegisterAccountRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RegisterAccountRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RegisterAccountRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *RegisterAccountRequest) GetPin() string {
+	if x != nil {
+		return x.Pin
+	}
+	return ""
+}
+
+type RegisterAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Employee      *Employee              `protobuf:"bytes,1,opt,name=employee,proto3" json:"employee,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterAccountResponse) Reset() {
+	*x = RegisterAccountResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterAccountResponse) ProtoMessage() {}
+
+func (x *RegisterAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterAccountResponse.ProtoReflect.Descriptor instead.
+func (*RegisterAccountResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *RegisterAccountResponse) GetEmployee() *Employee {
+	if x != nil {
+		return x.Employee
+	}
+	return nil
+}
+
+// OpenMerchantRequest opens a merchant owned by the session employee.
+type OpenMerchantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OpenMerchantRequest) Reset() {
+	*x = OpenMerchantRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OpenMerchantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenMerchantRequest) ProtoMessage() {}
+
+func (x *OpenMerchantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenMerchantRequest.ProtoReflect.Descriptor instead.
+func (*OpenMerchantRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *OpenMerchantRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *OpenMerchantRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type OpenMerchantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Merchant      *Merchant              `protobuf:"bytes,1,opt,name=merchant,proto3" json:"merchant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OpenMerchantResponse) Reset() {
+	*x = OpenMerchantResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OpenMerchantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenMerchantResponse) ProtoMessage() {}
+
+func (x *OpenMerchantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenMerchantResponse.ProtoReflect.Descriptor instead.
+func (*OpenMerchantResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *OpenMerchantResponse) GetMerchant() *Merchant {
+	if x != nil {
+		return x.Merchant
+	}
+	return nil
+}
+
+type ListMyMerchantsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyMerchantsRequest) Reset() {
+	*x = ListMyMerchantsRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyMerchantsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyMerchantsRequest) ProtoMessage() {}
+
+func (x *ListMyMerchantsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyMerchantsRequest.ProtoReflect.Descriptor instead.
+func (*ListMyMerchantsRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ListMyMerchantsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type ListMyMerchantsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Merchants     []*Merchant            `protobuf:"bytes,1,rep,name=merchants,proto3" json:"merchants,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyMerchantsResponse) Reset() {
+	*x = ListMyMerchantsResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyMerchantsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyMerchantsResponse) ProtoMessage() {}
+
+func (x *ListMyMerchantsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyMerchantsResponse.ProtoReflect.Descriptor instead.
+func (*ListMyMerchantsResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ListMyMerchantsResponse) GetMerchants() []*Merchant {
+	if x != nil {
+		return x.Merchants
+	}
+	return nil
+}
+
+type GetMerchantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMerchantRequest) Reset() {
+	*x = GetMerchantRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMerchantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMerchantRequest) ProtoMessage() {}
+
+func (x *GetMerchantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMerchantRequest.ProtoReflect.Descriptor instead.
+func (*GetMerchantRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *GetMerchantRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GetMerchantRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+type GetMerchantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Merchant      *Merchant              `protobuf:"bytes,1,opt,name=merchant,proto3" json:"merchant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMerchantResponse) Reset() {
+	*x = GetMerchantResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMerchantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMerchantResponse) ProtoMessage() {}
+
+func (x *GetMerchantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMerchantResponse.ProtoReflect.Descriptor instead.
+func (*GetMerchantResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *GetMerchantResponse) GetMerchant() *Merchant {
+	if x != nil {
+		return x.Merchant
+	}
+	return nil
+}
+
+type ListMembersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersRequest) Reset() {
+	*x = ListMembersRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersRequest) ProtoMessage() {}
+
+func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListMembersRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *ListMembersRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListMembersRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+type ListMembersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Members       []*MerchantMembership  `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersResponse) Reset() {
+	*x = ListMembersResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersResponse) ProtoMessage() {}
+
+func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListMembersResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *ListMembersResponse) GetMembers() []*MerchantMembership {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+// InviteMemberRequest invites a karyawan to a merchant. Only the owner may.
+type InviteMemberRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InviteMemberRequest) Reset() {
+	*x = InviteMemberRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InviteMemberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InviteMemberRequest) ProtoMessage() {}
+
+func (x *InviteMemberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InviteMemberRequest.ProtoReflect.Descriptor instead.
+func (*InviteMemberRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *InviteMemberRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *InviteMemberRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *InviteMemberRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *InviteMemberRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+type InviteMemberResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invitation    *MerchantInvitation    `protobuf:"bytes,1,opt,name=invitation,proto3" json:"invitation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InviteMemberResponse) Reset() {
+	*x = InviteMemberResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InviteMemberResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InviteMemberResponse) ProtoMessage() {}
+
+func (x *InviteMemberResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InviteMemberResponse.ProtoReflect.Descriptor instead.
+func (*InviteMemberResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *InviteMemberResponse) GetInvitation() *MerchantInvitation {
+	if x != nil {
+		return x.Invitation
+	}
+	return nil
+}
+
+type AcceptInvitationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Token         string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptInvitationRequest) Reset() {
+	*x = AcceptInvitationRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptInvitationRequest) ProtoMessage() {}
+
+func (x *AcceptInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptInvitationRequest.ProtoReflect.Descriptor instead.
+func (*AcceptInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *AcceptInvitationRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AcceptInvitationRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type AcceptInvitationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Membership    *MerchantMembership    `protobuf:"bytes,1,opt,name=membership,proto3" json:"membership,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptInvitationResponse) Reset() {
+	*x = AcceptInvitationResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptInvitationResponse) ProtoMessage() {}
+
+func (x *AcceptInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptInvitationResponse.ProtoReflect.Descriptor instead.
+func (*AcceptInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *AcceptInvitationResponse) GetMembership() *MerchantMembership {
+	if x != nil {
+		return x.Membership
+	}
+	return nil
+}
+
+type RevokeInvitationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	InvitationId  string                 `protobuf:"bytes,2,opt,name=invitation_id,json=invitationId,proto3" json:"invitation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeInvitationRequest) Reset() {
+	*x = RevokeInvitationRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeInvitationRequest) ProtoMessage() {}
+
+func (x *RevokeInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeInvitationRequest.ProtoReflect.Descriptor instead.
+func (*RevokeInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *RevokeInvitationRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RevokeInvitationRequest) GetInvitationId() string {
+	if x != nil {
+		return x.InvitationId
+	}
+	return ""
+}
+
+type RevokeInvitationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeInvitationResponse) Reset() {
+	*x = RevokeInvitationResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeInvitationResponse) ProtoMessage() {}
+
+func (x *RevokeInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeInvitationResponse.ProtoReflect.Descriptor instead.
+func (*RevokeInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{67}
+}
+
+// GrantMerchantPermissionRequest delegates a supported capability to a
+// karyawan member of a merchant. Only the owner may.
+type GrantMerchantPermissionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	EmployeeId    string                 `protobuf:"bytes,3,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	PermissionKey string                 `protobuf:"bytes,4,opt,name=permission_key,json=permissionKey,proto3" json:"permission_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrantMerchantPermissionRequest) Reset() {
+	*x = GrantMerchantPermissionRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantMerchantPermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantMerchantPermissionRequest) ProtoMessage() {}
+
+func (x *GrantMerchantPermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantMerchantPermissionRequest.ProtoReflect.Descriptor instead.
+func (*GrantMerchantPermissionRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *GrantMerchantPermissionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GrantMerchantPermissionRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *GrantMerchantPermissionRequest) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *GrantMerchantPermissionRequest) GetPermissionKey() string {
+	if x != nil {
+		return x.PermissionKey
+	}
+	return ""
+}
+
+type GrantMerchantPermissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrantMerchantPermissionResponse) Reset() {
+	*x = GrantMerchantPermissionResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantMerchantPermissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantMerchantPermissionResponse) ProtoMessage() {}
+
+func (x *GrantMerchantPermissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantMerchantPermissionResponse.ProtoReflect.Descriptor instead.
+func (*GrantMerchantPermissionResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{69}
+}
+
+type RevokeMerchantPermissionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	EmployeeId    string                 `protobuf:"bytes,3,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	PermissionKey string                 `protobuf:"bytes,4,opt,name=permission_key,json=permissionKey,proto3" json:"permission_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeMerchantPermissionRequest) Reset() {
+	*x = RevokeMerchantPermissionRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeMerchantPermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeMerchantPermissionRequest) ProtoMessage() {}
+
+func (x *RevokeMerchantPermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeMerchantPermissionRequest.ProtoReflect.Descriptor instead.
+func (*RevokeMerchantPermissionRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *RevokeMerchantPermissionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RevokeMerchantPermissionRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *RevokeMerchantPermissionRequest) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *RevokeMerchantPermissionRequest) GetPermissionKey() string {
+	if x != nil {
+		return x.PermissionKey
+	}
+	return ""
+}
+
+type RevokeMerchantPermissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeMerchantPermissionResponse) Reset() {
+	*x = RevokeMerchantPermissionResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeMerchantPermissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeMerchantPermissionResponse) ProtoMessage() {}
+
+func (x *RevokeMerchantPermissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeMerchantPermissionResponse.ProtoReflect.Descriptor instead.
+func (*RevokeMerchantPermissionResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{71}
+}
+
+type ListMerchantPermissionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	EmployeeId    string                 `protobuf:"bytes,3,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMerchantPermissionsRequest) Reset() {
+	*x = ListMerchantPermissionsRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMerchantPermissionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMerchantPermissionsRequest) ProtoMessage() {}
+
+func (x *ListMerchantPermissionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMerchantPermissionsRequest.ProtoReflect.Descriptor instead.
+func (*ListMerchantPermissionsRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *ListMerchantPermissionsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListMerchantPermissionsRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *ListMerchantPermissionsRequest) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+type ListMerchantPermissionsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PermissionKeys []string               `protobuf:"bytes,1,rep,name=permission_keys,json=permissionKeys,proto3" json:"permission_keys,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListMerchantPermissionsResponse) Reset() {
+	*x = ListMerchantPermissionsResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMerchantPermissionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMerchantPermissionsResponse) ProtoMessage() {}
+
+func (x *ListMerchantPermissionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMerchantPermissionsResponse.ProtoReflect.Descriptor instead.
+func (*ListMerchantPermissionsResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *ListMerchantPermissionsResponse) GetPermissionKeys() []string {
+	if x != nil {
+		return x.PermissionKeys
+	}
+	return nil
+}
+
+// CanManageProductRequest asks the merchant-scoped PDP whether the session
+// employee may modify products in the merchant.
+type CanManageProductRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CanManageProductRequest) Reset() {
+	*x = CanManageProductRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CanManageProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CanManageProductRequest) ProtoMessage() {}
+
+func (x *CanManageProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CanManageProductRequest.ProtoReflect.Descriptor instead.
+func (*CanManageProductRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *CanManageProductRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CanManageProductRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+type CanManageProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CanManageProductResponse) Reset() {
+	*x = CanManageProductResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CanManageProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CanManageProductResponse) ProtoMessage() {}
+
+func (x *CanManageProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CanManageProductResponse.ProtoReflect.Descriptor instead.
+func (*CanManageProductResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *CanManageProductResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
 var File_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_auth_v1_auth_proto_rawDesc = "" +
@@ -3030,7 +4538,137 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\"\x88\x01\n" +
 	"$ListAuthorizationAdminEventsResponse\x128\n" +
 	"\x06events\x18\x01 \x03(\v2 .auth.v1.AuthorizationAdminEventR\x06events\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x8c\x0f\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xed\x01\n" +
+	"\bMerchant\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12*\n" +
+	"\x11owner_employee_id\x18\x03 \x01(\tR\x0fownerEmployeeId\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xe1\x01\n" +
+	"\x12MerchantMembership\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\x12\x1f\n" +
+	"\vemployee_id\x18\x03 \x01(\tR\n" +
+	"employeeId\x12\x12\n" +
+	"\x04role\x18\x04 \x01(\tR\x04role\x12\x1d\n" +
+	"\n" +
+	"granted_by\x18\x05 \x01(\tR\tgrantedBy\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc7\x03\n" +
+	"\x12MerchantInvitation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1f\n" +
+	"\vmerchant_id\x18\x03 \x01(\tR\n" +
+	"merchantId\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12\x14\n" +
+	"\x05token\x18\a \x01(\tR\x05token\x129\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x1d\n" +
+	"\n" +
+	"invited_by\x18\t \x01(\tR\tinvitedBy\x129\n" +
+	"\n" +
+	"created_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vaccepted_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"acceptedAt\x129\n" +
+	"\n" +
+	"revoked_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\"q\n" +
+	"\x16RegisterAccountRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x10\n" +
+	"\x03pin\x18\x04 \x01(\tR\x03pin\"H\n" +
+	"\x17RegisterAccountResponse\x12-\n" +
+	"\bemployee\x18\x01 \x01(\v2\x11.auth.v1.EmployeeR\bemployee\"H\n" +
+	"\x13OpenMerchantRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"E\n" +
+	"\x14OpenMerchantResponse\x12-\n" +
+	"\bmerchant\x18\x01 \x01(\v2\x11.auth.v1.MerchantR\bmerchant\"7\n" +
+	"\x16ListMyMerchantsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"J\n" +
+	"\x17ListMyMerchantsResponse\x12/\n" +
+	"\tmerchants\x18\x01 \x03(\v2\x11.auth.v1.MerchantR\tmerchants\"T\n" +
+	"\x12GetMerchantRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\"D\n" +
+	"\x13GetMerchantResponse\x12-\n" +
+	"\bmerchant\x18\x01 \x01(\v2\x11.auth.v1.MerchantR\bmerchant\"T\n" +
+	"\x12ListMembersRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\"L\n" +
+	"\x13ListMembersResponse\x125\n" +
+	"\amembers\x18\x01 \x03(\v2\x1b.auth.v1.MerchantMembershipR\amembers\"\x7f\n" +
+	"\x13InviteMemberRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x04 \x01(\tR\x04role\"S\n" +
+	"\x14InviteMemberResponse\x12;\n" +
+	"\n" +
+	"invitation\x18\x01 \x01(\v2\x1b.auth.v1.MerchantInvitationR\n" +
+	"invitation\"N\n" +
+	"\x17AcceptInvitationRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\"W\n" +
+	"\x18AcceptInvitationResponse\x12;\n" +
+	"\n" +
+	"membership\x18\x01 \x01(\v2\x1b.auth.v1.MerchantMembershipR\n" +
+	"membership\"]\n" +
+	"\x17RevokeInvitationRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
+	"\rinvitation_id\x18\x02 \x01(\tR\finvitationId\"\x1a\n" +
+	"\x18RevokeInvitationResponse\"\xa8\x01\n" +
+	"\x1eGrantMerchantPermissionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\x12\x1f\n" +
+	"\vemployee_id\x18\x03 \x01(\tR\n" +
+	"employeeId\x12%\n" +
+	"\x0epermission_key\x18\x04 \x01(\tR\rpermissionKey\"!\n" +
+	"\x1fGrantMerchantPermissionResponse\"\xa9\x01\n" +
+	"\x1fRevokeMerchantPermissionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\x12\x1f\n" +
+	"\vemployee_id\x18\x03 \x01(\tR\n" +
+	"employeeId\x12%\n" +
+	"\x0epermission_key\x18\x04 \x01(\tR\rpermissionKey\"\"\n" +
+	" RevokeMerchantPermissionResponse\"\x81\x01\n" +
+	"\x1eListMerchantPermissionsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\x12\x1f\n" +
+	"\vemployee_id\x18\x03 \x01(\tR\n" +
+	"employeeId\"J\n" +
+	"\x1fListMerchantPermissionsResponse\x12'\n" +
+	"\x0fpermission_keys\x18\x01 \x03(\tR\x0epermissionKeys\"Y\n" +
+	"\x17CanManageProductRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\"4\n" +
+	"\x18CanManageProductResponse\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed2\xbe\x17\n" +
 	"\vAuthService\x12W\n" +
 	"\x10RegisterEmployee\x12 .auth.v1.RegisterEmployeeRequest\x1a!.auth.v1.RegisterEmployeeResponse\x12H\n" +
 	"\vGetEmployee\x12\x1b.auth.v1.GetEmployeeRequest\x1a\x1c.auth.v1.GetEmployeeResponse\x12]\n" +
@@ -3055,7 +4693,19 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x16ListAuthorizationRoles\x12&.auth.v1.ListAuthorizationRolesRequest\x1a'.auth.v1.ListAuthorizationRolesResponse\x12`\n" +
 	"\x13ListRoleAssignments\x12#.auth.v1.ListRoleAssignmentsRequest\x1a$.auth.v1.ListRoleAssignmentsResponse\x12r\n" +
 	"\x19ListTenantRoleAssignments\x12).auth.v1.ListTenantRoleAssignmentsRequest\x1a*.auth.v1.ListTenantRoleAssignmentsResponse\x12{\n" +
-	"\x1cListAuthorizationAdminEvents\x12,.auth.v1.ListAuthorizationAdminEventsRequest\x1a-.auth.v1.ListAuthorizationAdminEventsResponseB\x1fZ\x1dgogo/contracts/auth/v1;authv1b\x06proto3"
+	"\x1cListAuthorizationAdminEvents\x12,.auth.v1.ListAuthorizationAdminEventsRequest\x1a-.auth.v1.ListAuthorizationAdminEventsResponse\x12T\n" +
+	"\x0fRegisterAccount\x12\x1f.auth.v1.RegisterAccountRequest\x1a .auth.v1.RegisterAccountResponse\x12K\n" +
+	"\fOpenMerchant\x12\x1c.auth.v1.OpenMerchantRequest\x1a\x1d.auth.v1.OpenMerchantResponse\x12T\n" +
+	"\x0fListMyMerchants\x12\x1f.auth.v1.ListMyMerchantsRequest\x1a .auth.v1.ListMyMerchantsResponse\x12H\n" +
+	"\vGetMerchant\x12\x1b.auth.v1.GetMerchantRequest\x1a\x1c.auth.v1.GetMerchantResponse\x12H\n" +
+	"\vListMembers\x12\x1b.auth.v1.ListMembersRequest\x1a\x1c.auth.v1.ListMembersResponse\x12K\n" +
+	"\fInviteMember\x12\x1c.auth.v1.InviteMemberRequest\x1a\x1d.auth.v1.InviteMemberResponse\x12W\n" +
+	"\x10AcceptInvitation\x12 .auth.v1.AcceptInvitationRequest\x1a!.auth.v1.AcceptInvitationResponse\x12W\n" +
+	"\x10RevokeInvitation\x12 .auth.v1.RevokeInvitationRequest\x1a!.auth.v1.RevokeInvitationResponse\x12l\n" +
+	"\x17GrantMerchantPermission\x12'.auth.v1.GrantMerchantPermissionRequest\x1a(.auth.v1.GrantMerchantPermissionResponse\x12o\n" +
+	"\x18RevokeMerchantPermission\x12(.auth.v1.RevokeMerchantPermissionRequest\x1a).auth.v1.RevokeMerchantPermissionResponse\x12l\n" +
+	"\x17ListMerchantPermissions\x12'.auth.v1.ListMerchantPermissionsRequest\x1a(.auth.v1.ListMerchantPermissionsResponse\x12W\n" +
+	"\x10CanManageProduct\x12 .auth.v1.CanManageProductRequest\x1a!.auth.v1.CanManageProductResponseB\x1fZ\x1dgogo/contracts/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -3069,7 +4719,7 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_auth_v1_auth_proto_rawDescData
 }
 
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 76)
 var file_auth_v1_auth_proto_goTypes = []any{
 	(*Employee)(nil),                             // 0: auth.v1.Employee
 	(*Session)(nil),                              // 1: auth.v1.Session
@@ -3120,14 +4770,41 @@ var file_auth_v1_auth_proto_goTypes = []any{
 	(*AuthorizationAdminEvent)(nil),              // 46: auth.v1.AuthorizationAdminEvent
 	(*ListAuthorizationAdminEventsRequest)(nil),  // 47: auth.v1.ListAuthorizationAdminEventsRequest
 	(*ListAuthorizationAdminEventsResponse)(nil), // 48: auth.v1.ListAuthorizationAdminEventsResponse
-	(*timestamppb.Timestamp)(nil),                // 49: google.protobuf.Timestamp
+	(*Merchant)(nil),                             // 49: auth.v1.Merchant
+	(*MerchantMembership)(nil),                   // 50: auth.v1.MerchantMembership
+	(*MerchantInvitation)(nil),                   // 51: auth.v1.MerchantInvitation
+	(*RegisterAccountRequest)(nil),               // 52: auth.v1.RegisterAccountRequest
+	(*RegisterAccountResponse)(nil),              // 53: auth.v1.RegisterAccountResponse
+	(*OpenMerchantRequest)(nil),                  // 54: auth.v1.OpenMerchantRequest
+	(*OpenMerchantResponse)(nil),                 // 55: auth.v1.OpenMerchantResponse
+	(*ListMyMerchantsRequest)(nil),               // 56: auth.v1.ListMyMerchantsRequest
+	(*ListMyMerchantsResponse)(nil),              // 57: auth.v1.ListMyMerchantsResponse
+	(*GetMerchantRequest)(nil),                   // 58: auth.v1.GetMerchantRequest
+	(*GetMerchantResponse)(nil),                  // 59: auth.v1.GetMerchantResponse
+	(*ListMembersRequest)(nil),                   // 60: auth.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),                  // 61: auth.v1.ListMembersResponse
+	(*InviteMemberRequest)(nil),                  // 62: auth.v1.InviteMemberRequest
+	(*InviteMemberResponse)(nil),                 // 63: auth.v1.InviteMemberResponse
+	(*AcceptInvitationRequest)(nil),              // 64: auth.v1.AcceptInvitationRequest
+	(*AcceptInvitationResponse)(nil),             // 65: auth.v1.AcceptInvitationResponse
+	(*RevokeInvitationRequest)(nil),              // 66: auth.v1.RevokeInvitationRequest
+	(*RevokeInvitationResponse)(nil),             // 67: auth.v1.RevokeInvitationResponse
+	(*GrantMerchantPermissionRequest)(nil),       // 68: auth.v1.GrantMerchantPermissionRequest
+	(*GrantMerchantPermissionResponse)(nil),      // 69: auth.v1.GrantMerchantPermissionResponse
+	(*RevokeMerchantPermissionRequest)(nil),      // 70: auth.v1.RevokeMerchantPermissionRequest
+	(*RevokeMerchantPermissionResponse)(nil),     // 71: auth.v1.RevokeMerchantPermissionResponse
+	(*ListMerchantPermissionsRequest)(nil),       // 72: auth.v1.ListMerchantPermissionsRequest
+	(*ListMerchantPermissionsResponse)(nil),      // 73: auth.v1.ListMerchantPermissionsResponse
+	(*CanManageProductRequest)(nil),              // 74: auth.v1.CanManageProductRequest
+	(*CanManageProductResponse)(nil),             // 75: auth.v1.CanManageProductResponse
+	(*timestamppb.Timestamp)(nil),                // 76: google.protobuf.Timestamp
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
-	49, // 0: auth.v1.Employee.created_at:type_name -> google.protobuf.Timestamp
-	49, // 1: auth.v1.Employee.updated_at:type_name -> google.protobuf.Timestamp
-	49, // 2: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	49, // 3: auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	49, // 4: auth.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	76, // 0: auth.v1.Employee.created_at:type_name -> google.protobuf.Timestamp
+	76, // 1: auth.v1.Employee.updated_at:type_name -> google.protobuf.Timestamp
+	76, // 2: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	76, // 3: auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	76, // 4: auth.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: auth.v1.RegisterEmployeeResponse.employee:type_name -> auth.v1.Employee
 	0,  // 6: auth.v1.GetEmployeeResponse.employee:type_name -> auth.v1.Employee
 	0,  // 7: auth.v1.GetEmployeeByEmailResponse.employee:type_name -> auth.v1.Employee
@@ -3138,67 +4815,105 @@ var file_auth_v1_auth_proto_depIdxs = []int32{
 	1,  // 12: auth.v1.ValidateSessionResponse.session:type_name -> auth.v1.Session
 	0,  // 13: auth.v1.ValidateSessionResponse.employee:type_name -> auth.v1.Employee
 	1,  // 14: auth.v1.ExtendSessionResponse.session:type_name -> auth.v1.Session
-	49, // 15: auth.v1.GrantPermissionRequest.expires_at:type_name -> google.protobuf.Timestamp
-	49, // 16: auth.v1.AssignRoleRequest.valid_from:type_name -> google.protobuf.Timestamp
-	49, // 17: auth.v1.AssignRoleRequest.expires_at:type_name -> google.protobuf.Timestamp
+	76, // 15: auth.v1.GrantPermissionRequest.expires_at:type_name -> google.protobuf.Timestamp
+	76, // 16: auth.v1.AssignRoleRequest.valid_from:type_name -> google.protobuf.Timestamp
+	76, // 17: auth.v1.AssignRoleRequest.expires_at:type_name -> google.protobuf.Timestamp
 	38, // 18: auth.v1.ListAuthorizationRolesResponse.roles:type_name -> auth.v1.AuthorizationRole
-	49, // 19: auth.v1.RoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
-	49, // 20: auth.v1.RoleAssignment.valid_from:type_name -> google.protobuf.Timestamp
-	49, // 21: auth.v1.RoleAssignment.expires_at:type_name -> google.protobuf.Timestamp
-	49, // 22: auth.v1.RoleAssignment.revoked_at:type_name -> google.protobuf.Timestamp
+	76, // 19: auth.v1.RoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
+	76, // 20: auth.v1.RoleAssignment.valid_from:type_name -> google.protobuf.Timestamp
+	76, // 21: auth.v1.RoleAssignment.expires_at:type_name -> google.protobuf.Timestamp
+	76, // 22: auth.v1.RoleAssignment.revoked_at:type_name -> google.protobuf.Timestamp
 	41, // 23: auth.v1.ListRoleAssignmentsResponse.assignments:type_name -> auth.v1.RoleAssignment
 	41, // 24: auth.v1.ListTenantRoleAssignmentsResponse.assignments:type_name -> auth.v1.RoleAssignment
-	49, // 25: auth.v1.AuthorizationAdminEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	76, // 25: auth.v1.AuthorizationAdminEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	46, // 26: auth.v1.ListAuthorizationAdminEventsResponse.events:type_name -> auth.v1.AuthorizationAdminEvent
-	2,  // 27: auth.v1.AuthService.RegisterEmployee:input_type -> auth.v1.RegisterEmployeeRequest
-	4,  // 28: auth.v1.AuthService.GetEmployee:input_type -> auth.v1.GetEmployeeRequest
-	6,  // 29: auth.v1.AuthService.GetEmployeeByEmail:input_type -> auth.v1.GetEmployeeByEmailRequest
-	8,  // 30: auth.v1.AuthService.UpdateEmployee:input_type -> auth.v1.UpdateEmployeeRequest
-	10, // 31: auth.v1.AuthService.ListEmployees:input_type -> auth.v1.ListEmployeesRequest
-	12, // 32: auth.v1.AuthService.SetEmployeePIN:input_type -> auth.v1.SetEmployeePINRequest
-	14, // 33: auth.v1.AuthService.ActivateEmployee:input_type -> auth.v1.ActivateEmployeeRequest
-	16, // 34: auth.v1.AuthService.DeactivateEmployee:input_type -> auth.v1.DeactivateEmployeeRequest
-	18, // 35: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
-	20, // 36: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
-	22, // 37: auth.v1.AuthService.ValidateSession:input_type -> auth.v1.ValidateSessionRequest
-	24, // 38: auth.v1.AuthService.ExtendSession:input_type -> auth.v1.ExtendSessionRequest
-	26, // 39: auth.v1.AuthService.CheckPermission:input_type -> auth.v1.CheckPermissionRequest
-	28, // 40: auth.v1.AuthService.CreateRole:input_type -> auth.v1.CreateRoleRequest
-	30, // 41: auth.v1.AuthService.GrantPermission:input_type -> auth.v1.GrantPermissionRequest
-	32, // 42: auth.v1.AuthService.RevokePermission:input_type -> auth.v1.RevokePermissionRequest
-	34, // 43: auth.v1.AuthService.AssignRole:input_type -> auth.v1.AssignRoleRequest
-	36, // 44: auth.v1.AuthService.RevokeRoleAssignment:input_type -> auth.v1.RevokeRoleAssignmentRequest
-	39, // 45: auth.v1.AuthService.ListAuthorizationRoles:input_type -> auth.v1.ListAuthorizationRolesRequest
-	42, // 46: auth.v1.AuthService.ListRoleAssignments:input_type -> auth.v1.ListRoleAssignmentsRequest
-	44, // 47: auth.v1.AuthService.ListTenantRoleAssignments:input_type -> auth.v1.ListTenantRoleAssignmentsRequest
-	47, // 48: auth.v1.AuthService.ListAuthorizationAdminEvents:input_type -> auth.v1.ListAuthorizationAdminEventsRequest
-	3,  // 49: auth.v1.AuthService.RegisterEmployee:output_type -> auth.v1.RegisterEmployeeResponse
-	5,  // 50: auth.v1.AuthService.GetEmployee:output_type -> auth.v1.GetEmployeeResponse
-	7,  // 51: auth.v1.AuthService.GetEmployeeByEmail:output_type -> auth.v1.GetEmployeeByEmailResponse
-	9,  // 52: auth.v1.AuthService.UpdateEmployee:output_type -> auth.v1.UpdateEmployeeResponse
-	11, // 53: auth.v1.AuthService.ListEmployees:output_type -> auth.v1.ListEmployeesResponse
-	13, // 54: auth.v1.AuthService.SetEmployeePIN:output_type -> auth.v1.SetEmployeePINResponse
-	15, // 55: auth.v1.AuthService.ActivateEmployee:output_type -> auth.v1.ActivateEmployeeResponse
-	17, // 56: auth.v1.AuthService.DeactivateEmployee:output_type -> auth.v1.DeactivateEmployeeResponse
-	19, // 57: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	21, // 58: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
-	23, // 59: auth.v1.AuthService.ValidateSession:output_type -> auth.v1.ValidateSessionResponse
-	25, // 60: auth.v1.AuthService.ExtendSession:output_type -> auth.v1.ExtendSessionResponse
-	27, // 61: auth.v1.AuthService.CheckPermission:output_type -> auth.v1.CheckPermissionResponse
-	29, // 62: auth.v1.AuthService.CreateRole:output_type -> auth.v1.CreateRoleResponse
-	31, // 63: auth.v1.AuthService.GrantPermission:output_type -> auth.v1.GrantPermissionResponse
-	33, // 64: auth.v1.AuthService.RevokePermission:output_type -> auth.v1.RevokePermissionResponse
-	35, // 65: auth.v1.AuthService.AssignRole:output_type -> auth.v1.AssignRoleResponse
-	37, // 66: auth.v1.AuthService.RevokeRoleAssignment:output_type -> auth.v1.RevokeRoleAssignmentResponse
-	40, // 67: auth.v1.AuthService.ListAuthorizationRoles:output_type -> auth.v1.ListAuthorizationRolesResponse
-	43, // 68: auth.v1.AuthService.ListRoleAssignments:output_type -> auth.v1.ListRoleAssignmentsResponse
-	45, // 69: auth.v1.AuthService.ListTenantRoleAssignments:output_type -> auth.v1.ListTenantRoleAssignmentsResponse
-	48, // 70: auth.v1.AuthService.ListAuthorizationAdminEvents:output_type -> auth.v1.ListAuthorizationAdminEventsResponse
-	49, // [49:71] is the sub-list for method output_type
-	27, // [27:49] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	76, // 27: auth.v1.Merchant.created_at:type_name -> google.protobuf.Timestamp
+	76, // 28: auth.v1.Merchant.updated_at:type_name -> google.protobuf.Timestamp
+	76, // 29: auth.v1.MerchantMembership.created_at:type_name -> google.protobuf.Timestamp
+	76, // 30: auth.v1.MerchantInvitation.expires_at:type_name -> google.protobuf.Timestamp
+	76, // 31: auth.v1.MerchantInvitation.created_at:type_name -> google.protobuf.Timestamp
+	76, // 32: auth.v1.MerchantInvitation.accepted_at:type_name -> google.protobuf.Timestamp
+	76, // 33: auth.v1.MerchantInvitation.revoked_at:type_name -> google.protobuf.Timestamp
+	0,  // 34: auth.v1.RegisterAccountResponse.employee:type_name -> auth.v1.Employee
+	49, // 35: auth.v1.OpenMerchantResponse.merchant:type_name -> auth.v1.Merchant
+	49, // 36: auth.v1.ListMyMerchantsResponse.merchants:type_name -> auth.v1.Merchant
+	49, // 37: auth.v1.GetMerchantResponse.merchant:type_name -> auth.v1.Merchant
+	50, // 38: auth.v1.ListMembersResponse.members:type_name -> auth.v1.MerchantMembership
+	51, // 39: auth.v1.InviteMemberResponse.invitation:type_name -> auth.v1.MerchantInvitation
+	50, // 40: auth.v1.AcceptInvitationResponse.membership:type_name -> auth.v1.MerchantMembership
+	2,  // 41: auth.v1.AuthService.RegisterEmployee:input_type -> auth.v1.RegisterEmployeeRequest
+	4,  // 42: auth.v1.AuthService.GetEmployee:input_type -> auth.v1.GetEmployeeRequest
+	6,  // 43: auth.v1.AuthService.GetEmployeeByEmail:input_type -> auth.v1.GetEmployeeByEmailRequest
+	8,  // 44: auth.v1.AuthService.UpdateEmployee:input_type -> auth.v1.UpdateEmployeeRequest
+	10, // 45: auth.v1.AuthService.ListEmployees:input_type -> auth.v1.ListEmployeesRequest
+	12, // 46: auth.v1.AuthService.SetEmployeePIN:input_type -> auth.v1.SetEmployeePINRequest
+	14, // 47: auth.v1.AuthService.ActivateEmployee:input_type -> auth.v1.ActivateEmployeeRequest
+	16, // 48: auth.v1.AuthService.DeactivateEmployee:input_type -> auth.v1.DeactivateEmployeeRequest
+	18, // 49: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
+	20, // 50: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
+	22, // 51: auth.v1.AuthService.ValidateSession:input_type -> auth.v1.ValidateSessionRequest
+	24, // 52: auth.v1.AuthService.ExtendSession:input_type -> auth.v1.ExtendSessionRequest
+	26, // 53: auth.v1.AuthService.CheckPermission:input_type -> auth.v1.CheckPermissionRequest
+	28, // 54: auth.v1.AuthService.CreateRole:input_type -> auth.v1.CreateRoleRequest
+	30, // 55: auth.v1.AuthService.GrantPermission:input_type -> auth.v1.GrantPermissionRequest
+	32, // 56: auth.v1.AuthService.RevokePermission:input_type -> auth.v1.RevokePermissionRequest
+	34, // 57: auth.v1.AuthService.AssignRole:input_type -> auth.v1.AssignRoleRequest
+	36, // 58: auth.v1.AuthService.RevokeRoleAssignment:input_type -> auth.v1.RevokeRoleAssignmentRequest
+	39, // 59: auth.v1.AuthService.ListAuthorizationRoles:input_type -> auth.v1.ListAuthorizationRolesRequest
+	42, // 60: auth.v1.AuthService.ListRoleAssignments:input_type -> auth.v1.ListRoleAssignmentsRequest
+	44, // 61: auth.v1.AuthService.ListTenantRoleAssignments:input_type -> auth.v1.ListTenantRoleAssignmentsRequest
+	47, // 62: auth.v1.AuthService.ListAuthorizationAdminEvents:input_type -> auth.v1.ListAuthorizationAdminEventsRequest
+	52, // 63: auth.v1.AuthService.RegisterAccount:input_type -> auth.v1.RegisterAccountRequest
+	54, // 64: auth.v1.AuthService.OpenMerchant:input_type -> auth.v1.OpenMerchantRequest
+	56, // 65: auth.v1.AuthService.ListMyMerchants:input_type -> auth.v1.ListMyMerchantsRequest
+	58, // 66: auth.v1.AuthService.GetMerchant:input_type -> auth.v1.GetMerchantRequest
+	60, // 67: auth.v1.AuthService.ListMembers:input_type -> auth.v1.ListMembersRequest
+	62, // 68: auth.v1.AuthService.InviteMember:input_type -> auth.v1.InviteMemberRequest
+	64, // 69: auth.v1.AuthService.AcceptInvitation:input_type -> auth.v1.AcceptInvitationRequest
+	66, // 70: auth.v1.AuthService.RevokeInvitation:input_type -> auth.v1.RevokeInvitationRequest
+	68, // 71: auth.v1.AuthService.GrantMerchantPermission:input_type -> auth.v1.GrantMerchantPermissionRequest
+	70, // 72: auth.v1.AuthService.RevokeMerchantPermission:input_type -> auth.v1.RevokeMerchantPermissionRequest
+	72, // 73: auth.v1.AuthService.ListMerchantPermissions:input_type -> auth.v1.ListMerchantPermissionsRequest
+	74, // 74: auth.v1.AuthService.CanManageProduct:input_type -> auth.v1.CanManageProductRequest
+	3,  // 75: auth.v1.AuthService.RegisterEmployee:output_type -> auth.v1.RegisterEmployeeResponse
+	5,  // 76: auth.v1.AuthService.GetEmployee:output_type -> auth.v1.GetEmployeeResponse
+	7,  // 77: auth.v1.AuthService.GetEmployeeByEmail:output_type -> auth.v1.GetEmployeeByEmailResponse
+	9,  // 78: auth.v1.AuthService.UpdateEmployee:output_type -> auth.v1.UpdateEmployeeResponse
+	11, // 79: auth.v1.AuthService.ListEmployees:output_type -> auth.v1.ListEmployeesResponse
+	13, // 80: auth.v1.AuthService.SetEmployeePIN:output_type -> auth.v1.SetEmployeePINResponse
+	15, // 81: auth.v1.AuthService.ActivateEmployee:output_type -> auth.v1.ActivateEmployeeResponse
+	17, // 82: auth.v1.AuthService.DeactivateEmployee:output_type -> auth.v1.DeactivateEmployeeResponse
+	19, // 83: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
+	21, // 84: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
+	23, // 85: auth.v1.AuthService.ValidateSession:output_type -> auth.v1.ValidateSessionResponse
+	25, // 86: auth.v1.AuthService.ExtendSession:output_type -> auth.v1.ExtendSessionResponse
+	27, // 87: auth.v1.AuthService.CheckPermission:output_type -> auth.v1.CheckPermissionResponse
+	29, // 88: auth.v1.AuthService.CreateRole:output_type -> auth.v1.CreateRoleResponse
+	31, // 89: auth.v1.AuthService.GrantPermission:output_type -> auth.v1.GrantPermissionResponse
+	33, // 90: auth.v1.AuthService.RevokePermission:output_type -> auth.v1.RevokePermissionResponse
+	35, // 91: auth.v1.AuthService.AssignRole:output_type -> auth.v1.AssignRoleResponse
+	37, // 92: auth.v1.AuthService.RevokeRoleAssignment:output_type -> auth.v1.RevokeRoleAssignmentResponse
+	40, // 93: auth.v1.AuthService.ListAuthorizationRoles:output_type -> auth.v1.ListAuthorizationRolesResponse
+	43, // 94: auth.v1.AuthService.ListRoleAssignments:output_type -> auth.v1.ListRoleAssignmentsResponse
+	45, // 95: auth.v1.AuthService.ListTenantRoleAssignments:output_type -> auth.v1.ListTenantRoleAssignmentsResponse
+	48, // 96: auth.v1.AuthService.ListAuthorizationAdminEvents:output_type -> auth.v1.ListAuthorizationAdminEventsResponse
+	53, // 97: auth.v1.AuthService.RegisterAccount:output_type -> auth.v1.RegisterAccountResponse
+	55, // 98: auth.v1.AuthService.OpenMerchant:output_type -> auth.v1.OpenMerchantResponse
+	57, // 99: auth.v1.AuthService.ListMyMerchants:output_type -> auth.v1.ListMyMerchantsResponse
+	59, // 100: auth.v1.AuthService.GetMerchant:output_type -> auth.v1.GetMerchantResponse
+	61, // 101: auth.v1.AuthService.ListMembers:output_type -> auth.v1.ListMembersResponse
+	63, // 102: auth.v1.AuthService.InviteMember:output_type -> auth.v1.InviteMemberResponse
+	65, // 103: auth.v1.AuthService.AcceptInvitation:output_type -> auth.v1.AcceptInvitationResponse
+	67, // 104: auth.v1.AuthService.RevokeInvitation:output_type -> auth.v1.RevokeInvitationResponse
+	69, // 105: auth.v1.AuthService.GrantMerchantPermission:output_type -> auth.v1.GrantMerchantPermissionResponse
+	71, // 106: auth.v1.AuthService.RevokeMerchantPermission:output_type -> auth.v1.RevokeMerchantPermissionResponse
+	73, // 107: auth.v1.AuthService.ListMerchantPermissions:output_type -> auth.v1.ListMerchantPermissionsResponse
+	75, // 108: auth.v1.AuthService.CanManageProduct:output_type -> auth.v1.CanManageProductResponse
+	75, // [75:109] is the sub-list for method output_type
+	41, // [41:75] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_auth_v1_auth_proto_init() }
@@ -3212,7 +4927,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   49,
+			NumMessages:   76,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

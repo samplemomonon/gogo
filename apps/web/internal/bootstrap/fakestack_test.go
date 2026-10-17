@@ -25,6 +25,7 @@ import (
 	productv1 "gogo/contracts/product/v1"
 	productlistingv1 "gogo/contracts/productlisting/v1"
 	productsearchv1 "gogo/contracts/productsearch/v1"
+	"gogo/internal/bootstrap"
 	authmod "gogo/internal/modules/auth"
 	authinfra "gogo/internal/modules/auth/infrastructure"
 	"gogo/internal/modules/billing"
@@ -65,6 +66,14 @@ func (integrationEmployeeSessions) Current(context.Context, string) (*sellerresu
 }
 
 func (integrationEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+
+func (integrationEmployeeSessions) ListMyMerchants(context.Context, string) ([]sellerresults.Merchant, error) {
+	return []sellerresults.Merchant{{ID: "merchant-1", OwnerEmployeeID: "integration-employee", Name: "Integration Shop"}}, nil
+}
+
+func (integrationEmployeeSessions) CanManageProduct(context.Context, string, string) (bool, error) {
 	return true, nil
 }
 
@@ -716,7 +725,7 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 	salesBreaker := breaker.NewDefault()
 
 	authStore := authinfra.NewStore()
-	authModule := authmod.NewModule(authStore, authStore, nil, logger)
+	authModule := authmod.NewModule(authStore, authStore, authStore, nil, logger)
 	authConn, closeAuthServer, err := grpcx.InProcess(authModule.RegisterGRPC)
 	if err != nil {
 		t.Fatalf("grpcx.InProcess (auth) returned error: %v", err)
@@ -742,11 +751,12 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 		"auth":                                   authBreaker,
 	}
 
-	// Readiness aggregates the registry's health plus every upstream breaker — the same
-	// probe the production composition root builds from the contributed breaker group.
-	// Wiring it here is what makes the degradation tests meaningful: without a probe,
-	// ops would report ready no matter what the platform was doing.
-	registry.AddAll(ops.NewModuleWithProbe(ops.Readiness(registry, breakerGroup(upstreamBreakers))))
+	// Readiness aggregates the registry's health plus every required upstream breaker —
+	// the same probe and the same optional classification the production composition
+	// root builds from the contributed breaker group and the unit table. Wiring it here
+	// is what makes the degradation tests meaningful: without a probe, ops would report
+	// ready no matter what the platform was doing.
+	registry.AddAll(ops.NewModuleWithProbe(ops.Readiness(registry, breakerGroup(upstreamBreakers), bootstrap.ReadinessPolicy())))
 
 	app := httpserver.NewWithRegistry(cfg, logger, registry, upstreamBreakers,
 		home.New(homelistingclient.New(conns, breakers), logger),

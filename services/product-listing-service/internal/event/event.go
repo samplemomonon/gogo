@@ -86,6 +86,10 @@ type ProductSnapshot struct {
 	PrimaryMediaID *int64            `json:"primary_media_id"`
 	CreatedAt      time.Time         `json:"created_at"`
 	UpdatedAt      time.Time         `json:"updated_at"`
+	// MerchantID is the merchant that owns the product, inside gogo's identity
+	// module. Empty means unowned, which is what events from before the field
+	// existed decode to.
+	MerchantID string `json:"merchant_id"`
 }
 
 // VariantSnapshot is a variant as the producer saw it.

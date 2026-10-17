@@ -166,15 +166,15 @@ func TestBreakerUpstreamsAreDistinct(t *testing.T) {
 	}
 
 	seen := make(map[string]bool, len(breakerUpstreams))
-	for _, name := range breakerUpstreams {
-		if name == "" {
+	for _, u := range breakerUpstreams {
+		if u.name == "" {
 			t.Error("an upstream is declared with an empty name; a breaker keyed on \"\" never matches a dependency")
 			continue
 		}
-		if seen[name] {
-			t.Errorf("upstream %s is declared twice; the second breaker would shadow the first", name)
+		if seen[u.name] {
+			t.Errorf("upstream %s is declared twice; the second breaker would shadow the first", u.name)
 		}
-		seen[name] = true
+		seen[u.name] = true
 	}
 }
 

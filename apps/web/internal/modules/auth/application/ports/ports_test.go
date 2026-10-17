@@ -27,9 +27,11 @@ import (
 var (
 	_ ports.EmployeeStore = (*infrastructure.Store)(nil)
 	_ ports.SessionStore  = (*infrastructure.Store)(nil)
+	_ ports.MerchantStore = (*infrastructure.Store)(nil)
 	_ ports.AuthService   = (*application.Service)(nil)
 	_ ports.EmployeeStore = (*authpostgres.EmployeeStore)(nil)
 	_ ports.SessionStore  = (*authpostgres.SessionStore)(nil)
+	_ ports.MerchantStore = (*authpostgres.MerchantStore)(nil)
 )
 
 // TestInMemoryBackendSatisfiesThePorts drives the in-memory adapters through
@@ -42,7 +44,7 @@ func TestInMemoryBackendSatisfiesThePorts(t *testing.T) {
 
 	ctx := context.Background()
 	store := infrastructure.NewStore()
-	var svc ports.AuthService = application.NewService(store, store, bcrypt.MinCost, time.Hour)
+	var svc ports.AuthService = application.NewService(store, store, bcrypt.MinCost, time.Hour, store)
 
 	employee, err := svc.RegisterEmployee(ctx, "tenant-a", "emp-1", "Budi", "budi@toko.com", "123456", domain.RoleSeller)
 	if err != nil {

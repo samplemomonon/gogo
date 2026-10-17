@@ -23,6 +23,20 @@ func (h *Handler) Products(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ProductCreate(w http.ResponseWriter, r *http.Request) {
+	// Only a merchant the session employee may manage (their own as a penjual,
+	// or a merchant whose owner granted them product management as a karyawan)
+	// can receive a new product.
+	merchant, err := h.merchantForCreate(r)
+	if err != nil {
+		h.logger.Error("resolve seller merchant for product create", "error", err)
+		http.Error(w, "Authorization unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if merchant == nil {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	types, err := h.catalog.ListProductTypes(r.Context())
 	if err != nil {
 		h.fail(w, r, err)
@@ -33,6 +47,7 @@ func (h *Handler) ProductCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderProducts(w, r, msgInvalidForm, nil)
 		return
 	}
+	input.MerchantID = merchant.ID
 	created, err := h.catalog.Create(r.Context(), input)
 	if err != nil {
 		h.renderProducts(w, r, h.notice(r, err), nil)
@@ -68,12 +83,22 @@ func (h *Handler) ProductAttributeFields(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) ProductUpdate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	// Only a member of the merchant that owns the product may change it.
+	merchantID, err := h.productMerchant(r.Context(), id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	if !h.requireProductAccess(w, r, merchantID) {
+		return
+	}
 	input, ok := parseProduct(r)
 	if !ok {
 		h.renderProducts(w, r, msgInvalidForm, nil)
 		return
 	}
-	if _, err := h.catalog.Update(r.Context(), chi.URLParam(r, "id"), input); err != nil {
+	if _, err := h.catalog.Update(r.Context(), id, input); err != nil {
 		h.renderProducts(w, r, h.notice(r, err), nil)
 		return
 	}
@@ -81,7 +106,16 @@ func (h *Handler) ProductUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ProductDelete(w http.ResponseWriter, r *http.Request) {
-	if err := h.catalog.Delete(r.Context(), chi.URLParam(r, "id")); err != nil {
+	id := chi.URLParam(r, "id")
+	merchantID, err := h.productMerchant(r.Context(), id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	if !h.requireProductAccess(w, r, merchantID) {
+		return
+	}
+	if err := h.catalog.Delete(r.Context(), id); err != nil {
 		h.renderProducts(w, r, h.notice(r, err), nil)
 		return
 	}

@@ -22,7 +22,7 @@ func Build(
 ) (*auth.Module, func(), error) {
 	if cfg.DatabaseURL == "" {
 		store := infrastructure.NewStore()
-		return auth.NewModule(store, store, nil, logger), func() {}, nil
+		return auth.NewModule(store, store, store, nil, logger), func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(parent, cfg.DBPingTimeout+10*time.Second)
@@ -39,7 +39,8 @@ func Build(
 
 	employeeStore := authpostgres.NewEmployeeStore(pool)
 	sessionStore := authpostgres.NewSessionStore(pool)
+	merchantStore := authpostgres.NewMerchantStore(pool)
 	authorizationStore := authpostgres.NewAuthorizationRepository(pool)
 	logger.Info("auth backed by postgres")
-	return auth.NewModule(employeeStore, sessionStore, pool.Ping, logger, authorizationStore), func() { pool.Close() }, nil
+	return auth.NewModule(employeeStore, sessionStore, merchantStore, pool.Ping, logger, authorizationStore), func() { pool.Close() }, nil
 }

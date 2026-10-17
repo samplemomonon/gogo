@@ -37,7 +37,9 @@ type Input struct {
 	Status        Status
 	CategoryID    string
 	MediaID       string
-	Variants      []Variant
+	// MerchantID scopes the product to a merchant owned by the calling tenant.
+	MerchantID string
+	Variants   []Variant
 }
 
 // Patch is a partial update. Every field is a pointer: a nil field is left alone by
@@ -296,6 +298,7 @@ func coreFromBrowse(p *productlistingv1.Product) Core {
 		Status:        statusToBrowse(p.GetStatus()),
 		CategoryID:    formatID(p.GetCategoryId()),
 		MediaID:       formatID(p.GetPrimaryMediaId()),
+		MerchantID:    p.GetMerchantId(),
 		CreatedAt:     timestamp(p.GetCreatedAt()),
 		UpdatedAt:     timestamp(p.GetUpdatedAt()),
 	}
@@ -327,6 +330,7 @@ func coreFromWrite(p *productv1.Product) Core {
 		Status:        statusToWrite(p.GetStatus()),
 		CategoryID:    formatID(p.GetCategoryId()),
 		MediaID:       formatID(p.GetPrimaryMediaId()),
+		MerchantID:    p.GetMerchantId(),
 		CreatedAt:     timestamp(p.GetCreatedAt()),
 		UpdatedAt:     timestamp(p.GetUpdatedAt()),
 	}
@@ -371,6 +375,7 @@ func coreFromSearch(p *productsearchv1.SearchProduct) Core {
 		Status:        statusToSearch(p.GetStatus()),
 		CategoryID:    formatID(p.GetCategoryId()),
 		MediaID:       formatID(p.GetPrimaryMediaId()),
+		MerchantID:    p.GetMerchantId(),
 		CreatedAt:     timestamp(p.GetCreatedAt()),
 		UpdatedAt:     timestamp(p.GetUpdatedAt()),
 	}

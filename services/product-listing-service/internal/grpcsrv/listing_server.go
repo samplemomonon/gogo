@@ -84,6 +84,7 @@ func (s *Server) ListProducts(
 		Limit:           int(req.GetLimit()),
 		Offset:          int(req.GetOffset()),
 		IncludeVariants: req.GetIncludeVariants(),
+		MerchantID:      req.GetMerchantId(),
 	})
 	if err != nil {
 		return nil, toStatus(err)
@@ -168,6 +169,7 @@ func productToProto(p *model.Product) *listingpb.Product {
 		CreatedAt:     timestamppb.New(p.CreatedAt),
 		UpdatedAt:     timestamppb.New(p.UpdatedAt),
 		ProjectedAt:   timestamppb.New(p.ProjectedAt),
+		MerchantId:    p.MerchantID,
 	}
 	if p.Description != nil {
 		proto.Description = *p.Description

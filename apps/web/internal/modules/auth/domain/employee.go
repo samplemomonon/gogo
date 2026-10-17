@@ -39,6 +39,45 @@ const (
 	RoleViewer Role = "viewer"
 )
 
+// ReservedRole represents an account-level role provisioned by the auth module.
+// These are not the legacy gRPC/HTTP role values but internal authority labels
+// used for merchant ownership and membership. They are assigned to an Employee
+// at creation (pembeli) or when opening a shop (penjual) / being invited (karyawan).
+type ReservedRole string
+
+const (
+	ReservedBuyer    ReservedRole = "pembeli"
+	ReservedMerchant ReservedRole = "penjual"
+	ReservedEmployee ReservedRole = "karyawan"
+)
+
+// ReservedRoles derives an employee's account-level authority labels from the
+// merchant relationships the identity module owns. The set is never stored: a
+// user who owns at least one merchant is a penjual, a user who is a non-owner
+// member of at least one merchant is a karyawan, and every account is a
+// pembeli. ownsMerchant is whether the employee owns any merchant; memberOf
+// counts the non-owner merchant memberships the employee holds.
+func ReservedRoles(ownsMerchant bool, memberOf int) []ReservedRole {
+	roles := []ReservedRole{ReservedBuyer}
+	if ownsMerchant {
+		roles = append(roles, ReservedMerchant)
+	}
+	if memberOf > 0 {
+		roles = append(roles, ReservedEmployee)
+	}
+	return roles
+}
+
+// HasReservedRole reports whether roles contains the given label.
+func HasReservedRole(roles []ReservedRole, want ReservedRole) bool {
+	for _, role := range roles {
+		if role == want {
+			return true
+		}
+	}
+	return false
+}
+
 // Employee represents an employee who can log into the seller console.
 type Employee struct {
 	TenantID  string

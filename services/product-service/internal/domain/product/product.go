@@ -28,6 +28,11 @@ type Product struct {
 	Variants       []*Variant
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// MerchantID names the merchant that owns this product, inside gogo's
+	// identity module. Empty means unowned. Ownership is fixed at creation —
+	// moving a product between merchants is not a supported operation — and
+	// every event carries it so the read models can enforce ownership too.
+	MerchantID string
 }
 
 // Product constants for validation.
@@ -37,7 +42,21 @@ const (
 	MaxBrandLength        = 255
 	MaxDescriptionLength  = 10_000
 	MaxVariantsPerProduct = 100
+	// MaxMerchantIDLength bounds the opaque merchant reference. gogo's
+	// merchant IDs are UUIDs; the cap only stops a caller from storing
+	// unbounded junk in a reference column.
+	MaxMerchantIDLength = 128
 )
+
+// ValidateMerchantID checks the optional merchant reference. An empty ID is
+// valid — it means unowned — but a non-empty one must fit the reference
+// column's bound.
+func ValidateMerchantID(id string) error {
+	if utf8.RuneCountInString(strings.TrimSpace(id)) > MaxMerchantIDLength {
+		return NewValidationError("merchant_id", ErrInvalidInput)
+	}
+	return nil
+}
 
 // MarshalJSON renders the product as the wire snapshot shared by the HTTP API
 // and every product event.
@@ -67,6 +86,10 @@ func (p *Product) MarshalJSON() ([]byte, error) {
 		Variants       []*Variant        `json:"variants,omitempty"`
 		CreatedAt      time.Time         `json:"created_at"`
 		UpdatedAt      time.Time         `json:"updated_at"`
+		// Omitted when empty so an unowned product's snapshot stays
+		// byte-identical to the shape consumers decoded before the field
+		// existed. Present, it is the ownership the read models enforce.
+		MerchantID string `json:"merchant_id,omitempty"`
 	}
 	return json.Marshal(snapshot{
 		ID:             p.ID,
@@ -86,6 +109,7 @@ func (p *Product) MarshalJSON() ([]byte, error) {
 		Variants:       p.Variants,
 		CreatedAt:      p.CreatedAt,
 		UpdatedAt:      p.UpdatedAt,
+		MerchantID:     p.MerchantID,
 	})
 }
 

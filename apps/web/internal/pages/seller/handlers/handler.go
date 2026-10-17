@@ -121,6 +121,66 @@ func (h *Handler) RequirePermission(permissionKey string) func(http.Handler) htt
 	}
 }
 
+// merchantForCreate returns the merchant in which the session employee may
+// create products: their own merchant (a penjual) or a merchant whose owner
+// granted them product management (a karyawan). It returns nil when the
+// employee may create in no merchant.
+func (h *Handler) merchantForCreate(r *http.Request) (*results.Merchant, error) {
+	merchants, err := h.employees.ListMyMerchants(r.Context(), session.Read(r))
+	if err != nil {
+		return nil, err
+	}
+	for i := range merchants {
+		allowed, err := h.employees.CanManageProduct(r.Context(), session.Read(r), merchants[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			return &merchants[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// productMerchant returns the merchant that owns the product with id, from the
+// console's product page. An empty result means the product is unknown or
+// unowned, which the caller treats as a forbidden write.
+func (h *Handler) productMerchant(ctx context.Context, id string) (string, error) {
+	products, err := h.catalog.List(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, product := range products {
+		if product.ID == id {
+			return product.MerchantID, nil
+		}
+	}
+	return "", nil
+}
+
+// requireProductAccess gates a product mutation on the merchant-scoped PDP: the
+// session employee must be a member of the merchant that owns the product and,
+// unless they own it, hold an explicit merchant-scoped grant. An outage fails
+// closed as 503, distinct from an explicit deny (403).
+func (h *Handler) requireProductAccess(w http.ResponseWriter, r *http.Request, merchantID string) bool {
+	if merchantID == "" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return false
+	}
+	allowed, err := h.employees.CanManageProduct(r.Context(), session.Read(r), merchantID)
+	if err != nil {
+		h.logger.Error("merchant product access check failed", "merchant", merchantID, "error", err)
+		http.Error(w, "Authorization unavailable", http.StatusServiceUnavailable)
+		return false
+	}
+	if !allowed {
+		h.logger.Warn("seller product mutation forbidden", "merchant", merchantID, "path", r.URL.Path)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
 // Dashboard renders the console overview.
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	products, err := h.catalog.List(r.Context())

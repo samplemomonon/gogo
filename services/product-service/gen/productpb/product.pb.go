@@ -104,8 +104,13 @@ type Product struct {
 	ProductTypeId  string                 `protobuf:"bytes,15,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
 	SchemaVersion  int32                  `protobuf:"varint,16,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	Attributes     map[string]string      `protobuf:"bytes,17,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// merchant_id names the merchant that owns this product, within the calling
+	// tenant. It references gogo's identity module, so there is no foreign key to
+	// enforce it. Empty means unowned: products stored before merchants existed,
+	// and products created without a merchant context, remain representable.
+	MerchantId    string `protobuf:"bytes,18,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Product) Reset() {
@@ -255,6 +260,13 @@ func (x *Product) GetAttributes() map[string]string {
 		return x.Attributes
 	}
 	return nil
+}
+
+func (x *Product) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
 }
 
 type ListProductTypesRequest struct {
@@ -608,8 +620,13 @@ type CreateProductRequest struct {
 	ProductTypeId  string            `protobuf:"bytes,12,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
 	SchemaVersion  int32             `protobuf:"varint,13,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	Attributes     map[string]string `protobuf:"bytes,14,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Merchant_id scopes the product to a merchant owned by the calling tenant.
+	// Empty means unowned. Ownership is set at creation and carried by every
+	// event, which is what lets gogo's seller console enforce that only the
+	// owning merchant's members may change the product.
+	MerchantId    string `protobuf:"bytes,15,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateProductRequest) Reset() {
@@ -738,6 +755,13 @@ func (x *CreateProductRequest) GetAttributes() map[string]string {
 		return x.Attributes
 	}
 	return nil
+}
+
+func (x *CreateProductRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
 }
 
 // VariantSpec describes a variant to create alongside the product. It has no id
@@ -1157,7 +1181,7 @@ var File_product_v1_product_proto protoreflect.FileDescriptor
 const file_product_v1_product_proto_rawDesc = "" +
 	"\n" +
 	"\x18product/v1/product.proto\x12\n" +
-	"product.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc4\x05\n" +
+	"product.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x05\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -1182,7 +1206,9 @@ const file_product_v1_product_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x10 \x01(\x05R\rschemaVersion\x12C\n" +
 	"\n" +
 	"attributes\x18\x11 \x03(\v2#.product.v1.Product.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x12\x1f\n" +
+	"\vmerchant_id\x18\x12 \x01(\tR\n" +
+	"merchantId\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x19\n" +
@@ -1213,7 +1239,7 @@ const file_product_v1_product_proto_rawDesc = "" +
 	"priceCents\x12\x1a\n" +
 	"\bcurrency\x18\x06 \x01(\tR\bcurrency\x12\x14\n" +
 	"\x05stock\x18\a \x01(\x05R\x05stock\x12\x19\n" +
-	"\bmedia_id\x18\b \x01(\x03R\amediaId\"\xdc\x04\n" +
+	"\bmedia_id\x18\b \x01(\x03R\amediaId\"\xfd\x04\n" +
 	"\x14CreateProductRequest\x12\x1f\n" +
 	"\vcategory_id\x18\x01 \x01(\x03R\n" +
 	"categoryId\x12\x12\n" +
@@ -1233,7 +1259,9 @@ const file_product_v1_product_proto_rawDesc = "" +
 	"\x0eschema_version\x18\r \x01(\x05R\rschemaVersion\x12P\n" +
 	"\n" +
 	"attributes\x18\x0e \x03(\v20.product.v1.CreateProductRequest.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x12\x1f\n" +
+	"\vmerchant_id\x18\x0f \x01(\tR\n" +
+	"merchantId\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa1\x01\n" +

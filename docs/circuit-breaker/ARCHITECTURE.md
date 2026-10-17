@@ -37,9 +37,10 @@ the storefront can render at all:
      gogo-postgres — the inventory ledger and the sales history
 ```
 
-Readiness aggregates every contributed breaker, so any one of them being open
-takes that replica out. Half-open counts as ready — the breaker is probing, and
-draining a recovering replica would keep it from ever recovering.
+Readiness gates on every *required* contributed breaker (the root's readiness
+policy marks `search` optional), so any required one being open takes that
+replica out. Half-open counts as ready — the breaker is probing, and draining a
+recovering replica would keep it from ever recovering.
 
 ## State machine
 
@@ -102,7 +103,10 @@ User → Gateway → grpcconsumer.Do → breaker(OPEN) ─X─ no dial
                                      ├─→ returns breaker.ErrOpen (survives wrapping)
                                      ├─→ page maps it: browse outage → 503,
                                      │                     search outage → 200, search off
-                                     └─→ /readyz → 503 → replica drained
+                                     └─→ /readyz → 503 for a required upstream
+                                          (browse) → replica drained;
+                                          200 for an optional one (search)
+                                          → replica stays in rotation
 ```
 
 ### Recovery (HALF-OPEN)
@@ -121,15 +125,21 @@ GET /readyz
   │
   ├─→ registry.ReadyExcluding(ctx, "ops")     # every module's own health report
   │
-  └─→ every contributed breaker.State()
-       │
+  └─→ every *required* contributed breaker.State()
+       │                                       # the readiness policy skips
+       │                                       # optional upstreams (search)
        ├─→ any == OPEN  → 503
        └─→ else         → 200
 ```
 
 `ops` never names a specific upstream — the composition root contributes the
-*group*. Adding a platform service is therefore one contribution plus one
-`productconsumer` upstream constant; the readiness message does not change.
+*group*, and the classification travels with the root's `ReadinessPolicy`
+(optional: search; declared in `apps/web/internal/bootstrap/units.go`).
+Adding a platform service is therefore one contribution plus one
+`productconsumer` upstream constant and one readiness class in the table; the
+readiness message does not change. A search outage degrades search without
+draining the instance — the page-level promise ("keep serving browse while
+search is down") now holds at the traffic level too.
 
 ## Metrics pipeline
 
@@ -173,6 +183,7 @@ Gateway-1,2,3 → product-listing (all down) → 5 failures each → OPEN
 GET /?page=2  → browse CLOSED  → 200 with a working grid
 GET /?q=ayam → search OPEN    → 200, search disabled, term preserved
 GET /seller/produk (POST) → writes CLOSED → unaffected
+GET /readyz   → search skipped by policy → 200, replica stays in rotation
 
 Only the search breaker trips. A shared breaker would have taken all three.
 ```

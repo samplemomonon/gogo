@@ -120,6 +120,10 @@ type SearchProduct struct {
 	ProductTypeId string                 `protobuf:"bytes,16,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
 	SchemaVersion int32                  `protobuf:"varint,17,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	Attributes    map[string]string      `protobuf:"bytes,18,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// merchant_id names the merchant that owns this product, within the calling
+	// tenant. Empty means unowned. It is projected from the same events the
+	// listing service consumes, so both read models agree on ownership.
+	MerchantId    string `protobuf:"bytes,19,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -278,6 +282,13 @@ func (x *SearchProduct) GetAttributes() map[string]string {
 		return x.Attributes
 	}
 	return nil
+}
+
+func (x *SearchProduct) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
 }
 
 type SearchProductsRequest struct {
@@ -464,7 +475,7 @@ var File_search_v1_search_proto protoreflect.FileDescriptor
 
 const file_search_v1_search_proto_rawDesc = "" +
 	"\n" +
-	"\x16search/v1/search.proto\x12\x10productsearch.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x80\x06\n" +
+	"\x16search/v1/search.proto\x12\x10productsearch.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa1\x06\n" +
 	"\rSearchProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -490,7 +501,9 @@ const file_search_v1_search_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x11 \x01(\x05R\rschemaVersion\x12O\n" +
 	"\n" +
 	"attributes\x18\x12 \x03(\v2/.productsearch.v1.SearchProduct.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x12\x1f\n" +
+	"\vmerchant_id\x18\x13 \x01(\tR\n" +
+	"merchantId\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x85\x02\n" +

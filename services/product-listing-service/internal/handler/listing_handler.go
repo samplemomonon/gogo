@@ -124,6 +124,10 @@ func (h *ProductListingHandler) List(w http.ResponseWriter, r *http.Request) {
 		Limit:           limit,
 		Offset:          offset,
 		IncludeVariants: parseBool(query.Get("include_variants")),
+		// An absent or empty merchant_id means unfiltered, matching the
+		// contract: the browse page sends none, while the seller console
+		// sends the merchant it is scoped to.
+		MerchantID: strings.TrimSpace(query.Get("merchant_id")),
 	}
 
 	result, err := h.service.List(r.Context(), req)

@@ -114,6 +114,11 @@ type Product struct {
 	ProductTypeId string                 `protobuf:"bytes,16,opt,name=product_type_id,json=productTypeId,proto3" json:"product_type_id,omitempty"`
 	SchemaVersion int32                  `protobuf:"varint,17,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	Attributes    map[string]string      `protobuf:"bytes,18,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// merchant_id names the merchant that owns this product, within the calling
+	// tenant. Empty means unowned. It is carried by the events product-service
+	// publishes, so a browse result can be scoped to one merchant without
+	// another service lookup.
+	MerchantId    string `protobuf:"bytes,19,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -272,6 +277,13 @@ func (x *Product) GetAttributes() map[string]string {
 		return x.Attributes
 	}
 	return nil
+}
+
+func (x *Product) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
 }
 
 // Variant is a purchasable size or colour of a product.
@@ -508,8 +520,12 @@ type ListProductsRequest struct {
 	Limit           int32  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset          int32  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"`
 	IncludeVariants bool   `protobuf:"varint,8,opt,name=include_variants,json=includeVariants,proto3" json:"include_variants,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Merchant_id filters to one merchant's products. Empty means unfiltered,
+	// which is what the storefront browse sends; the seller console sends the
+	// merchant it is scoped to.
+	MerchantId    string `protobuf:"bytes,9,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListProductsRequest) Reset() {
@@ -597,6 +613,13 @@ func (x *ListProductsRequest) GetIncludeVariants() bool {
 		return x.IncludeVariants
 	}
 	return false
+}
+
+func (x *ListProductsRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
 }
 
 type ListProductsResponse struct {
@@ -744,7 +767,7 @@ var File_productlisting_v1_listing_proto protoreflect.FileDescriptor
 
 const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"\n" +
-	"\x1fproductlisting/v1/listing.proto\x12\x11productlisting.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x98\x06\n" +
+	"\x1fproductlisting/v1/listing.proto\x12\x11productlisting.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb9\x06\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\x03R\n" +
@@ -770,7 +793,9 @@ const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"\x0eschema_version\x18\x11 \x01(\x05R\rschemaVersion\x12J\n" +
 	"\n" +
 	"attributes\x18\x12 \x03(\v2*.productlisting.v1.Product.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x12\x1f\n" +
+	"\vmerchant_id\x18\x13 \x01(\tR\n" +
+	"merchantId\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc2\x02\n" +
@@ -794,7 +819,7 @@ const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12)\n" +
 	"\x10include_variants\x18\x02 \x01(\bR\x0fincludeVariants\"J\n" +
 	"\x12GetProductResponse\x124\n" +
-	"\aproduct\x18\x01 \x01(\v2\x1a.productlisting.v1.ProductR\aproduct\"\xb3\x02\n" +
+	"\aproduct\x18\x01 \x01(\v2\x1a.productlisting.v1.ProductR\aproduct\"\xd4\x02\n" +
 	"\x13ListProductsRequest\x12\x1f\n" +
 	"\vcategory_id\x18\x01 \x01(\x03R\n" +
 	"categoryId\x128\n" +
@@ -804,7 +829,9 @@ const file_productlisting_v1_listing_proto_rawDesc = "" +
 	"\x0fmax_price_cents\x18\x05 \x01(\x03R\rmaxPriceCents\x12\x14\n" +
 	"\x05limit\x18\x06 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\a \x01(\x05R\x06offset\x12)\n" +
-	"\x10include_variants\x18\b \x01(\bR\x0fincludeVariants\"d\n" +
+	"\x10include_variants\x18\b \x01(\bR\x0fincludeVariants\x12\x1f\n" +
+	"\vmerchant_id\x18\t \x01(\tR\n" +
+	"merchantId\"d\n" +
 	"\x14ListProductsResponse\x126\n" +
 	"\bproducts\x18\x01 \x03(\v2\x1a.productlisting.v1.ProductR\bproducts\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x03R\x05total\"4\n" +

@@ -64,4 +64,9 @@ type Sales interface {
 type EmployeeSessions interface {
 	Current(ctx context.Context, sessionID string) (*results.Employee, error)
 	CheckPermission(ctx context.Context, sessionID, permissionKey string) (bool, error)
+	// ListMyMerchants returns the merchants the session employee belongs to.
+	ListMyMerchants(ctx context.Context, sessionID string) ([]results.Merchant, error)
+	// CanManageProduct is the merchant-scoped PDP: may the employee holding the
+	// session modify products in the merchant?
+	CanManageProduct(ctx context.Context, sessionID, merchantID string) (bool, error)
 }

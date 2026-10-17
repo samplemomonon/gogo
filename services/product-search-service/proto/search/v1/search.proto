@@ -69,6 +69,10 @@ message SearchProduct {
   string product_type_id = 16;
   int32 schema_version = 17;
   map<string, string> attributes = 18;
+  // merchant_id names the merchant that owns this product, within the calling
+  // tenant. Empty means unowned. It is projected from the same events the
+  // listing service consumes, so both read models agree on ownership.
+  string merchant_id = 19;
 }
 
 message SearchProductsRequest {

@@ -236,6 +236,11 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	// a write outage must not stop the console reading what it needs to diagnose it.
 	registerUpstreamBreakers(b)
 
+	// The same separation at the traffic level: the readiness classification of
+	// those upstreams, keyed by type so the ops module consumes it without
+	// importing this package. Search is the optional one; see units.go.
+	fdi.ProvideInstanceType(b, ReadinessPolicy())
+
 	// productPlatformBreakers resolves the four platform breakers as one value, so a
 	// surface that needs the whole set takes it as a bundle instead of resolving four
 	// names and risking a mismatch between the connections and the breakers it hands

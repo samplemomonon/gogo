@@ -648,15 +648,17 @@ service-to-service token.
   and latency/resource budgets are not specified. Do not size HPA, Loki storage,
   or Prometheus retention from national scale as a proxy; record real workload
   assumptions and measure before tuning.
-- **Readiness policy needs reconciliation:** storefront documentation promises
-  browse remains available when search is down, while `/readyz` currently
-  aggregates every upstream breaker. A failed readiness probe removes that pod
-  from normal service traffic in Kubernetes
-  ([probe behavior](https://kubernetes.io/docs/concepts/workloads/pods/probes/)).
-  Decide which dependencies are required for serving traffic before changing
-  readiness; keep this separate from liveness and report optional dependency
-  degradation through metrics/logs. This is an observed requirements conflict,
-  not a readiness policy chosen by this plan.
+- **Readiness policy settled:** the requirement conflict recorded here earlier —
+  the storefront promises browse stays available when search is down, while a
+  failed readiness probe removes the pod from service traffic in Kubernetes
+  ([probe behavior](https://kubernetes.io/docs/concepts/workloads/pods/probes/))
+  — is resolved by classifying upstreams. Readiness gates only on *required*
+  upstreams, and the composition root's unit table declares the classes
+  (`apps/web/internal/bootstrap/units.go`: `search` is the optional one, and
+  everything else is required). A search outage therefore degrades search
+  without draining the instance, while a browse outage still fails `/readyz`.
+  Liveness stays "process is up"; optional dependency degradation keeps
+  surfacing through metrics and logs.
 
 ## 7. References
 

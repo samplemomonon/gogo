@@ -276,6 +276,162 @@ func (s *service) ListAuthorizationAdminEvents(ctx context.Context, req *authv1.
 	return response, nil
 }
 
+// ---- merchant relationship handlers ---------------------------------------
+
+func (s *service) RegisterAccount(ctx context.Context, req *authv1.RegisterAccountRequest) (*authv1.RegisterAccountResponse, error) {
+	employee, err := s.svc.RegisterAccount(ctx, tenantOf(ctx), req.GetName(), req.GetEmail(), req.GetPin())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.RegisterAccountResponse{Employee: s.toProtoEmployee(employee)}, nil
+}
+
+func (s *service) OpenMerchant(ctx context.Context, req *authv1.OpenMerchantRequest) (*authv1.OpenMerchantResponse, error) {
+	merchant, err := s.svc.OpenMerchant(ctx, req.GetSessionId(), req.GetName())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.OpenMerchantResponse{Merchant: s.toProtoMerchant(merchant)}, nil
+}
+
+func (s *service) ListMyMerchants(ctx context.Context, req *authv1.ListMyMerchantsRequest) (*authv1.ListMyMerchantsResponse, error) {
+	merchants, err := s.svc.ListMyMerchants(ctx, req.GetSessionId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	out := make([]*authv1.Merchant, 0, len(merchants))
+	for _, merchant := range merchants {
+		out = append(out, s.toProtoMerchant(merchant))
+	}
+	return &authv1.ListMyMerchantsResponse{Merchants: out}, nil
+}
+
+func (s *service) GetMerchant(ctx context.Context, req *authv1.GetMerchantRequest) (*authv1.GetMerchantResponse, error) {
+	merchant, err := s.svc.GetMerchant(ctx, req.GetSessionId(), req.GetMerchantId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.GetMerchantResponse{Merchant: s.toProtoMerchant(merchant)}, nil
+}
+
+func (s *service) ListMembers(ctx context.Context, req *authv1.ListMembersRequest) (*authv1.ListMembersResponse, error) {
+	members, err := s.svc.ListMembers(ctx, req.GetSessionId(), req.GetMerchantId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	out := make([]*authv1.MerchantMembership, 0, len(members))
+	for _, member := range members {
+		out = append(out, s.toProtoMembership(member))
+	}
+	return &authv1.ListMembersResponse{Members: out}, nil
+}
+
+func (s *service) InviteMember(ctx context.Context, req *authv1.InviteMemberRequest) (*authv1.InviteMemberResponse, error) {
+	invitation, err := s.svc.InviteMember(ctx, req.GetSessionId(), req.GetMerchantId(), req.GetEmail(), domain.MerchantRole(req.GetRole()))
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.InviteMemberResponse{Invitation: s.toProtoInvitation(invitation)}, nil
+}
+
+func (s *service) AcceptInvitation(ctx context.Context, req *authv1.AcceptInvitationRequest) (*authv1.AcceptInvitationResponse, error) {
+	membership, err := s.svc.AcceptInvitation(ctx, req.GetSessionId(), req.GetToken())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.AcceptInvitationResponse{Membership: s.toProtoMembership(membership)}, nil
+}
+
+func (s *service) RevokeInvitation(ctx context.Context, req *authv1.RevokeInvitationRequest) (*authv1.RevokeInvitationResponse, error) {
+	if err := s.svc.RevokeInvitation(ctx, req.GetSessionId(), req.GetInvitationId()); err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.RevokeInvitationResponse{}, nil
+}
+
+func (s *service) GrantMerchantPermission(ctx context.Context, req *authv1.GrantMerchantPermissionRequest) (*authv1.GrantMerchantPermissionResponse, error) {
+	if err := s.svc.GrantMerchantPermission(ctx, req.GetSessionId(), req.GetMerchantId(), req.GetEmployeeId(), req.GetPermissionKey()); err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.GrantMerchantPermissionResponse{}, nil
+}
+
+func (s *service) RevokeMerchantPermission(ctx context.Context, req *authv1.RevokeMerchantPermissionRequest) (*authv1.RevokeMerchantPermissionResponse, error) {
+	if err := s.svc.RevokeMerchantPermission(ctx, req.GetSessionId(), req.GetMerchantId(), req.GetEmployeeId(), req.GetPermissionKey()); err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.RevokeMerchantPermissionResponse{}, nil
+}
+
+func (s *service) ListMerchantPermissions(ctx context.Context, req *authv1.ListMerchantPermissionsRequest) (*authv1.ListMerchantPermissionsResponse, error) {
+	keys, err := s.svc.ListMerchantPermissions(ctx, req.GetSessionId(), req.GetMerchantId(), req.GetEmployeeId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.ListMerchantPermissionsResponse{PermissionKeys: keys}, nil
+}
+
+func (s *service) CanManageProduct(ctx context.Context, req *authv1.CanManageProductRequest) (*authv1.CanManageProductResponse, error) {
+	allowed, err := s.svc.CanManageProduct(ctx, req.GetSessionId(), req.GetMerchantId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.CanManageProductResponse{Allowed: allowed}, nil
+}
+
+func (s *service) toProtoMerchant(m *domain.Merchant) *authv1.Merchant {
+	if m == nil {
+		return nil
+	}
+	return &authv1.Merchant{
+		Id:              m.ID,
+		TenantId:        m.TenantID,
+		OwnerEmployeeId: m.OwnerEmployeeID,
+		Name:            m.Name,
+		CreatedAt:       timestamppb.New(m.CreatedAt),
+		UpdatedAt:       timestamppb.New(m.UpdatedAt),
+	}
+}
+
+func (s *service) toProtoMembership(m *domain.Membership) *authv1.MerchantMembership {
+	if m == nil {
+		return nil
+	}
+	return &authv1.MerchantMembership{
+		TenantId:   m.TenantID,
+		MerchantId: m.MerchantID,
+		EmployeeId: m.EmployeeID,
+		Role:       string(m.Role),
+		GrantedBy:  m.GrantedBy,
+		CreatedAt:  timestamppb.New(m.CreatedAt),
+	}
+}
+
+func (s *service) toProtoInvitation(inv *domain.Invitation) *authv1.MerchantInvitation {
+	if inv == nil {
+		return nil
+	}
+	out := &authv1.MerchantInvitation{
+		Id:         inv.ID,
+		TenantId:   inv.TenantID,
+		MerchantId: inv.MerchantID,
+		Email:      inv.Email,
+		Role:       string(inv.Role),
+		Status:     string(inv.Status),
+		Token:      inv.Token,
+		ExpiresAt:  timestamppb.New(inv.ExpiresAt),
+		InvitedBy:  inv.InvitedBy,
+		CreatedAt:  timestamppb.New(inv.CreatedAt),
+	}
+	if inv.AcceptedAt != nil {
+		out.AcceptedAt = timestamppb.New(*inv.AcceptedAt)
+	}
+	if inv.RevokedAt != nil {
+		out.RevokedAt = timestamppb.New(*inv.RevokedAt)
+	}
+	return out
+}
+
 func (s *service) toProtoEmployee(e *domain.Employee) *authv1.Employee {
 	if e == nil {
 		return nil

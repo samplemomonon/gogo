@@ -8,6 +8,7 @@
 # main-repo imports>. Test-only imports are excluded; external and
 # standard-library imports are omitted. Derived from `go list`.
 #
+gogo/cmd/authseed	gogo/internal/modules/auth/application,gogo/internal/modules/auth/domain,gogo/internal/modules/auth/infrastructure/postgres
 gogo/cmd/authzbootstrap	gogo/internal/modules/auth/infrastructure/postgres
 gogo/cmd/modulegen
 gogo/cmd/server	gogo/internal/bootstrap,gogo/internal/shared/config,gogo/internal/shared/logging
