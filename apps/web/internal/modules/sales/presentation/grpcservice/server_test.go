@@ -17,11 +17,34 @@ import (
 	"gogo/internal/modules/sales/application/ports"
 	"gogo/internal/modules/sales/domain"
 	"gogo/internal/modules/sales/infrastructure"
+	"gogo/internal/shared/authconsumer"
 	"gogo/internal/shared/tenant"
 )
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// testPrincipal identifies the caller every test adapter runs as. The handlers
+// take actor identity from the authorizer's answer, never from the request, so
+// the tests configure this principal and assert on where it lands.
+var testPrincipal = authconsumer.Principal{EmployeeID: "emp-1", Name: "Kasir A"}
+
+// allowAllAuthorizer stands in for the auth service's PDP: it grants every
+// permission and answers with the configured principal.
+type allowAllAuthorizer struct {
+	principal authconsumer.Principal
+}
+
+func (a allowAllAuthorizer) Authorize(context.Context, string, string) (authconsumer.Principal, bool, error) {
+	return a.principal, true, nil
+}
+
+// newTestService wires the adapter the way Register does — over an allow-all
+// authorizer — so the fail-closed default (no authorizer) is not what every
+// handler test accidentally exercises.
+func newTestService(svc ports.SalesService) *service {
+	return &service{svc: svc, logger: discardLogger(), authorizer: allowAllAuthorizer{principal: testPrincipal}}
 }
 
 // stubStock records how many stock adjustments the application service made.
@@ -35,7 +58,7 @@ func (s *stubStock) Adjust(context.Context, domain.Tenant, string, int, string, 
 func newWiredService() (*service, *infrastructure.Store, *stubStock) {
 	store := infrastructure.NewStore()
 	stock := &stubStock{}
-	return &service{svc: application.NewService(store, stock), logger: discardLogger()}, store, stock
+	return newTestService(application.NewService(store, stock)), store, stock
 }
 
 // recordingSales is a ports.SalesService that records what each handler passed
@@ -116,7 +139,9 @@ func TestTenantOf(t *testing.T) {
 // TestCheckoutMapsTheContractOntoTheDomainAndBack pins the checkout round trip
 // at the wire boundary: request fields reach the domain, totals and change are
 // computed server-side, every amount crosses in minor units, and the line
-// items are mapped back with quantity, discount and subtotal intact.
+// items are mapped back with quantity, discount and subtotal intact. The
+// request's cashier identity is a planted forgery: the stored sale must be
+// attributed to the principal the PDP returned.
 func TestCheckoutMapsTheContractOntoTheDomainAndBack(t *testing.T) {
 	t.Parallel()
 
@@ -131,8 +156,8 @@ func TestCheckoutMapsTheContractOntoTheDomainAndBack(t *testing.T) {
 		Discount:      1000,
 		Paid:          24000,
 		PaymentMethod: "Kartu",
-		Cashier:       "Kasir A",
-		EmployeeId:    "emp-1",
+		Cashier:       "forged-cashier",
+		EmployeeId:    "forged-emp",
 	})
 	if err != nil {
 		t.Fatalf("Checkout: %v", err)
@@ -149,9 +174,10 @@ func TestCheckoutMapsTheContractOntoTheDomainAndBack(t *testing.T) {
 		t.Errorf("total/discount/paid/change = %d/%d/%d/%d, want 23000/1000/24000/1000",
 			got.GetTotal(), got.GetDiscount(), got.GetPaid(), got.GetChange())
 	}
-	if got.GetPaymentMethod() != "Kartu" || got.GetCashier() != "Kasir A" || got.GetEmployeeId() != "emp-1" {
-		t.Errorf("method/cashier/employee = %q/%q/%q, want Kartu/Kasir A/emp-1",
-			got.GetPaymentMethod(), got.GetCashier(), got.GetEmployeeId())
+	if got.GetPaymentMethod() != "Kartu" ||
+		got.GetCashier() != testPrincipal.Name || got.GetEmployeeId() != testPrincipal.EmployeeID {
+		t.Errorf("method/cashier/employee = %q/%q/%q, want Kartu/%s/%s",
+			got.GetPaymentMethod(), got.GetCashier(), got.GetEmployeeId(), testPrincipal.Name, testPrincipal.EmployeeID)
 	}
 	if got.GetCreatedAt() == nil {
 		t.Fatal("CreatedAt is nil on a stored checkout")
@@ -208,7 +234,7 @@ func TestGetAndListMapAStoredTransaction(t *testing.T) {
 	if err := store.Create(context.Background(), "acme", sale); err != nil {
 		t.Fatalf("store.Create: %v", err)
 	}
-	svc := &service{svc: application.NewService(store, &stubStock{}), logger: discardLogger()}
+	svc := newTestService(application.NewService(store, &stubStock{}))
 	ctx := tenant.WithID(t.Context(), "acme")
 
 	resp, err := svc.GetTransaction(ctx, &salesv1.GetTransactionRequest{Id: "tx-1"})
@@ -261,7 +287,8 @@ func TestGetAndListMapAStoredTransaction(t *testing.T) {
 
 // TestHandlersPassTheContextTenantAndRequestFieldsToTheService pins the
 // service boundary of every handler: each one resolves the tenant from its
-// context and forwards the request's own fields unchanged.
+// context and forwards the request's own fields — except actor identity,
+// which always comes from the authorized principal, never from the request.
 func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) {
 	t.Parallel()
 
@@ -269,7 +296,7 @@ func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) 
 		t.Parallel()
 
 		rec := &recordingSales{result: &domain.Transaction{ID: "tx-1"}}
-		svc := &service{svc: rec, logger: discardLogger()}
+		svc := newTestService(rec)
 		ctx := tenant.WithID(context.Background(), "video")
 
 		if _, err := svc.Checkout(ctx, &salesv1.CheckoutRequest{
@@ -277,8 +304,8 @@ func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) 
 			Discount:      5,
 			Paid:          200,
 			PaymentMethod: "Kartu",
-			Cashier:       "Kasir A",
-			EmployeeId:    "emp-1",
+			Cashier:       "forged-cashier",
+			EmployeeId:    "forged-emp",
 		}); err != nil {
 			t.Fatalf("Checkout: %v", err)
 		}
@@ -288,9 +315,10 @@ func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) 
 		if len(rec.items) != 1 || rec.items[0] != (domain.CheckoutItem{ProductID: "p1", Name: "Kopi", Quantity: 2, Price: 100, Discount: 10}) {
 			t.Errorf("Checkout items = %+v, want the request line", rec.items)
 		}
-		if rec.discount != 5 || rec.paid != 200 || rec.method != "Kartu" || rec.cashier != "Kasir A" || rec.employeeID != "emp-1" {
-			t.Errorf("Checkout fields = %d/%d/%q/%q/%q, want 5/200/Kartu/Kasir A/emp-1",
-				rec.discount, rec.paid, rec.method, rec.cashier, rec.employeeID)
+		if rec.discount != 5 || rec.paid != 200 || rec.method != "Kartu" ||
+			rec.cashier != testPrincipal.Name || rec.employeeID != testPrincipal.EmployeeID {
+			t.Errorf("Checkout fields = %d/%d/%q/%q/%q, want 5/200/Kartu/%s/%s",
+				rec.discount, rec.paid, rec.method, rec.cashier, rec.employeeID, testPrincipal.Name, testPrincipal.EmployeeID)
 		}
 
 		if _, err := svc.GetTransaction(ctx, &salesv1.GetTransactionRequest{Id: "tx-9"}); err != nil {
@@ -307,12 +335,12 @@ func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) 
 			t.Errorf("ListTransactions saw tenant/limit = %q/%d, want video/7", rec.tenant, rec.limit)
 		}
 
-		if _, err := svc.VoidTransaction(ctx, &salesv1.VoidTransactionRequest{Id: "tx-9", VoidedBy: "Supervisor", Reason: "Barang rusak"}); err != nil {
+		if _, err := svc.VoidTransaction(ctx, &salesv1.VoidTransactionRequest{Id: "tx-9", VoidedBy: "forged-supervisor", Reason: "Barang rusak"}); err != nil {
 			t.Fatalf("VoidTransaction: %v", err)
 		}
-		if rec.tenant != "video" || rec.id != "tx-9" || rec.by != "Supervisor" || rec.reason != "Barang rusak" {
-			t.Errorf("VoidTransaction saw %q/%q/%q/%q, want video/tx-9/Supervisor/Barang rusak",
-				rec.tenant, rec.id, rec.by, rec.reason)
+		if rec.tenant != "video" || rec.id != "tx-9" || rec.by != testPrincipal.EmployeeID || rec.reason != "Barang rusak" {
+			t.Errorf("VoidTransaction saw %q/%q/%q/%q, want video/tx-9/%s/Barang rusak",
+				rec.tenant, rec.id, rec.by, rec.reason, testPrincipal.EmployeeID)
 		}
 	})
 
@@ -320,7 +348,7 @@ func TestHandlersPassTheContextTenantAndRequestFieldsToTheService(t *testing.T) 
 		t.Parallel()
 
 		rec := &recordingSales{}
-		svc := &service{svc: rec, logger: discardLogger()}
+		svc := newTestService(rec)
 
 		if _, err := svc.GetTransaction(context.Background(), &salesv1.GetTransactionRequest{Id: "tx-1"}); err != nil {
 			t.Fatalf("GetTransaction: %v", err)
@@ -378,7 +406,7 @@ func TestErrorsClassifyIntoStatus(t *testing.T) {
 			t.Parallel()
 
 			for name, call := range handlers {
-				svc := &service{svc: &recordingSales{err: tt.err}, logger: discardLogger()}
+				svc := newTestService(&recordingSales{err: tt.err})
 				err := call(svc)
 				if got := status.Code(err); got != tt.wantCode {
 					t.Errorf("%s status = %v, want %v", name, got, tt.wantCode)

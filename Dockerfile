@@ -4,9 +4,11 @@
 FROM oven/bun:1 AS assets
 WORKDIR /src
 
-# Lockfile-pinned install so image rebuilds are reproducible.
+# Lockfile-pinned install so image rebuilds are reproducible. Tailwind CLI is
+# a devDependency because it is needed only while building the CSS asset; this
+# stage is disposable, so include it here and keep it out of the runtime image.
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile
 
 # Tailwind scans .templ/.go for the classes it must emit, so the whole source
 # tree must be present before css:build — copying only app.css produced a CSS
@@ -20,11 +22,11 @@ FROM golang:1.27-alpine AS build
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 
-# The contracts module is a separate go.mod in the same repository and the
-# gateway imports it, so it must be on disk before `go mod download` resolves
-# anything. There is no replace directive; the workspace resolves it.
+# The contracts and design-system modules are local workspace dependencies.
+# Their go.mod files must be on disk before `go mod download` resolves them.
 COPY apps/web/go.mod apps/web/go.sum ./apps/web/
 COPY contracts/go.mod contracts/go.sum ./contracts/
+COPY design-system/web/ui/go.mod ./design-system/web/ui/
 RUN cd apps/web && go mod download
 
 COPY . .
@@ -33,7 +35,8 @@ COPY --from=assets /src/apps/web/internal/shared/web/assets/css/output.css ./app
 # *_templ.go files are gitignored, so generate them in the image.
 # templ is a Go tool dependency, so the module download layer above caches its
 # complete command dependency graph as part of the normal, checksum-pinned build.
-RUN cd apps/web && go tool templ generate
+RUN go -C design-system/web/ui tool templ generate \
+ && cd apps/web && go tool templ generate
 
 ARG VERSION=dev
 ARG LDFLAGS=

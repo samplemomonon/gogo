@@ -93,8 +93,10 @@ func TestMiddleware_WrapWithError(t *testing.T) {
 	err := middleware.Wrap(ctx, "order.delete", "order", "order-1", func() error {
 		return expectedErr
 	})
-	if err != expectedErr {
-		t.Fatalf("expected %v, got %v", expectedErr, err)
+	// Wrap joins the operation error with any logging error, so the operation's
+	// error must remain the cause rather than be identical to the return value.
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected error chain to contain %v, got %v", expectedErr, err)
 	}
 
 	logs, _ := logger.Query(ctx, &audit.Filter{})

@@ -42,29 +42,15 @@ func newServiceUnderTest(fake ports.AuthService) *service {
 type fakeService struct {
 	ports.AuthService
 
-	registerEmployee func(ctx context.Context, tenant domain.Tenant, id, name, email, pin string, role domain.Role) (*domain.Employee, error)
-	getEmployee      func(ctx context.Context, tenant domain.Tenant, id string) (*domain.Employee, error)
-	listEmployees    func(ctx context.Context, tenant domain.Tenant, limit int) ([]*domain.Employee, error)
-	login            func(ctx context.Context, tenant domain.Tenant, email, pin string) (*domain.Session, *domain.Employee, error)
-	extendSession    func(ctx context.Context, sessionID string) (*domain.Session, error)
+	listEmployees   func(ctx context.Context, tenant domain.Tenant, limit int) ([]*domain.Employee, error)
+	login           func(ctx context.Context, tenant domain.Tenant, email, pin string) (*domain.Session, *domain.Employee, error)
+	extendSession   func(ctx context.Context, sessionID string) (*domain.Session, error)
+	validateSession func(ctx context.Context, sessionID string) (*domain.Session, *domain.Employee, error)
+	checkPermission func(ctx context.Context, sessionID, permissionKey string) (bool, error)
 }
 
 func unexpectedCall(method string) error {
 	return fmt.Errorf("fakeService: unexpected %s call", method)
-}
-
-func (f *fakeService) RegisterEmployee(ctx context.Context, tenant domain.Tenant, id, name, email, pin string, role domain.Role) (*domain.Employee, error) {
-	if f.registerEmployee == nil {
-		return nil, unexpectedCall("RegisterEmployee")
-	}
-	return f.registerEmployee(ctx, tenant, id, name, email, pin, role)
-}
-
-func (f *fakeService) GetEmployee(ctx context.Context, tenant domain.Tenant, id string) (*domain.Employee, error) {
-	if f.getEmployee == nil {
-		return nil, unexpectedCall("GetEmployee")
-	}
-	return f.getEmployee(ctx, tenant, id)
 }
 
 func (f *fakeService) ListEmployees(ctx context.Context, tenant domain.Tenant, limit int) ([]*domain.Employee, error) {
@@ -88,6 +74,20 @@ func (f *fakeService) ExtendSession(ctx context.Context, sessionID string) (*dom
 	return f.extendSession(ctx, sessionID)
 }
 
+func (f *fakeService) ValidateSession(ctx context.Context, sessionID string) (*domain.Session, *domain.Employee, error) {
+	if f.validateSession == nil {
+		return nil, nil, unexpectedCall("ValidateSession")
+	}
+	return f.validateSession(ctx, sessionID)
+}
+
+func (f *fakeService) CheckPermission(ctx context.Context, sessionID, permissionKey string) (bool, error) {
+	if f.checkPermission == nil {
+		return false, unexpectedCall("CheckPermission")
+	}
+	return f.checkPermission(ctx, sessionID, permissionKey)
+}
+
 // failingService answers every method under test with one error, so the
 // classification table can drive each domain sentinel through the adapter.
 type failingService struct {
@@ -101,12 +101,12 @@ func (f failingService) Login(context.Context, domain.Tenant, string, string) (*
 
 func (f failingService) Logout(context.Context, string) error { return f.err }
 
-func (f failingService) GetEmployee(context.Context, domain.Tenant, string) (*domain.Employee, error) {
+func (f failingService) ExtendSession(context.Context, string) (*domain.Session, error) {
 	return nil, f.err
 }
 
-func (f failingService) ExtendSession(context.Context, string) (*domain.Session, error) {
-	return nil, f.err
+func (f failingService) ValidateSession(context.Context, string) (*domain.Session, *domain.Employee, error) {
+	return nil, nil, f.err
 }
 
 // TestTenantResolution pins where the tenant comes from: the adapter resolves
@@ -190,8 +190,8 @@ func TestErrorClassification(t *testing.T) {
 		_, err := svc.Logout(ctx, &authv1.LogoutRequest{})
 		return err
 	}
-	viaGetEmployee := func(ctx context.Context, svc *service) error {
-		_, err := svc.GetEmployee(ctx, &authv1.GetEmployeeRequest{})
+	viaValidateSession := func(ctx context.Context, svc *service) error {
+		_, err := svc.ValidateSession(ctx, &authv1.ValidateSessionRequest{})
 		return err
 	}
 	viaExtendSession := func(ctx context.Context, svc *service) error {
@@ -218,7 +218,7 @@ func TestErrorClassification(t *testing.T) {
 		},
 		{
 			name: "a wrapped not-found keeps its code",
-			err:  fmt.Errorf("store: %w", domain.ErrEmployeeNotFound), call: viaGetEmployee,
+			err:  fmt.Errorf("store: %w", domain.ErrEmployeeNotFound), call: viaValidateSession,
 			wantCode: codes.NotFound, wantMessage: "employee not found",
 		},
 		{
@@ -299,7 +299,8 @@ func TestInternalErrorsAreLogged(t *testing.T) {
 
 // TestProtoEmployeeMapping pins every field of the Employee message,
 // including the timestamps and the inactive state (a zero-value bool must
-// survive the mapping, not be dropped).
+// survive the mapping, not be dropped). Login is the RPC that still returns an
+// Employee: the legacy read RPCs are closed.
 func TestProtoEmployeeMapping(t *testing.T) {
 	t.Parallel()
 
@@ -318,19 +319,19 @@ func TestProtoEmployeeMapping(t *testing.T) {
 	}
 
 	impl := newServiceUnderTest(&fakeService{
-		getEmployee: func(_ context.Context, _ domain.Tenant, _ string) (*domain.Employee, error) {
-			return stored, nil
+		login: func(_ context.Context, _ domain.Tenant, _, _ string) (*domain.Session, *domain.Employee, error) {
+			return &domain.Session{ID: "sess-1"}, stored, nil
 		},
 	})
 
-	resp, err := impl.GetEmployee(context.Background(), &authv1.GetEmployeeRequest{Id: "emp-1"})
+	resp, err := impl.Login(context.Background(), &authv1.LoginRequest{Email: "budi@toko.com", Pin: "123456"})
 	if err != nil {
-		t.Fatalf("GetEmployee: %v", err)
+		t.Fatalf("Login: %v", err)
 	}
 
 	got := resp.GetEmployee()
 	if got == nil {
-		t.Fatal("GetEmployee returned no employee")
+		t.Fatal("Login returned no employee")
 	}
 	if got.GetId() != "emp-1" || got.GetTenantId() != "tenant-a" {
 		t.Errorf("id/tenant = %q/%q, want emp-1/tenant-a", got.GetId(), got.GetTenantId())
@@ -441,16 +442,31 @@ func TestNilAggregatesMapToNilProto(t *testing.T) {
 	}
 }
 
-// TestListEmployeesMapsEach pins the list adapter: every stored employee is
-// converted in order, the request limit is passed through as an int, and an
-// empty result is an empty (not nil) repeated field.
+// TestListEmployeesMapsEach pins the list adapter: the tenant comes from the
+// validated session (never from the caller's context), the permission check is
+// asked for the employee-read key, every stored employee is converted in
+// order, and the request limit is passed through as an int.
 func TestListEmployeesMapsEach(t *testing.T) {
 	t.Parallel()
 
-	var seenLimit int
+	var (
+		seenTenant domain.Tenant
+		seenLimit  int
+		seenPerm   string
+	)
 	impl := newServiceUnderTest(&fakeService{
-		listEmployees: func(_ context.Context, _ domain.Tenant, limit int) ([]*domain.Employee, error) {
-			seenLimit = limit
+		validateSession: func(_ context.Context, sessionID string) (*domain.Session, *domain.Employee, error) {
+			if sessionID != "sess-1" {
+				t.Errorf("service saw session %q, want sess-1", sessionID)
+			}
+			return &domain.Session{ID: "sess-1", TenantID: "tenant-a", EmployeeID: "emp-9"}, &domain.Employee{ID: "emp-9"}, nil
+		},
+		checkPermission: func(_ context.Context, _, permissionKey string) (bool, error) {
+			seenPerm = permissionKey
+			return true, nil
+		},
+		listEmployees: func(_ context.Context, tenant domain.Tenant, limit int) ([]*domain.Employee, error) {
+			seenTenant, seenLimit = tenant, limit
 			return []*domain.Employee{
 				{ID: "emp-1", TenantID: "tenant-a", Name: "Budi", Email: "budi@toko.com", Role: domain.RoleSeller},
 				{ID: "emp-2", TenantID: "tenant-a", Name: "Siti", Email: "siti@toko.com", Role: domain.RoleViewer},
@@ -458,12 +474,21 @@ func TestListEmployeesMapsEach(t *testing.T) {
 		},
 	})
 
-	resp, err := impl.ListEmployees(context.Background(), &authv1.ListEmployeesRequest{Limit: 25})
+	// The context names a different tenant: a message field or metadata
+	// tenant must not be able to widen the session's scope.
+	ctx := tenant.WithID(context.Background(), "mallory")
+	resp, err := impl.ListEmployees(ctx, &authv1.ListEmployeesRequest{SessionId: "sess-1", Limit: 25})
 	if err != nil {
 		t.Fatalf("ListEmployees: %v", err)
 	}
+	if seenTenant != "tenant-a" {
+		t.Errorf("service saw tenant %q, want the session tenant tenant-a", seenTenant)
+	}
 	if seenLimit != 25 {
 		t.Errorf("service saw limit %d, want 25", seenLimit)
+	}
+	if seenPerm != "authz.employee.read" {
+		t.Errorf("permission checked = %q, want authz.employee.read", seenPerm)
 	}
 	if len(resp.GetEmployees()) != 2 {
 		t.Fatalf("listed %d employees, want 2", len(resp.GetEmployees()))
@@ -474,44 +499,128 @@ func TestListEmployeesMapsEach(t *testing.T) {
 	}
 }
 
-// TestRegisterEmployeeDelegation pins that the adapter forwards the request
-// fields to the service unchanged — including the role as a domain.Role —
-// and maps the returned employee into the response.
-func TestRegisterEmployeeDelegation(t *testing.T) {
+// TestSessionAuthorizationGate pins authorizeSession's refusals: a session-
+// authorized RPC must be refused before the service is asked for anything when
+// the session is missing, unknown, or lacks the permission.
+func TestSessionAuthorizationGate(t *testing.T) {
 	t.Parallel()
 
-	var (
-		seenTenant domain.Tenant
-		seenID     string
-		seenName   string
-		seenEmail  string
-		seenPIN    string
-		seenRole   domain.Role
-	)
-	impl := newServiceUnderTest(&fakeService{
-		registerEmployee: func(_ context.Context, tenant domain.Tenant, id, name, email, pin string, role domain.Role) (*domain.Employee, error) {
-			seenTenant, seenID, seenName, seenEmail, seenPIN, seenRole = tenant, id, name, email, pin, role
-			return &domain.Employee{ID: id, TenantID: string(tenant), Name: name, Email: email, Role: role, Active: true}, nil
-		},
+	t.Run("a missing session is unauthenticated", func(t *testing.T) {
+		t.Parallel()
+
+		impl := newServiceUnderTest(&fakeService{})
+
+		_, err := impl.ListEmployees(context.Background(), &authv1.ListEmployeesRequest{})
+		if got := status.Code(err); got != codes.Unauthenticated {
+			t.Errorf("code = %v, want Unauthenticated (error %v)", got, err)
+		}
+		if got := status.Convert(err).Message(); got != "session required" {
+			t.Errorf("message = %q, want %q", got, "session required")
+		}
 	})
 
-	ctx := tenant.WithID(context.Background(), "acme")
-	resp, err := impl.RegisterEmployee(ctx, &authv1.RegisterEmployeeRequest{
-		Id:    "emp-1",
-		Name:  "Budi",
-		Email: "budi@toko.com",
-		Pin:   "123456",
-		Role:  string(domain.RoleSeller),
+	t.Run("an unknown session is not found", func(t *testing.T) {
+		t.Parallel()
+
+		impl := newServiceUnderTest(&fakeService{
+			validateSession: func(_ context.Context, _ string) (*domain.Session, *domain.Employee, error) {
+				return nil, nil, domain.ErrSessionNotFound
+			},
+		})
+
+		_, err := impl.ListEmployees(context.Background(), &authv1.ListEmployeesRequest{SessionId: "sess-9"})
+		if got := status.Code(err); got != codes.NotFound {
+			t.Errorf("code = %v, want NotFound (error %v)", got, err)
+		}
+		if got := status.Convert(err).Message(); got != "session not found" {
+			t.Errorf("message = %q, want %q", got, "session not found")
+		}
 	})
-	if err != nil {
-		t.Fatalf("RegisterEmployee: %v", err)
+
+	t.Run("a denied permission is forbidden", func(t *testing.T) {
+		t.Parallel()
+
+		listed := false
+		impl := newServiceUnderTest(&fakeService{
+			validateSession: func(_ context.Context, _ string) (*domain.Session, *domain.Employee, error) {
+				return &domain.Session{ID: "sess-1", TenantID: "tenant-a", EmployeeID: "emp-9"}, &domain.Employee{ID: "emp-9"}, nil
+			},
+			checkPermission: func(_ context.Context, _, _ string) (bool, error) {
+				return false, nil
+			},
+			listEmployees: func(_ context.Context, _ domain.Tenant, _ int) ([]*domain.Employee, error) {
+				listed = true
+				return nil, nil
+			},
+		})
+
+		_, err := impl.ListEmployees(context.Background(), &authv1.ListEmployeesRequest{SessionId: "sess-1"})
+		if got := status.Code(err); got != codes.PermissionDenied {
+			t.Errorf("code = %v, want PermissionDenied (error %v)", got, err)
+		}
+		if got := status.Convert(err).Message(); got != "permission denied" {
+			t.Errorf("message = %q, want %q", got, "permission denied")
+		}
+		if listed {
+			t.Error("the service was asked to list despite the denial")
+		}
+	})
+}
+
+// TestLegacyEmployeeAdministrationIsClosed pins that the tenant-and-id
+// employee RPCs are closed at the adapter: none of them carries a session or a
+// permission, so delegating them would bypass the dynamic authorization model.
+// They answer Unimplemented and never reach the application service.
+func TestLegacyEmployeeAdministrationIsClosed(t *testing.T) {
+	t.Parallel()
+
+	calls := []struct {
+		name string
+		call func(context.Context, *service) error
+	}{
+		{"RegisterEmployee", func(ctx context.Context, svc *service) error {
+			_, err := svc.RegisterEmployee(ctx, &authv1.RegisterEmployeeRequest{})
+			return err
+		}},
+		{"GetEmployee", func(ctx context.Context, svc *service) error {
+			_, err := svc.GetEmployee(ctx, &authv1.GetEmployeeRequest{})
+			return err
+		}},
+		{"GetEmployeeByEmail", func(ctx context.Context, svc *service) error {
+			_, err := svc.GetEmployeeByEmail(ctx, &authv1.GetEmployeeByEmailRequest{})
+			return err
+		}},
+		{"UpdateEmployee", func(ctx context.Context, svc *service) error {
+			_, err := svc.UpdateEmployee(ctx, &authv1.UpdateEmployeeRequest{})
+			return err
+		}},
+		{"SetEmployeePIN", func(ctx context.Context, svc *service) error {
+			_, err := svc.SetEmployeePIN(ctx, &authv1.SetEmployeePINRequest{})
+			return err
+		}},
+		{"ActivateEmployee", func(ctx context.Context, svc *service) error {
+			_, err := svc.ActivateEmployee(ctx, &authv1.ActivateEmployeeRequest{})
+			return err
+		}},
+		{"DeactivateEmployee", func(ctx context.Context, svc *service) error {
+			_, err := svc.DeactivateEmployee(ctx, &authv1.DeactivateEmployeeRequest{})
+			return err
+		}},
 	}
 
-	if seenTenant != "acme" || seenID != "emp-1" || seenName != "Budi" || seenEmail != "budi@toko.com" || seenPIN != "123456" || seenRole != domain.RoleSeller {
-		t.Errorf("service saw (%q, %q, %q, %q, %q, %q), want the request fields under tenant acme",
-			seenTenant, seenID, seenName, seenEmail, seenPIN, seenRole)
-	}
-	if got := resp.GetEmployee().GetId(); got != "emp-1" {
-		t.Errorf("response employee id = %q, want emp-1", got)
+	for _, tc := range calls {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			impl := newServiceUnderTest(&fakeService{})
+			err := tc.call(context.Background(), impl)
+
+			if got := status.Code(err); got != codes.Unimplemented {
+				t.Errorf("code = %v, want Unimplemented (error %v)", got, err)
+			}
+			if got := status.Convert(err).Message(); got != "employee administration requires a session-authorized API" {
+				t.Errorf("message = %q, want the closed-administration message", got)
+			}
+		})
 	}
 }

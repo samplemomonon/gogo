@@ -10,8 +10,8 @@ import (
 
 	"github.com/a-h/templ"
 
+	"gogo.design/system/web/ui"
 	"gogo/internal/shared/web/navigation"
-	"gogo/internal/shared/web/ui"
 )
 
 func TestPageWrapsInnerInBaseShell(t *testing.T) {
@@ -69,6 +69,8 @@ func TestPageEmitsShellScripts(t *testing.T) {
 		"getElementById(\"theme-toggle\")",          // ThemeApplyJS
 		"window.htmx.config.includeIndicatorStyles", // HtmxConfigJS
 		"label[role='button'][for]",                 // DrawerTriggerJS
+		"navigator.sendBeacon(\"/rum\"",             // WebVitalsJS
+		"web-vitals.attribution.iife.js",            // vendored web-vitals
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("shell script missing %q; expected InlineScript to emit it as JavaScript", want)

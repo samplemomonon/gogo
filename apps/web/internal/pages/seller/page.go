@@ -21,8 +21,8 @@ type Page struct {
 }
 
 // New wires the console around its remote peers.
-func New(catalog ports.ProductCatalog, inventory ports.Inventory, sales ports.Sales, logger *slog.Logger) *Page {
-	return &Page{handler: handlers.NewHandler(catalog, inventory, sales, logger)}
+func New(catalog ports.ProductCatalog, inventory ports.Inventory, sales ports.Sales, employees ports.EmployeeSessions, logger *slog.Logger) *Page {
+	return &Page{handler: handlers.NewHandler(catalog, inventory, sales, employees, logger)}
 }
 
 // Register registers the seller page's graph with the composition root.
@@ -32,6 +32,7 @@ func Register(b *fdi.Builder) {
 			fdi.MustResolveType[ports.ProductCatalog](c),
 			fdi.MustResolveType[ports.Inventory](c),
 			fdi.MustResolveType[ports.Sales](c),
+			fdi.MustResolveType[ports.EmployeeSessions](c),
 			fdi.MustResolveType[*slog.Logger](c),
 		), nil
 	})
@@ -45,20 +46,21 @@ func Register(b *fdi.Builder) {
 // categories remain administrator-owned in category-service.
 func (p *Page) RegisterRoutes(r chi.Router) {
 	r.Route("/seller", func(r chi.Router) {
-		r.Get("/", p.handler.Dashboard)
-		r.Get("/produk", p.handler.Products)
-		r.Get("/produk/attributes", p.handler.ProductAttributeFields)
-		r.Post("/produk", p.handler.ProductCreate)
-		r.Post("/produk/{id}", p.handler.ProductUpdate)
-		r.Post("/produk/{id}/delete", p.handler.ProductDelete)
-		r.Get("/kategori", p.handler.Categories)
-		r.Post("/kategori", p.handler.CategoryCreate)
-		r.Get("/stok", p.handler.Stock)
-		r.Post("/stok", p.handler.StockAdjust)
-		r.Get("/kasir", p.handler.Kasir)
-		r.Post("/kasir", p.handler.Checkout)
-		r.Get("/transaksi", p.handler.Transactions)
-		r.Post("/transaksi/{id}/void", p.handler.TransactionVoid)
+		r.Use(p.handler.RequireEmployee)
+		r.With(p.handler.RequirePermission("seller.dashboard.read")).Get("/", p.handler.Dashboard)
+		r.With(p.handler.RequirePermission("seller.catalog.read")).Get("/produk", p.handler.Products)
+		r.With(p.handler.RequirePermission("seller.catalog.read")).Get("/produk/attributes", p.handler.ProductAttributeFields)
+		r.With(p.handler.RequirePermission("seller.catalog.manage")).Post("/produk", p.handler.ProductCreate)
+		r.With(p.handler.RequirePermission("seller.catalog.manage")).Post("/produk/{id}", p.handler.ProductUpdate)
+		r.With(p.handler.RequirePermission("seller.catalog.manage")).Post("/produk/{id}/delete", p.handler.ProductDelete)
+		r.With(p.handler.RequirePermission("seller.category.read")).Get("/kategori", p.handler.Categories)
+		r.With(p.handler.RequirePermission("seller.category.manage")).Post("/kategori", p.handler.CategoryCreate)
+		r.With(p.handler.RequirePermission("seller.inventory.read")).Get("/stok", p.handler.Stock)
+		r.With(p.handler.RequirePermission("seller.inventory.manage")).Post("/stok", p.handler.StockAdjust)
+		r.With(p.handler.RequirePermission("seller.sales.read")).Get("/kasir", p.handler.Kasir)
+		r.With(p.handler.RequirePermission("seller.sales.checkout")).Post("/kasir", p.handler.Checkout)
+		r.With(p.handler.RequirePermission("seller.sales.read")).Get("/transaksi", p.handler.Transactions)
+		r.With(p.handler.RequirePermission("seller.sales.void")).Post("/transaksi/{id}/void", p.handler.TransactionVoid)
 	})
 }
 

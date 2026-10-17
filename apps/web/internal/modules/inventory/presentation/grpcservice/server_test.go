@@ -16,6 +16,8 @@ import (
 	"gogo/internal/modules/inventory/application/ports"
 	"gogo/internal/modules/inventory/domain"
 	"gogo/internal/modules/inventory/infrastructure"
+	"gogo/internal/shared/authconsumer"
+	"gogo/internal/shared/authn"
 	"gogo/internal/shared/tenant"
 )
 
@@ -28,15 +30,16 @@ func testLogger() *slog.Logger {
 // the method under test; the unused methods still return the configured error
 // so a wrong call cannot silently look like success.
 type fakeStockService struct {
-	tenantSeen    domain.Tenant
-	productSeen   string
-	idsSeen       []string
-	deltaSeen     int
-	kindSeen      string
-	noteSeen      string
-	actorSeen     string
-	referenceSeen string
-	limitSeen     int
+	tenantSeen       domain.Tenant
+	productSeen      string
+	idsSeen          []string
+	deltaSeen        int
+	kindSeen         string
+	noteSeen         string
+	actorSeen        string
+	serviceActorSeen string
+	referenceSeen    string
+	limitSeen        int
 
 	stock        *domain.Stock
 	movement     *domain.Movement
@@ -60,13 +63,14 @@ func (f *fakeStockService) ListStocks(_ context.Context, tenant domain.Tenant, p
 	return f.stocks, f.stocksErr
 }
 
-func (f *fakeStockService) AdjustStock(_ context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, reference string) (*domain.Stock, *domain.Movement, error) {
+func (f *fakeStockService) AdjustStock(_ context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, serviceActor, reference string) (*domain.Stock, *domain.Movement, error) {
 	f.tenantSeen = tenant
 	f.productSeen = productID
 	f.deltaSeen = delta
 	f.kindSeen = kind
 	f.noteSeen = note
 	f.actorSeen = actor
+	f.serviceActorSeen = serviceActor
 	f.referenceSeen = reference
 	return f.stock, f.movement, f.adjustErr
 }
@@ -78,8 +82,38 @@ func (f *fakeStockService) ListMovements(_ context.Context, tenant domain.Tenant
 	return f.movements, f.movementsErr
 }
 
+// testPrincipal identifies the caller every test adapter runs as. The adapter
+// takes actor identity from the authorizer's answer, never from the request, so
+// the tests configure this principal and assert on where it lands.
+var testPrincipal = authconsumer.Principal{EmployeeID: "kasir", Name: "Kasir"}
+
+// allowAllAuthorizer stands in for the auth service's PDP: it grants every
+// permission and answers with the configured principal, recording what it was
+// asked so a test can pin the permission a handler requested.
+type allowAllAuthorizer struct {
+	principal authconsumer.Principal
+	denied    bool
+	err       error
+	asked     []string
+}
+
+func (a *allowAllAuthorizer) Authorize(_ context.Context, _ string, permission string) (authconsumer.Principal, bool, error) {
+	a.asked = append(a.asked, permission)
+	if a.err != nil {
+		return authconsumer.Principal{}, false, a.err
+	}
+	return a.principal, !a.denied, nil
+}
+
+// newTestService wires the adapter the way Register does — over an allow-all
+// authorizer — so the fail-closed default (no authorizer) is not what every
+// handler test accidentally exercises.
 func newTestService(svc ports.StockService) *service {
-	return &service{svc: svc, logger: testLogger()}
+	return newTestServiceWithAuthorizer(svc, &allowAllAuthorizer{principal: testPrincipal})
+}
+
+func newTestServiceWithAuthorizer(svc ports.StockService, authorizer Authorizer) *service {
+	return &service{svc: svc, logger: testLogger(), authorizer: authorizer}
 }
 
 // TestToStatus pins the error vocabulary exactly: each domain kind maps to one
@@ -253,6 +287,75 @@ func TestHandlersClassifyServiceErrors(t *testing.T) {
 	}
 }
 
+// TestAdjustStockPermissionFollowsTheCaller pins the PEP's permission choice:
+// an employee call is authorized against the console's inventory permission,
+// while the sales module's in-process call presents the shared capability and
+// is authorized against the sale it is applying — and both are attributed to
+// the principal the PDP returns, never to the request's actor field.
+func TestAdjustStockPermissionFollowsTheCaller(t *testing.T) {
+	t.Parallel()
+
+	capability, err := authn.NewCapability()
+	if err != nil {
+		t.Fatalf("NewCapability: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		ctx            context.Context
+		wantPermission string
+		wantService    string
+	}{
+		{
+			name:           "an employee call asks for inventory management",
+			ctx:            context.Background(),
+			wantPermission: "seller.inventory.manage",
+		},
+		{
+			name:           "the sales caller asks for the checkout permission",
+			ctx:            authn.WithService(context.Background(), authn.SalesCaller, capability),
+			wantPermission: "seller.sales.checkout",
+			wantService:    authn.SalesCaller,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			authorizer := &allowAllAuthorizer{principal: testPrincipal}
+			fixture := &fakeStockService{stock: &domain.Stock{}, movement: &domain.Movement{}}
+			svc := newTestServiceWithAuthorizer(fixture, authorizer)
+			svc.salesCapability = capability
+
+			if _, err := svc.AdjustStock(tc.ctx, &inventoryv1.AdjustStockRequest{ProductId: "p-1", Delta: 1}); err != nil {
+				t.Fatalf("AdjustStock: %v", err)
+			}
+			if len(authorizer.asked) != 1 || authorizer.asked[0] != tc.wantPermission {
+				t.Errorf("permissions asked = %v, want [%s]", authorizer.asked, tc.wantPermission)
+			}
+			if fixture.actorSeen != testPrincipal.EmployeeID || fixture.serviceActorSeen != tc.wantService {
+				t.Errorf("attribution = actor %q service %q, want %q/%q",
+					fixture.actorSeen, fixture.serviceActorSeen, testPrincipal.EmployeeID, tc.wantService)
+			}
+		})
+	}
+}
+
+// TestHandlersFailClosedWithoutAnAuthorizer pins the deny-by-default edge: a
+// module wired without an authorizer must refuse every call rather than serve
+// it unauthenticated.
+func TestHandlersFailClosedWithoutAnAuthorizer(t *testing.T) {
+	t.Parallel()
+
+	svc := &service{svc: &fakeStockService{stock: &domain.Stock{}}, logger: testLogger()}
+
+	_, err := svc.GetStock(context.Background(), &inventoryv1.GetStockRequest{ProductId: "p-1"})
+	if got := status.Code(err); got != codes.Unauthenticated {
+		t.Errorf("GetStock without an authorizer = %v, want Unauthenticated", got)
+	}
+}
+
 // TestTenantReachesTheService pins tenantOf: a tenant carried on the context
 // reaches the port verbatim, and a context with none resolves to the default
 // tenant — the same fallback the HTTP gateway applies to an unmatched host.
@@ -339,7 +442,8 @@ func TestTenantsAreIsolated(t *testing.T) {
 // TestAdjustStockThenGetStockRoundtrip pins the field mapping in both
 // directions: the domain values the store returns reach the wire with the
 // right quantities, signed deltas, string fields and non-nil timestamps, and a
-// subsequent read returns the same level.
+// subsequent read returns the same level. The request's actor field is a
+// planted forgery: the ledger must record the validated session's employee.
 func TestAdjustStockThenGetStockRoundtrip(t *testing.T) {
 	t.Parallel()
 
@@ -347,7 +451,7 @@ func TestAdjustStockThenGetStockRoundtrip(t *testing.T) {
 	ctx := tenant.WithID(context.Background(), "acme")
 
 	adjust, err := svc.AdjustStock(ctx, &inventoryv1.AdjustStockRequest{
-		ProductId: "p-1", Delta: 7, Kind: "receive", Note: "restock", Actor: "kasir", Reference: "ref-1",
+		ProductId: "p-1", Delta: 7, Kind: "receive", Note: "restock", Actor: "forged-actor", Reference: "ref-1",
 	})
 	if err != nil {
 		t.Fatalf("AdjustStock: %v", err)
@@ -372,8 +476,8 @@ func TestAdjustStockThenGetStockRoundtrip(t *testing.T) {
 		t.Errorf("movement product = %q, want p-1", movement.GetProductId())
 	}
 	if movement.GetKind() != "receive" || movement.GetNote() != "restock" ||
-		movement.GetActor() != "kasir" || movement.GetReference() != "ref-1" {
-		t.Errorf("movement fields = %+v, want receive/restock/kasir/ref-1", movement)
+		movement.GetActor() != testPrincipal.EmployeeID || movement.GetReference() != "ref-1" {
+		t.Errorf("movement fields = %+v, want receive/restock/%s/ref-1", movement, testPrincipal.EmployeeID)
 	}
 	if movement.GetQuantityDelta() != 7 || movement.GetQuantityBefore() != 0 || movement.GetQuantityAfter() != 7 {
 		t.Errorf("movement quantities = delta %d before %d after %d, want 7/0/7",

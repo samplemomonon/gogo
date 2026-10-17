@@ -1,5 +1,12 @@
 # web/ui — design-system boundary
 
+This package is the **web component adapter**, not the owner of the cross-
+platform contract. The token source, governance, release rules and adapter map
+live in the repository-root [`design-system`](../../README.md). The Go/Templ
+primitives live here so they can be imported independently from the web
+application's private `internal` tree. Native clients consume the neutral token
+contract and build platform-native components.
+
 The lowest visual layer of the web surface: reusable, presentational primitives
 that every page, module and shell partial composes. Nothing here knows about a
 page, a module, a domain, or a request.
@@ -7,13 +14,13 @@ page, a module, a domain, or a request.
 ## Dependency contract (one-way)
 
 ```
-internal/pages/**       ─┐
-internal/modules/**     ─┼─▶  internal/shared/web/ui
-internal/shared/web/**  ─┘
+apps/web/internal/pages/**       ─┐
+apps/web/internal/modules/**     ─┼─▶  gogo.design/system/web/ui
+apps/web/internal/shared/web/**  ─┘
 ```
 
-`ui` may import only the standard library, `github.com/a-h/templ` and
-`internal/shared/money`. It must never import pages, modules, `shell`,
+`ui` may import only the standard library and `github.com/a-h/templ`. It must
+never import pages, modules, `shell`,
 `pagekit`, `render`, or a domain package — otherwise a primitive would couple
 two surfaces together.
 
@@ -82,8 +89,17 @@ One rule per kind of declaration, so the package reads predictably:
 | List-element descriptor | shortest name tied to its primitive | `Column`, `Crumb`, `PageLink` |
 | Attribute passthrough | a container whose caller may need its own `id`/`hx-*` takes `attrs templ.Attributes` last | `Card(bodyClass string, attrs templ.Attributes)` |
 
-The dependency contract above is enforced by the `ui primitives depend on no
-app code` test in `internal/architecture`; this convention is reviewed by hand.
+The separate Go module is the dependency boundary: it cannot import the web
+application's private Go packages. The module's direct dependencies stay
+limited to Templ and the standard library.
+
+## Local workflow
+
+From the repository root, `make templ` regenerates this module and its web-app
+consumers. `go -C design-system/web/ui build ./...` builds the standalone
+component package; `make css` regenerates the token adapter and embedded web
+stylesheet. Run component changes through the web module's existing render
+assertions and review their consuming page at narrow and wide widths.
 
 ## Adding a primitive
 

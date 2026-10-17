@@ -6,7 +6,7 @@ import (
 
 	"gogo/internal/pages/seller/application/results"
 	"gogo/internal/shared/money"
-	"gogo/internal/shared/web/ui"
+	"gogo.design/system/web/ui"
 )
 
 // stockKinds is the movement vocabulary: the wire value is stored in the ledger
@@ -296,7 +296,6 @@ templ StockSection(products []*results.Product, stocks []*results.Stock, movemen
 				</select>
 			}
 			@ui.FormField("Catatan") { <input name="note" class={ ui.InputClass }/> }
-			@ui.FormField("Petugas") { <input name="actor" class={ ui.InputClass }/> }
 			@ui.FormActions("") {
 				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, nil) {
 					@ui.IconLayers("size-4")
@@ -409,9 +408,6 @@ templ KasirSection(products []*results.Product, errMsg string) {
 				@ui.FormField("Dibayar") {
 					<input name="paid" type="number" min="0" value="0" class={ ui.InputClass }/>
 				}
-				@ui.FormField("Kasir") {
-					<input name="cashier" class={ ui.InputClass }/>
-				}
 			</div>
 			@ui.FormActions("-mt-2") {
 				@ui.SubmitAction(ui.IntentPrimary, "", ui.TapTargetClass, ui.SubmitAttrs("Proses pembayaran untuk produk yang dipilih?")) {
@@ -459,12 +455,6 @@ templ TransactionsSection(transactions []*results.Transaction, errMsg string) {
 				@ui.TableCell("right", "") {
 					if transaction.VoidedAt == nil {
 						@ui.Form(ui.FormOptions{Action: "/seller/transaksi/" + transaction.ID + "/void", Class: "flex flex-wrap items-center justify-end gap-2"}) {
-							<input
-								name="voidedBy"
-								placeholder="Petugas"
-								aria-label={ "Nama petugas pembatal transaksi " + transaction.Number }
-								class={ ui.InputClass + " input-sm w-28 " + ui.TapTargetClass }
-							/>
 							@ui.Button(ui.ActionClass(ui.IntentDanger, "sm"), ui.SubmitAttrs("Batalkan transaksi "+transaction.Number+"? Tindakan ini tidak dapat dibatalkan.")) {
 								@ui.IconXCircle("size-4")
 								Batal

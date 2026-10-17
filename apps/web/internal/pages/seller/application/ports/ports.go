@@ -59,3 +59,9 @@ type Sales interface {
 	Checkout(ctx context.Context, items []*results.TransactionItem, discount, paid int64, method, cashier, employeeID string) (*results.Transaction, error)
 	Void(ctx context.Context, id, by, reason string) (*results.Transaction, error)
 }
+
+// EmployeeSessions resolves a browser session to its authenticated employee.
+type EmployeeSessions interface {
+	Current(ctx context.Context, sessionID string) (*results.Employee, error)
+	CheckPermission(ctx context.Context, sessionID, permissionKey string) (bool, error)
+}

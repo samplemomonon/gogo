@@ -26,10 +26,14 @@ func connectSales(
 	inventoryBreaker *breaker.Breaker,
 	logger *slog.Logger,
 	registry *module.Registry,
+	security ...moduleSecurity,
 ) (conn *grpc.ClientConn, closeConn func(), err error) {
-	stock := salesinventoryclient.New(inventoryConn, inventoryBreaker)
-
-	module, closeModule, err := salescompose.Build(parent, cfg, stock, logger)
+	var moduleCfg moduleSecurity
+	if len(security) > 0 {
+		moduleCfg = security[0]
+	}
+	stock := salesinventoryclient.New(inventoryConn, inventoryBreaker, moduleCfg.capability)
+	module, closeModule, err := salescompose.Build(parent, cfg, stock, logger, moduleCfg.authorizer)
 	if err != nil {
 		return nil, nil, err
 	}

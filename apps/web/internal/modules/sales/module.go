@@ -19,20 +19,25 @@ import (
 
 // Module is the sales feature module.
 type Module struct {
-	service ports.SalesService
-	logger  *slog.Logger
-	ping    func(context.Context) error
+	service    ports.SalesService
+	logger     *slog.Logger
+	ping       func(context.Context) error
+	authorizer grpcservice.Authorizer
 }
 
 // NewModule wires the sales module around an explicit transaction store and stock
 // adjuster. ping backs the health report; pass nil for the in-memory store.
-func NewModule(store ports.Store, stock ports.StockAdjuster, ping func(context.Context) error, logger *slog.Logger) *Module {
-	return &Module{service: application.NewService(store, stock), logger: logger, ping: ping}
+func NewModule(store ports.Store, stock ports.StockAdjuster, ping func(context.Context) error, logger *slog.Logger, authorizers ...grpcservice.Authorizer) *Module {
+	var authorizer grpcservice.Authorizer
+	if len(authorizers) > 0 {
+		authorizer = authorizers[0]
+	}
+	return &Module{service: application.NewService(store, stock), logger: logger, ping: ping, authorizer: authorizer}
 }
 
 // RegisterGRPC mounts the sales contract surface on a gRPC server.
 func (m *Module) RegisterGRPC(s grpc.ServiceRegistrar) {
-	grpcservice.Register(s, m.service, m.logger, m.ping)
+	grpcservice.Register(s, m.service, m.logger, m.ping, m.authorizer)
 }
 
 // Manifest is the sales module's remote contract.

@@ -20,13 +20,18 @@ func (h *Handler) StockAdjust(w http.ResponseWriter, r *http.Request) {
 		h.renderStock(w, r, "Jumlah tidak valid")
 		return
 	}
+	employee := employeeFromContext(r)
+	if employee == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
 	_, _, err = h.inventory.AdjustStock(
 		r.Context(),
 		r.PostFormValue("productId"),
 		delta,
 		defaultKind(r.PostFormValue("kind")),
 		r.PostFormValue("note"),
-		r.PostFormValue("actor"),
+		employee.ID,
 		"",
 	)
 	if err != nil {

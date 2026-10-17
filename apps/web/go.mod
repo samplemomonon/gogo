@@ -3,9 +3,11 @@ module gogo
 go 1.27.1
 
 require (
+	gogo.design/system/web/ui v0.0.0
 	github.com/a-h/templ v0.3.1020
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/uuid v1.6.0
+	github.com/yuin/goldmark v1.8.6
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/joho/godotenv v1.5.1
 	github.com/twmb/franz-go v1.22.1
@@ -14,6 +16,8 @@ require (
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
+
+replace gogo.design/system/web/ui => ../../design-system/web/ui
 
 require (
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect

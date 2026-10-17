@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -203,33 +204,30 @@ func TestRegisterGRPCServesTheWireContract(t *testing.T) {
 	}
 }
 
-// TestRegisterGRPCRoundTripsAnEmployee pins the contract end to end: an
-// employee registered over the wire can log in over the wire, and the response
-// carries the stored session and employee — the flow the gateway performs.
+// TestRegisterGRPCRoundTripsAnEmployee pins the contract end to end: a seeded
+// employee logs in over the wire and the response carries the stored session
+// and employee. Registration is closed on the wire — the legacy RPCs carry no
+// session or permission — so the seed goes straight into the store, the row
+// the postgres deployment would hold, and login proves the hash it reads.
 func TestRegisterGRPCRoundTripsAnEmployee(t *testing.T) {
 	t.Parallel()
 
-	client := dialAuth(t, newModule(nil))
-	ctx := context.Background()
-
-	registered, err := client.RegisterEmployee(ctx, &authv1.RegisterEmployeeRequest{
-		Id:    "emp-1",
-		Name:  "Budi",
-		Email: "Budi@Toko.com",
-		Pin:   "123456",
-		Role:  string(domain.RoleSeller),
-	})
+	store := infrastructure.NewStore()
+	hash, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.MinCost)
 	if err != nil {
-		t.Fatalf("RegisterEmployee: %v", err)
+		t.Fatalf("GenerateFromPassword: %v", err)
 	}
-	if got := registered.GetEmployee().GetEmail(); got != "budi@toko.com" {
-		t.Errorf("registered Email = %q, want the domain-normalised budi@toko.com", got)
+	employee, err := domain.NewEmployee("default", "emp-1", "Budi", "budi@toko.com", string(hash), domain.RoleSeller)
+	if err != nil {
+		t.Fatalf("NewEmployee: %v", err)
 	}
-	if got := registered.GetEmployee().GetRole(); got != string(domain.RoleSeller) {
-		t.Errorf("registered Role = %q, want %q", got, domain.RoleSeller)
+	if err := store.Create(context.Background(), "default", employee); err != nil {
+		t.Fatalf("seed store: %v", err)
 	}
 
-	login, err := client.Login(ctx, &authv1.LoginRequest{Email: "budi@toko.com", Pin: "123456"})
+	client := dialAuth(t, auth.NewModule(store, store, nil, testLogger()))
+
+	login, err := client.Login(context.Background(), &authv1.LoginRequest{Email: "budi@toko.com", Pin: "123456"})
 	if err != nil {
 		t.Fatalf("Login: %v", err)
 	}
@@ -241,5 +239,31 @@ func TestRegisterGRPCRoundTripsAnEmployee(t *testing.T) {
 	}
 	if got := login.GetEmployee().GetId(); got != "emp-1" {
 		t.Errorf("Login employee Id = %q, want emp-1", got)
+	}
+	if got := login.GetEmployee().GetEmail(); got != "budi@toko.com" {
+		t.Errorf("Login employee Email = %q, want the domain-normalised budi@toko.com", got)
+	}
+	if got := login.GetEmployee().GetRole(); got != string(domain.RoleSeller) {
+		t.Errorf("Login employee Role = %q, want %q", got, domain.RoleSeller)
+	}
+}
+
+// TestRegisterGRPCClosesLegacyEmployeeAdministration pins that the mounted
+// wire surface refuses the legacy employee RPCs: they carry no session or
+// permission, so delegating them would bypass the dynamic authorization model.
+func TestRegisterGRPCClosesLegacyEmployeeAdministration(t *testing.T) {
+	t.Parallel()
+
+	client := dialAuth(t, newModule(nil))
+	ctx := context.Background()
+
+	if _, err := client.RegisterEmployee(ctx, &authv1.RegisterEmployeeRequest{Id: "emp-1"}); status.Code(err) != codes.Unimplemented {
+		t.Errorf("RegisterEmployee = %v (code %v), want Unimplemented", err, status.Code(err))
+	}
+	if _, err := client.GetEmployeeByEmail(ctx, &authv1.GetEmployeeByEmailRequest{Email: "budi@toko.com"}); status.Code(err) != codes.Unimplemented {
+		t.Errorf("GetEmployeeByEmail = %v (code %v), want Unimplemented", err, status.Code(err))
+	}
+	if _, err := client.ListEmployees(ctx, &authv1.ListEmployeesRequest{}); status.Code(err) != codes.Unauthenticated {
+		t.Errorf("ListEmployees without a session = %v (code %v), want Unauthenticated", err, status.Code(err))
 	}
 }

@@ -59,3 +59,19 @@ func join(components []templ.Component) templ.Component {
 		return nil
 	})
 }
+
+// wrapIsland wraps a server-rendered island in its marker element. The
+// wrapper is the DOM anchor client-side web-vitals attribution walks
+// (closest("[data-island]")) and the hook for the stylesheet's
+// display:contents rule, which keeps the element out of layout while it
+// stays in the DOM.
+func wrapIsland(name string, html []byte) []byte {
+	var b bytes.Buffer
+	b.Grow(len(html) + len(name) + 40)
+	b.WriteString(`<div class="ds-island" data-island="`)
+	b.WriteString(templ.EscapeString(name))
+	b.WriteString(`">`)
+	b.Write(html)
+	b.WriteString(`</div>`)
+	return b.Bytes()
+}

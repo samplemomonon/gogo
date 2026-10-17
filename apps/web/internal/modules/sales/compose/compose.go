@@ -11,6 +11,7 @@ import (
 	"gogo/internal/modules/sales/application/ports"
 	"gogo/internal/modules/sales/infrastructure"
 	salespostgres "gogo/internal/modules/sales/infrastructure/postgres"
+	"gogo/internal/modules/sales/presentation/grpcservice"
 	"gogo/internal/shared/config"
 )
 
@@ -21,9 +22,10 @@ func Build(
 	cfg *config.AppConfig,
 	stock ports.StockAdjuster,
 	logger *slog.Logger,
+	authorizers ...grpcservice.Authorizer,
 ) (*sales.Module, func(), error) {
 	if cfg.DatabaseURL == "" {
-		return sales.NewModule(infrastructure.NewStore(), stock, nil, logger), func() {}, nil
+		return sales.NewModule(infrastructure.NewStore(), stock, nil, logger, authorizers...), func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(parent, cfg.DBPingTimeout+10*time.Second)
@@ -40,5 +42,5 @@ func Build(
 
 	store := salespostgres.NewStore(pool)
 	logger.Info("sales backed by postgres")
-	return sales.NewModule(store, stock, store.Ping, logger), func() { pool.Close() }, nil
+	return sales.NewModule(store, stock, store.Ping, logger, authorizers...), func() { pool.Close() }, nil
 }

@@ -29,6 +29,11 @@ func (h *Handler) Kasir(w http.ResponseWriter, r *http.Request) {
 // the filter happens here, and a qty posted for a non-active product is ignored
 // rather than trusted.
 func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
+	employee := employeeFromContext(r)
+	if employee == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
 	all, stocks, err := h.sellableWithStock(r)
 	if err != nil {
 		h.fail(w, r, err)
@@ -62,7 +67,7 @@ func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	paid, _ := parseInt64(r.PostFormValue("paid"))
-	_, err = h.sales.Checkout(r.Context(), items, 0, paid, r.PostFormValue("method"), r.PostFormValue("cashier"), "")
+	_, err = h.sales.Checkout(r.Context(), items, 0, paid, r.PostFormValue("method"), employee.Name, employee.ID)
 	if err != nil {
 		h.page(w, r, partials.KasirSection(all, h.notice(r, err)))
 		return
@@ -104,7 +109,12 @@ func (h *Handler) Transactions(w http.ResponseWriter, r *http.Request) {
 
 // TransactionVoid voids a completed sale.
 func (h *Handler) TransactionVoid(w http.ResponseWriter, r *http.Request) {
-	_, err := h.sales.Void(r.Context(), chi.URLParam(r, "id"), r.PostFormValue("voidedBy"), r.PostFormValue("reason"))
+	employee := employeeFromContext(r)
+	if employee == nil {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+	_, err := h.sales.Void(r.Context(), chi.URLParam(r, "id"), employee.ID, r.PostFormValue("reason"))
 	if err != nil {
 		h.renderTransactions(w, r, h.notice(r, err))
 		return

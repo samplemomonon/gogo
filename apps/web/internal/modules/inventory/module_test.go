@@ -21,6 +21,7 @@ import (
 	"gogo/internal/modules/inventory"
 	"gogo/internal/modules/inventory/domain"
 	"gogo/internal/modules/inventory/infrastructure"
+	"gogo/internal/shared/authconsumer"
 	"gogo/internal/shared/grpcx"
 	sharedmodule "gogo/internal/shared/module"
 )
@@ -37,6 +38,23 @@ var (
 
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// allowAllAuthorizer stands in for the auth service's PDP. The wire tests are
+// about the module's contract, not the deny-by-default edge (which the adapter
+// tests pin), so they wire the same permissive shape compose.Build receives in
+// production.
+type allowAllAuthorizer struct{}
+
+func (allowAllAuthorizer) Authorize(context.Context, string, string) (authconsumer.Principal, bool, error) {
+	return authconsumer.Principal{EmployeeID: "employee-1"}, true, nil
+}
+
+// securedModule builds the in-memory module the way compose.Build does: over
+// the in-memory store and under an authorizer.
+func securedModule(logger *slog.Logger) *inventory.Module {
+	return inventory.NewModuleWithDeps(infrastructure.NewStockRepository(), nil, logger,
+		inventory.Security{Authorizer: allowAllAuthorizer{}})
 }
 
 // serveModule mounts the module the way the composition root does — over the
@@ -158,7 +176,7 @@ func TestRegisterRoutesMountsNothing(t *testing.T) {
 func TestListStocksOnAnEmptyStoreReturnsOK(t *testing.T) {
 	t.Parallel()
 
-	client := inventoryv1.NewInventoryServiceClient(serveModule(t, inventory.NewModule(testLogger())))
+	client := inventoryv1.NewInventoryServiceClient(serveModule(t, securedModule(testLogger())))
 
 	resp, err := client.ListStocks(context.Background(), &inventoryv1.ListStocksRequest{})
 	if err != nil {
@@ -194,7 +212,7 @@ func TestHealthCheckServesServing(t *testing.T) {
 func TestNewModuleWiresTheInMemoryStore(t *testing.T) {
 	t.Parallel()
 
-	client := inventoryv1.NewInventoryServiceClient(serveModule(t, inventory.NewModule(testLogger())))
+	client := inventoryv1.NewInventoryServiceClient(serveModule(t, securedModule(testLogger())))
 	ctx := context.Background()
 
 	adjust, err := client.AdjustStock(ctx, &inventoryv1.AdjustStockRequest{
@@ -227,7 +245,7 @@ func TestNewModuleWithDepsServesTheInjectedService(t *testing.T) {
 	fixture := &fixedStockService{
 		stock: &domain.Stock{ProductID: "from-the-store", Quantity: 42},
 	}
-	module := inventory.NewModuleWithDeps(fixture, nil, testLogger())
+	module := inventory.NewModuleWithDeps(fixture, nil, testLogger(), inventory.Security{Authorizer: allowAllAuthorizer{}})
 	client := inventoryv1.NewInventoryServiceClient(serveModule(t, module))
 
 	resp, err := client.GetStock(context.Background(), &inventoryv1.GetStockRequest{ProductId: "from-the-store"})
@@ -254,7 +272,7 @@ func (f *fixedStockService) ListStocks(context.Context, domain.Tenant, []string)
 	return nil, nil
 }
 
-func (f *fixedStockService) AdjustStock(context.Context, domain.Tenant, string, int, string, string, string, string) (*domain.Stock, *domain.Movement, error) {
+func (f *fixedStockService) AdjustStock(context.Context, domain.Tenant, string, int, string, string, string, string, string) (*domain.Stock, *domain.Movement, error) {
 	return nil, nil, nil
 }
 

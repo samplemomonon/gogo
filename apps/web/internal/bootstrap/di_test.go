@@ -162,8 +162,10 @@ func TestObserveKernelProductEvents(t *testing.T) {
 }
 
 // TestGatewayContainer_ResolvesAppGraph pins that resolving serviceApp walks
-// the whole graph and registers the in-process modules in shell order, and
-// that the lifecycle releases the connections the graph acquired.
+// the whole graph and registers the in-process modules in dependency order —
+// auth first, because inventory and sales resolve their authorizer from its
+// connection — and that the lifecycle releases the connections the graph
+// acquired.
 func TestGatewayContainer_ResolvesAppGraph(t *testing.T) {
 	cfg := testGatewayConfig()
 	cfg.AppEnv = "test"
@@ -183,8 +185,11 @@ func TestGatewayContainer_ResolvesAppGraph(t *testing.T) {
 	}
 	// The catalog and listing are gone: the product platform owns them, in another
 	// process, so nothing registers them in this registry. What remains is what this
-	// process still owns outright.
-	if want := []string{"inventory", "sales", "auth", "billing", "ops"}; !reflect.DeepEqual(names, want) {
+	// process still owns outright. Auth is registered before the console's modules:
+	// inventory and sales resolve their authorizer from the auth connection, and
+	// lifecycle stops run in reverse registration order, so a dependency must
+	// register before its dependents to stop last.
+	if want := []string{"auth", "inventory", "sales", "billing", "ops"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("registry modules = %v, want %v", names, want)
 	}
 

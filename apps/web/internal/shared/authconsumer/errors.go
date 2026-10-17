@@ -14,6 +14,10 @@ var (
 	ErrPrecondition = errors.New("auth: refused")
 	// ErrUnauthenticated is a refusal because the credentials did not match.
 	ErrUnauthenticated = errors.New("auth: not authenticated")
+	// ErrForbidden is an authenticated request without the requested authority.
+	ErrForbidden = errors.New("auth: forbidden")
+	// ErrPolicyConflict is a duplicate or conflicting policy mutation.
+	ErrPolicyConflict = errors.New("auth: policy conflict")
 	// ErrAuthUnavailable is "the auth service cannot be reached", whether the
 	// circuit is open, the transport is failing, or the service answered with a
 	// status this contract does not name. Callers degrade on it instead of

@@ -177,17 +177,16 @@ func TestSellerSidebarLinksOnlyToServedSurfaces(t *testing.T) {
 }
 
 // TestTheInsetDoesNotRestateTheShellContainer pins the bug the class was defined
-// to prevent: the shell already wraps every page body in one
-// `container mx-auto px-4 py-8`, so restating it in the console's inset nested a
-// second max-width container and a second gutter inside the first. The document
-// must contain the shell's container exactly once and the inset's own class must
-// stay free of it.
+// to prevent: the shell already wraps every page body in one `ds-container py-8`,
+// so restating it in the console's inset nested a second max-width container and
+// a second gutter inside the first. The document must contain the shell's
+// container exactly once and the inset's own class must stay free of it.
 func TestTheInsetDoesNotRestateTheShellContainer(t *testing.T) {
 	t.Parallel()
 
 	body := renderShell(t, "/seller", templ.Raw(""))
 
-	if got := strings.Count(body, "container mx-auto px-4 py-8"); got != 1 {
+	if got := strings.Count(body, "ds-container py-8"); got != 1 {
 		t.Errorf("shell container occurrences = %d, want exactly 1", got)
 	}
 	if pages.SidebarInsetClass != "gap-6" {

@@ -262,6 +262,8 @@ func TestValidate(t *testing.T) {
 		{"missing product search address", func(c *AppConfig) { c.ProductSearchAddress = "" }, "PRODUCT_SEARCH_ADDRESS"},
 		{"missing category address", func(c *AppConfig) { c.CategoryAddress = "" }, "CATEGORY_ADDRESS"},
 		{"missing product platform token", func(c *AppConfig) { c.ProductPlatformServiceToken = "" }, "PRODUCT_PLATFORM_SERVICE_TOKEN"},
+		{"Builder key without model", func(c *AppConfig) { c.BuilderPublicAPIKey = "public-key" }, "BUILDER_PUBLIC_API_KEY"},
+		{"invalid Builder model", func(c *AppConfig) { c.BuilderPublicAPIKey = "public-key"; c.BuilderModel = "Editorial Page" }, "BUILDER_CONTENT_MODEL"},
 		{"blank product address", func(c *AppConfig) { c.ProductAddress = "   " }, "PRODUCT_ADDRESS"},
 		// A bare hostname with no port is the common typo; it would otherwise fail as an
 		// opaque dial error at first request rather than at startup.

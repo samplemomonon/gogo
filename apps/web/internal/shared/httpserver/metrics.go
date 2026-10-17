@@ -275,6 +275,45 @@ func (m *Metrics) prometheusRows() []string {
 		fmt.Sprintf("gogo_render_cache_misses_total %d", cacheMisses),
 	)
 
+	// Per-island render totals, keyed by island family (the search term a
+	// paged island was requested with is collapsed away — see
+	// render.IslandCounters). Errors and fallbacks are separate series so a
+	// degrading island is visible before its fallback rate moves.
+	islands := render.IslandCounters()
+	if len(islands) > 0 {
+		rows = append(rows,
+			"# HELP gogo_render_island_renders_total Server-rendered island regions by island family.",
+			"# TYPE gogo_render_island_renders_total counter",
+			"# HELP gogo_render_island_fallbacks_total Island renders degraded to their fallback.",
+			"# TYPE gogo_render_island_fallbacks_total counter",
+			"# HELP gogo_render_island_timeouts_total Island renders that exceeded their timeout.",
+			"# TYPE gogo_render_island_timeouts_total counter",
+			"# HELP gogo_render_island_errors_total Island renders that failed.",
+			"# TYPE gogo_render_island_errors_total counter",
+			"# HELP gogo_render_island_duration_seconds_sum Total island render time in seconds.",
+			"# TYPE gogo_render_island_duration_seconds_sum counter",
+		)
+		names := make([]string, 0, len(islands))
+		for name := range islands {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			stat := islands[name]
+			rows = append(rows,
+				fmt.Sprintf("gogo_render_island_renders_total{island=%q} %d", name, stat.Renders),
+				fmt.Sprintf("gogo_render_island_fallbacks_total{island=%q} %d", name, stat.Fallbacks),
+				fmt.Sprintf("gogo_render_island_timeouts_total{island=%q} %d", name, stat.Timeouts),
+				fmt.Sprintf("gogo_render_island_errors_total{island=%q} %d", name, stat.Errors),
+				fmt.Sprintf("gogo_render_island_duration_seconds_sum{island=%q} %g", name, stat.DurationSeconds),
+			)
+		}
+	}
+
+	// Client-side web-vitals, aggregated by the /rum beacon (rum.go). Same
+	// bounded-label policy as the island counters above.
+	rows = append(rows, rumRows()...)
+
 	for _, name := range sortedBreakerNames(m.breakers) {
 		b := m.breakers[name]
 		successes, failures, rejects, trips := b.Counters()

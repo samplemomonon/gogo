@@ -419,7 +419,7 @@ Sources: [Jackson's taxonomy](https://martinfowler.com/articles/micro-frontends.
 
 **What it costs, stated honestly:** a module cannot be deployed independently of the gateway. gogo is a *federated modular monolith*, not independently deployable frontends. Correct at this size; must be written down rather than implied. `TT-029` requires the `module.go` comment be corrected.
 
-**TT-063 (fragment import rules).** A module's fragment may reference only its own `views`, `shared/web/ui`, and `shared/web/navigation`. It may **not** reference another module's views, and may **not** reference a page's views. This is the no-cross-remote-imports rule from Module Federation, expressed for hypermedia.
+**TT-063 (fragment import rules).** A module's fragment may reference only its own `views`, the platform-owned `gogo.design/system/web/ui` primitives, and `shared/web/navigation`. It may **not** reference another module's views, and may **not** reference a page's views. This is the no-cross-remote-imports rule from Module Federation, expressed for hypermedia.
 
 ### 5.2 Render strategy is HTTP content negotiation
 
@@ -444,7 +444,7 @@ Matches three independent precedents: htmx's documented `if HX-Request: render p
 
 ### 5.3 The primitives layer already has a written contract
 
-`internal/shared/web/ui/doc.go` states a one-way dependency, an import allowlist (stdlib, `templ`, `internal/shared/money`), a naming convention (`<Thing>Class`, `<Component>Options`, `attrs` last), and names its enforcer. That is a design-system boundary in the Radix/Storybook sense, where the public entry is one file and accessibility is tested at the component level — because *"a broken button style isn't one bug — it's hundreds of affected screens"* ([visual regression](https://www.visual-regression-testing.dev/storybook-visual-regression-testing)).
+`design-system/web/ui/doc.go` states the component module's dependency boundary (stdlib + `templ`) and its naming convention (`<Thing>Class`, `<Component>Options`, `attrs` last). The separate root Go module keeps primitives outside the web app's private `internal` tree; `design-system/CONTRIBUTING.md` records platform-team ownership and the cross-platform token governance. That is a design-system boundary in the Radix/Storybook sense, where the public entry is one file and accessibility is tested at the component level — because *"a broken button style isn't one bug — it's hundreds of affected screens"* ([visual regression](https://www.visual-regression-testing.dev/storybook-visual-regression-testing)).
 
 The four-zone map in §2.5 is [Feature-Sliced Design](https://feature-sliced.design/docs) with the naming fixed. FSD's definition of `shared` is the load-bearing part: it contains *no business logic at all*, which is why it has no slices — identical to gogo's `internal/shared/` and identical to the extractability test already implemented as `platform must not import app code`.
 
@@ -570,7 +570,7 @@ gRPC over `grpcx.InProcess`, so the deployment boundary is same-process while th
 |---|---|---|---|
 | C-12 | `shared/module` — `Descriptor`, `Registry`, lifecycle | T5 `bootstrap`; T2/T4 modules | import rule 4 |
 | C-13 | `shared/web/render` — `Strategy`, `Respond`, `Composer`, `Planner` | every handler in Z-C/Z-D/Z-U | TT-043/044 |
-| C-14 | `shared/web/ui` — primitives | every view | `ui primitives depend on no app code` |
+| C-14 | `design-system/web/ui` — web primitives + shared token contract | every web view; native clients consume tokens | standalone Go module; token generation from canonical source |
 | C-15 | `shared/web/pagekit` | Z-U pages | `platform must not import app code` |
 | C-16 | `shared/grpcconsumer` — `Caller`, `Do[T]`, `Vocabulary` | T1, T2, T4, T5 | imports no wire types, no app code |
 | C-17 | `shared/productconsumer` | T2 `pages/seller`, T5 `bootstrap` | import rule 6 |
@@ -1122,7 +1122,7 @@ content lifecycles from product schema management.
 [devenv](https://devenv.sh/) ([options](https://devenv.sh/reference/options/), [repo](https://github.com/cachix/devenv/), [processes](https://devenv.sh/processes/)) · [Nix pure-eval](https://zemdregon.github.io/nix-docs/07-flakes/pure-eval-and-impure/) · [builders & sandboxes](https://zemdregon.github.io/nix-docs/04-store-and-build/builders-and-sandboxes/) · [`nix.conf`](https://nix.dev/manual/nix/latest/command-ref/conf-file.html) · [Devbox](https://www.jetify.com/docs/devbox/configuration) · [Dev Containers spec](https://containers.dev/implementors/spec/) ([supporting tools](https://github.com/devcontainers/spec/blob/main/docs/specs/supporting-tools.md)) · [nix-direnv](https://github.com/nix-community/nix-direnv/) · [Bazel hermeticity](https://bazel.build/basics/hermeticity) / [FAQ](https://bazel.build/about/faq) / [sandboxing](https://bazel.build/docs/sandboxing) · [Tilt](https://docs.tilt.dev/tutorial/2-tilt-up.html) · [mise](https://mise.jdx.dev/) · [12-factor config](https://12factor.net/config) ([tension](https://github.com/twelve-factor/twelve-factor/issues/4), [counter-case](https://hitchdev.com/strictyaml/why-not/environment-variables-as-config/), [compose both](https://blog.pilosus.org/posts/2019/06/07/application-configs-files-or-environment-variables-actually-both/))
 
 ### Repository-local
-`ARCHITECTURE.md` (four zones in §1, seven rules in §2, `D-0xx` log — **`D-010` absent**) · `apps/web/internal/architecture/architecture_test.go` · `apps/web/internal/architecture/import_graph.txt` · `apps/web/internal/shared/module/{module,lifecycle}.go` · `apps/web/internal/shared/web/render/{strategy,planner,composer,htmx,render}.go` · `apps/web/internal/shared/web/ui/doc.go` · `apps/web/internal/shared/{grpcconsumer,productconsumer,authconsumer,productevents}/` · `apps/web/internal/bootstrap/*.go` · `apps/web/internal/modules/*/{module.go,compose/}` · `services/aggregator-service/{README.md,cmd/server/main.go,graph/}` · `contracts/` · `Makefile` · module `project.json` descriptors · `go.work` · `deploy/k8s/networkpolicy.yaml`
+`ARCHITECTURE.md` (four zones in §1, seven rules in §2, `D-0xx` log — **`D-010` absent**) · `apps/web/internal/architecture/architecture_test.go` · `apps/web/internal/architecture/import_graph.txt` · `apps/web/internal/shared/module/{module,lifecycle}.go` · `apps/web/internal/shared/web/render/{strategy,planner,composer,htmx,render}.go` · `design-system/web/ui/doc.go` · `design-system/CONTRIBUTING.md` · `apps/web/internal/shared/{grpcconsumer,productconsumer,authconsumer,productevents}/` · `apps/web/internal/bootstrap/*.go` · `apps/web/internal/modules/*/{module.go,compose/}` · `services/aggregator-service/{README.md,cmd/server/main.go,graph/}` · `contracts/` · `Makefile` · module `project.json` descriptors · `go.work` · `deploy/k8s/networkpolicy.yaml`
 
 ---
 

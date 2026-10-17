@@ -13,7 +13,7 @@ func TestStockIsTenantScoped(t *testing.T) {
 	ctx := context.Background()
 	repo := infrastructure.NewStockRepository()
 
-	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 10, "adjustment", "", "tester", "ref-a"); err != nil {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 10, "adjustment", "", "tester", "", "ref-a"); err != nil {
 		t.Fatalf("adjust as tenant-a: %v", err)
 	}
 
@@ -50,10 +50,10 @@ func TestAdjustStockIsIdempotentPerTenant(t *testing.T) {
 	ctx := context.Background()
 	repo := infrastructure.NewStockRepository()
 
-	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 5, "sale", "", "tester", "order-1"); err != nil {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 5, "sale", "", "tester", "", "order-1"); err != nil {
 		t.Fatalf("first adjust: %v", err)
 	}
-	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 5, "sale", "", "tester", "order-1"); err != nil {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 5, "sale", "", "tester", "", "order-1"); err != nil {
 		t.Fatalf("replayed adjust: %v", err)
 	}
 
@@ -65,7 +65,7 @@ func TestAdjustStockIsIdempotentPerTenant(t *testing.T) {
 		t.Fatalf("stock after a replayed reference = %d, want 5", stock.Quantity)
 	}
 
-	if _, _, err := repo.AdjustStock(ctx, "tenant-b", "prod-1", 5, "sale", "", "tester", "order-1"); err != nil {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-b", "prod-1", 5, "sale", "", "tester", "", "order-1"); err != nil {
 		t.Fatalf("same reference for another tenant: %v", err)
 	}
 	stock, err = repo.GetStock(ctx, "tenant-b", "prod-1")
@@ -81,10 +81,10 @@ func TestAdjustStockRejectsOversell(t *testing.T) {
 	ctx := context.Background()
 	repo := infrastructure.NewStockRepository()
 
-	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 3, "adjustment", "", "tester", ""); err != nil {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", 3, "adjustment", "", "tester", "", ""); err != nil {
 		t.Fatalf("seed adjust: %v", err)
 	}
-	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", -4, "adjustment", "", "tester", ""); !errors.Is(err, domain.ErrInsufficientStock) {
+	if _, _, err := repo.AdjustStock(ctx, "tenant-a", "prod-1", -4, "adjustment", "", "tester", "", ""); !errors.Is(err, domain.ErrInsufficientStock) {
 		t.Fatalf("oversell = %v, want ErrInsufficientStock", err)
 	}
 

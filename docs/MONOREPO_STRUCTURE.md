@@ -55,11 +55,10 @@ search, identity, and merchant workflows remain domain capabilities exposed by
 service APIs and versioned contracts. Each app owns navigation, screen
 composition, accessibility behavior, and platform-specific interactions.
 
-The web primitives in `apps/web/internal/shared/web/ui` are HTML/Templ
-components; they are not shared with native apps. Keep design decisions and
-semantic token names consistent, but add a cross-platform token package only
-when there is a second implemented consumer and an agreed source format. Avoid
-sharing view components across different rendering runtimes.
+The web primitives in the repository-root `design-system/web/ui` Go module
+are HTML/Templ components consumed by the web app. Platform-neutral tokens,
+governance and release policy live in the root `design-system/`; native apps
+map those tokens to native controls instead of importing web components.
 
 The mobile and desktop directories currently contain architecture notes rather
 than runnable projects. Add their toolchains, dependency manifests, CI targets,

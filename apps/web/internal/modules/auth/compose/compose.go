@@ -39,6 +39,7 @@ func Build(
 
 	employeeStore := authpostgres.NewEmployeeStore(pool)
 	sessionStore := authpostgres.NewSessionStore(pool)
+	authorizationStore := authpostgres.NewAuthorizationRepository(pool)
 	logger.Info("auth backed by postgres")
-	return auth.NewModule(employeeStore, sessionStore, pool.Ping, logger), func() { pool.Close() }, nil
+	return auth.NewModule(employeeStore, sessionStore, pool.Ping, logger, authorizationStore), func() { pool.Close() }, nil
 }

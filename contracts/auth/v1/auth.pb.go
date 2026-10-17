@@ -658,9 +658,11 @@ func (x *UpdateEmployeeResponse) GetEmployee() *Employee {
 
 // ListEmployeesRequest requests a list of employees.
 type ListEmployeesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	TenantId string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Limit    int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Session used for authorization. Tenant is always resolved from this session.
+	SessionId     string `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -707,6 +709,13 @@ func (x *ListEmployeesRequest) GetLimit() int32 {
 		return x.Limit
 	}
 	return 0
+}
+
+func (x *ListEmployeesRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
 }
 
 // ListEmployeesResponse returns a list of employees.
@@ -1416,6 +1425,1397 @@ func (x *ExtendSessionResponse) GetSession() *Session {
 	return nil
 }
 
+// CheckPermissionRequest asks the auth service to evaluate a supported
+// capability against the current employee roles for this authenticated session.
+type CheckPermissionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	PermissionKey string                 `protobuf:"bytes,2,opt,name=permission_key,json=permissionKey,proto3" json:"permission_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPermissionRequest) Reset() {
+	*x = CheckPermissionRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPermissionRequest) ProtoMessage() {}
+
+func (x *CheckPermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPermissionRequest.ProtoReflect.Descriptor instead.
+func (*CheckPermissionRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CheckPermissionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CheckPermissionRequest) GetPermissionKey() string {
+	if x != nil {
+		return x.PermissionKey
+	}
+	return ""
+}
+
+// CheckPermissionResponse returns the deny-by-default decision.
+type CheckPermissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckPermissionResponse) Reset() {
+	*x = CheckPermissionResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckPermissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckPermissionResponse) ProtoMessage() {}
+
+func (x *CheckPermissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckPermissionResponse.ProtoReflect.Descriptor instead.
+func (*CheckPermissionResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *CheckPermissionResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+type CreateRoleRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description     string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	ChangeReference string                 `protobuf:"bytes,4,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CreateRoleRequest) Reset() {
+	*x = CreateRoleRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoleRequest) ProtoMessage() {}
+
+func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoleRequest.ProtoReflect.Descriptor instead.
+func (*CreateRoleRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *CreateRoleRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+type CreateRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoleId        string                 `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoleResponse) Reset() {
+	*x = CreateRoleResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoleResponse) ProtoMessage() {}
+
+func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoleResponse.ProtoReflect.Descriptor instead.
+func (*CreateRoleResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *CreateRoleResponse) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+type GrantPermissionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RoleId          string                 `protobuf:"bytes,2,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	PermissionKey   string                 `protobuf:"bytes,3,opt,name=permission_key,json=permissionKey,proto3" json:"permission_key,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Reason          string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	ChangeReference string                 `protobuf:"bytes,6,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GrantPermissionRequest) Reset() {
+	*x = GrantPermissionRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantPermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantPermissionRequest) ProtoMessage() {}
+
+func (x *GrantPermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantPermissionRequest.ProtoReflect.Descriptor instead.
+func (*GrantPermissionRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GrantPermissionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GrantPermissionRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *GrantPermissionRequest) GetPermissionKey() string {
+	if x != nil {
+		return x.PermissionKey
+	}
+	return ""
+}
+
+func (x *GrantPermissionRequest) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *GrantPermissionRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *GrantPermissionRequest) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+type GrantPermissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GrantId       string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrantPermissionResponse) Reset() {
+	*x = GrantPermissionResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantPermissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantPermissionResponse) ProtoMessage() {}
+
+func (x *GrantPermissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantPermissionResponse.ProtoReflect.Descriptor instead.
+func (*GrantPermissionResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *GrantPermissionResponse) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+type RevokePermissionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	GrantId         string                 `protobuf:"bytes,2,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	Reason          string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ChangeReference string                 `protobuf:"bytes,4,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RevokePermissionRequest) Reset() {
+	*x = RevokePermissionRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokePermissionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokePermissionRequest) ProtoMessage() {}
+
+func (x *RevokePermissionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokePermissionRequest.ProtoReflect.Descriptor instead.
+func (*RevokePermissionRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *RevokePermissionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RevokePermissionRequest) GetGrantId() string {
+	if x != nil {
+		return x.GrantId
+	}
+	return ""
+}
+
+func (x *RevokePermissionRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RevokePermissionRequest) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+type RevokePermissionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokePermissionResponse) Reset() {
+	*x = RevokePermissionResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokePermissionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokePermissionResponse) ProtoMessage() {}
+
+func (x *RevokePermissionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokePermissionResponse.ProtoReflect.Descriptor instead.
+func (*RevokePermissionResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{33}
+}
+
+type AssignRoleRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	EmployeeId      string                 `protobuf:"bytes,2,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	RoleId          string                 `protobuf:"bytes,3,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	ValidFrom       *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=valid_from,json=validFrom,proto3" json:"valid_from,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Reason          string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	ChangeReference string                 `protobuf:"bytes,7,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AssignRoleRequest) Reset() {
+	*x = AssignRoleRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleRequest) ProtoMessage() {}
+
+func (x *AssignRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleRequest.ProtoReflect.Descriptor instead.
+func (*AssignRoleRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *AssignRoleRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetValidFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ValidFrom
+	}
+	return nil
+}
+
+func (x *AssignRoleRequest) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *AssignRoleRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+type AssignRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssignmentId  string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignRoleResponse) Reset() {
+	*x = AssignRoleResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleResponse) ProtoMessage() {}
+
+func (x *AssignRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleResponse.ProtoReflect.Descriptor instead.
+func (*AssignRoleResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *AssignRoleResponse) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+type RevokeRoleAssignmentRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	AssignmentId    string                 `protobuf:"bytes,2,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	Reason          string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	ChangeReference string                 `protobuf:"bytes,4,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RevokeRoleAssignmentRequest) Reset() {
+	*x = RevokeRoleAssignmentRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeRoleAssignmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeRoleAssignmentRequest) ProtoMessage() {}
+
+func (x *RevokeRoleAssignmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeRoleAssignmentRequest.ProtoReflect.Descriptor instead.
+func (*RevokeRoleAssignmentRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RevokeRoleAssignmentRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RevokeRoleAssignmentRequest) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+func (x *RevokeRoleAssignmentRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RevokeRoleAssignmentRequest) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+type RevokeRoleAssignmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeRoleAssignmentResponse) Reset() {
+	*x = RevokeRoleAssignmentResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeRoleAssignmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeRoleAssignmentResponse) ProtoMessage() {}
+
+func (x *RevokeRoleAssignmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeRoleAssignmentResponse.ProtoReflect.Descriptor instead.
+func (*RevokeRoleAssignmentResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{37}
+}
+
+type AuthorizationRole struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                 string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	ActivePermissionKeys []string               `protobuf:"bytes,4,rep,name=active_permission_keys,json=activePermissionKeys,proto3" json:"active_permission_keys,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AuthorizationRole) Reset() {
+	*x = AuthorizationRole{}
+	mi := &file_auth_v1_auth_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizationRole) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizationRole) ProtoMessage() {}
+
+func (x *AuthorizationRole) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizationRole.ProtoReflect.Descriptor instead.
+func (*AuthorizationRole) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *AuthorizationRole) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AuthorizationRole) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AuthorizationRole) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *AuthorizationRole) GetActivePermissionKeys() []string {
+	if x != nil {
+		return x.ActivePermissionKeys
+	}
+	return nil
+}
+
+type ListAuthorizationRolesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuthorizationRolesRequest) Reset() {
+	*x = ListAuthorizationRolesRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuthorizationRolesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuthorizationRolesRequest) ProtoMessage() {}
+
+func (x *ListAuthorizationRolesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuthorizationRolesRequest.ProtoReflect.Descriptor instead.
+func (*ListAuthorizationRolesRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ListAuthorizationRolesRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type ListAuthorizationRolesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Roles         []*AuthorizationRole   `protobuf:"bytes,1,rep,name=roles,proto3" json:"roles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuthorizationRolesResponse) Reset() {
+	*x = ListAuthorizationRolesResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuthorizationRolesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuthorizationRolesResponse) ProtoMessage() {}
+
+func (x *ListAuthorizationRolesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuthorizationRolesResponse.ProtoReflect.Descriptor instead.
+func (*ListAuthorizationRolesResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ListAuthorizationRolesResponse) GetRoles() []*AuthorizationRole {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+type RoleAssignment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	EmployeeId    string                 `protobuf:"bytes,2,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	RoleId        string                 `protobuf:"bytes,3,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	AssignedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=assigned_at,json=assignedAt,proto3" json:"assigned_at,omitempty"`
+	ValidFrom     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=valid_from,json=validFrom,proto3" json:"valid_from,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	AssignedBy    string                 `protobuf:"bytes,9,opt,name=assigned_by,json=assignedBy,proto3" json:"assigned_by,omitempty"`
+	Source        string                 `protobuf:"bytes,10,opt,name=source,proto3" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoleAssignment) Reset() {
+	*x = RoleAssignment{}
+	mi := &file_auth_v1_auth_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoleAssignment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoleAssignment) ProtoMessage() {}
+
+func (x *RoleAssignment) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoleAssignment.ProtoReflect.Descriptor instead.
+func (*RoleAssignment) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *RoleAssignment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RoleAssignment) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *RoleAssignment) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *RoleAssignment) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RoleAssignment) GetAssignedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AssignedAt
+	}
+	return nil
+}
+
+func (x *RoleAssignment) GetValidFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ValidFrom
+	}
+	return nil
+}
+
+func (x *RoleAssignment) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *RoleAssignment) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+func (x *RoleAssignment) GetAssignedBy() string {
+	if x != nil {
+		return x.AssignedBy
+	}
+	return ""
+}
+
+func (x *RoleAssignment) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+type ListRoleAssignmentsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SessionId      string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	EmployeeId     string                 `protobuf:"bytes,2,opt,name=employee_id,json=employeeId,proto3" json:"employee_id,omitempty"`
+	IncludeHistory bool                   `protobuf:"varint,3,opt,name=include_history,json=includeHistory,proto3" json:"include_history,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListRoleAssignmentsRequest) Reset() {
+	*x = ListRoleAssignmentsRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRoleAssignmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRoleAssignmentsRequest) ProtoMessage() {}
+
+func (x *ListRoleAssignmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRoleAssignmentsRequest.ProtoReflect.Descriptor instead.
+func (*ListRoleAssignmentsRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ListRoleAssignmentsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListRoleAssignmentsRequest) GetEmployeeId() string {
+	if x != nil {
+		return x.EmployeeId
+	}
+	return ""
+}
+
+func (x *ListRoleAssignmentsRequest) GetIncludeHistory() bool {
+	if x != nil {
+		return x.IncludeHistory
+	}
+	return false
+}
+
+type ListRoleAssignmentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Assignments   []*RoleAssignment      `protobuf:"bytes,1,rep,name=assignments,proto3" json:"assignments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRoleAssignmentsResponse) Reset() {
+	*x = ListRoleAssignmentsResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRoleAssignmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRoleAssignmentsResponse) ProtoMessage() {}
+
+func (x *ListRoleAssignmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRoleAssignmentsResponse.ProtoReflect.Descriptor instead.
+func (*ListRoleAssignmentsResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ListRoleAssignmentsResponse) GetAssignments() []*RoleAssignment {
+	if x != nil {
+		return x.Assignments
+	}
+	return nil
+}
+
+type ListTenantRoleAssignmentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	PageSize      uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTenantRoleAssignmentsRequest) Reset() {
+	*x = ListTenantRoleAssignmentsRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTenantRoleAssignmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTenantRoleAssignmentsRequest) ProtoMessage() {}
+
+func (x *ListTenantRoleAssignmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTenantRoleAssignmentsRequest.ProtoReflect.Descriptor instead.
+func (*ListTenantRoleAssignmentsRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ListTenantRoleAssignmentsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListTenantRoleAssignmentsRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListTenantRoleAssignmentsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListTenantRoleAssignmentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Assignments   []*RoleAssignment      `protobuf:"bytes,1,rep,name=assignments,proto3" json:"assignments,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTenantRoleAssignmentsResponse) Reset() {
+	*x = ListTenantRoleAssignmentsResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTenantRoleAssignmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTenantRoleAssignmentsResponse) ProtoMessage() {}
+
+func (x *ListTenantRoleAssignmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTenantRoleAssignmentsResponse.ProtoReflect.Descriptor instead.
+func (*ListTenantRoleAssignmentsResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ListTenantRoleAssignmentsResponse) GetAssignments() []*RoleAssignment {
+	if x != nil {
+		return x.Assignments
+	}
+	return nil
+}
+
+func (x *ListTenantRoleAssignmentsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type AuthorizationAdminEvent struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Action            string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	SubjectId         string                 `protobuf:"bytes,3,opt,name=subject_id,json=subjectId,proto3" json:"subject_id,omitempty"`
+	RoleId            string                 `protobuf:"bytes,4,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	ActorEmployeeId   string                 `protobuf:"bytes,5,opt,name=actor_employee_id,json=actorEmployeeId,proto3" json:"actor_employee_id,omitempty"`
+	ActorDatabaseUser string                 `protobuf:"bytes,6,opt,name=actor_database_user,json=actorDatabaseUser,proto3" json:"actor_database_user,omitempty"`
+	ChangeReference   string                 `protobuf:"bytes,7,opt,name=change_reference,json=changeReference,proto3" json:"change_reference,omitempty"`
+	OccurredAt        *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	Reason            string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AuthorizationAdminEvent) Reset() {
+	*x = AuthorizationAdminEvent{}
+	mi := &file_auth_v1_auth_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthorizationAdminEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthorizationAdminEvent) ProtoMessage() {}
+
+func (x *AuthorizationAdminEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthorizationAdminEvent.ProtoReflect.Descriptor instead.
+func (*AuthorizationAdminEvent) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *AuthorizationAdminEvent) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetSubjectId() string {
+	if x != nil {
+		return x.SubjectId
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetActorEmployeeId() string {
+	if x != nil {
+		return x.ActorEmployeeId
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetActorDatabaseUser() string {
+	if x != nil {
+		return x.ActorDatabaseUser
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetChangeReference() string {
+	if x != nil {
+		return x.ChangeReference
+	}
+	return ""
+}
+
+func (x *AuthorizationAdminEvent) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *AuthorizationAdminEvent) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ListAuthorizationAdminEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	PageSize      uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuthorizationAdminEventsRequest) Reset() {
+	*x = ListAuthorizationAdminEventsRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuthorizationAdminEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuthorizationAdminEventsRequest) ProtoMessage() {}
+
+func (x *ListAuthorizationAdminEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuthorizationAdminEventsRequest.ProtoReflect.Descriptor instead.
+func (*ListAuthorizationAdminEventsRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ListAuthorizationAdminEventsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListAuthorizationAdminEventsRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListAuthorizationAdminEventsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListAuthorizationAdminEventsResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Events        []*AuthorizationAdminEvent `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	NextPageToken string                     `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuthorizationAdminEventsResponse) Reset() {
+	*x = ListAuthorizationAdminEventsResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuthorizationAdminEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuthorizationAdminEventsResponse) ProtoMessage() {}
+
+func (x *ListAuthorizationAdminEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuthorizationAdminEventsResponse.ProtoReflect.Descriptor instead.
+func (*ListAuthorizationAdminEventsResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *ListAuthorizationAdminEventsResponse) GetEvents() []*AuthorizationAdminEvent {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *ListAuthorizationAdminEventsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_auth_v1_auth_proto_rawDesc = "" +
@@ -1469,10 +2869,12 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x12\n" +
 	"\x04role\x18\x05 \x01(\tR\x04role\"G\n" +
 	"\x16UpdateEmployeeResponse\x12-\n" +
-	"\bemployee\x18\x01 \x01(\v2\x11.auth.v1.EmployeeR\bemployee\"I\n" +
+	"\bemployee\x18\x01 \x01(\v2\x11.auth.v1.EmployeeR\bemployee\"h\n" +
 	"\x14ListEmployeesRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\"H\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\"H\n" +
 	"\x15ListEmployeesResponse\x12/\n" +
 	"\temployees\x18\x01 \x03(\v2\x11.auth.v1.EmployeeR\temployees\"V\n" +
 	"\x15SetEmployeePINRequest\x12\x1b\n" +
@@ -1509,7 +2911,126 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"C\n" +
 	"\x15ExtendSessionResponse\x12*\n" +
-	"\asession\x18\x01 \x01(\v2\x10.auth.v1.SessionR\asession2\xd6\a\n" +
+	"\asession\x18\x01 \x01(\v2\x10.auth.v1.SessionR\asession\"^\n" +
+	"\x16CheckPermissionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12%\n" +
+	"\x0epermission_key\x18\x02 \x01(\tR\rpermissionKey\"3\n" +
+	"\x17CheckPermissionResponse\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\"\x93\x01\n" +
+	"\x11CreateRoleRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12)\n" +
+	"\x10change_reference\x18\x04 \x01(\tR\x0fchangeReference\"-\n" +
+	"\x12CreateRoleResponse\x12\x17\n" +
+	"\arole_id\x18\x01 \x01(\tR\x06roleId\"\xf5\x01\n" +
+	"\x16GrantPermissionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x17\n" +
+	"\arole_id\x18\x02 \x01(\tR\x06roleId\x12%\n" +
+	"\x0epermission_key\x18\x03 \x01(\tR\rpermissionKey\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12)\n" +
+	"\x10change_reference\x18\x06 \x01(\tR\x0fchangeReference\"4\n" +
+	"\x17GrantPermissionResponse\x12\x19\n" +
+	"\bgrant_id\x18\x01 \x01(\tR\agrantId\"\x96\x01\n" +
+	"\x17RevokePermissionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x19\n" +
+	"\bgrant_id\x18\x02 \x01(\tR\agrantId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12)\n" +
+	"\x10change_reference\x18\x04 \x01(\tR\x0fchangeReference\"\x1a\n" +
+	"\x18RevokePermissionResponse\"\xa5\x02\n" +
+	"\x11AssignRoleRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vemployee_id\x18\x02 \x01(\tR\n" +
+	"employeeId\x12\x17\n" +
+	"\arole_id\x18\x03 \x01(\tR\x06roleId\x129\n" +
+	"\n" +
+	"valid_from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tvalidFrom\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\x12)\n" +
+	"\x10change_reference\x18\a \x01(\tR\x0fchangeReference\"9\n" +
+	"\x12AssignRoleResponse\x12#\n" +
+	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\"\xa4\x01\n" +
+	"\x1bRevokeRoleAssignmentRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12#\n" +
+	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12)\n" +
+	"\x10change_reference\x18\x04 \x01(\tR\x0fchangeReference\"\x1e\n" +
+	"\x1cRevokeRoleAssignmentResponse\"\x8f\x01\n" +
+	"\x11AuthorizationRole\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x124\n" +
+	"\x16active_permission_keys\x18\x04 \x03(\tR\x14activePermissionKeys\">\n" +
+	"\x1dListAuthorizationRolesRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"R\n" +
+	"\x1eListAuthorizationRolesResponse\x120\n" +
+	"\x05roles\x18\x01 \x03(\v2\x1a.auth.v1.AuthorizationRoleR\x05roles\"\x99\x03\n" +
+	"\x0eRoleAssignment\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vemployee_id\x18\x02 \x01(\tR\n" +
+	"employeeId\x12\x17\n" +
+	"\arole_id\x18\x03 \x01(\tR\x06roleId\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12;\n" +
+	"\vassigned_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"assignedAt\x129\n" +
+	"\n" +
+	"valid_from\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tvalidFrom\x129\n" +
+	"\n" +
+	"expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x129\n" +
+	"\n" +
+	"revoked_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\x12\x1f\n" +
+	"\vassigned_by\x18\t \x01(\tR\n" +
+	"assignedBy\x12\x16\n" +
+	"\x06source\x18\n" +
+	" \x01(\tR\x06source\"\x85\x01\n" +
+	"\x1aListRoleAssignmentsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
+	"\vemployee_id\x18\x02 \x01(\tR\n" +
+	"employeeId\x12'\n" +
+	"\x0finclude_history\x18\x03 \x01(\bR\x0eincludeHistory\"X\n" +
+	"\x1bListRoleAssignmentsResponse\x129\n" +
+	"\vassignments\x18\x01 \x03(\v2\x17.auth.v1.RoleAssignmentR\vassignments\"}\n" +
+	" ListTenantRoleAssignmentsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\rR\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\x86\x01\n" +
+	"!ListTenantRoleAssignmentsResponse\x129\n" +
+	"\vassignments\x18\x01 \x03(\v2\x17.auth.v1.RoleAssignmentR\vassignments\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xd5\x02\n" +
+	"\x17AuthorizationAdminEvent\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12\x1d\n" +
+	"\n" +
+	"subject_id\x18\x03 \x01(\tR\tsubjectId\x12\x17\n" +
+	"\arole_id\x18\x04 \x01(\tR\x06roleId\x12*\n" +
+	"\x11actor_employee_id\x18\x05 \x01(\tR\x0factorEmployeeId\x12.\n" +
+	"\x13actor_database_user\x18\x06 \x01(\tR\x11actorDatabaseUser\x12)\n" +
+	"\x10change_reference\x18\a \x01(\tR\x0fchangeReference\x12;\n" +
+	"\voccurred_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\"\x80\x01\n" +
+	"#ListAuthorizationAdminEventsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\rR\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\x88\x01\n" +
+	"$ListAuthorizationAdminEventsResponse\x128\n" +
+	"\x06events\x18\x01 \x03(\v2 .auth.v1.AuthorizationAdminEventR\x06events\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x8c\x0f\n" +
 	"\vAuthService\x12W\n" +
 	"\x10RegisterEmployee\x12 .auth.v1.RegisterEmployeeRequest\x1a!.auth.v1.RegisterEmployeeResponse\x12H\n" +
 	"\vGetEmployee\x12\x1b.auth.v1.GetEmployeeRequest\x1a\x1c.auth.v1.GetEmployeeResponse\x12]\n" +
@@ -1522,7 +3043,19 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\x129\n" +
 	"\x06Logout\x12\x16.auth.v1.LogoutRequest\x1a\x17.auth.v1.LogoutResponse\x12T\n" +
 	"\x0fValidateSession\x12\x1f.auth.v1.ValidateSessionRequest\x1a .auth.v1.ValidateSessionResponse\x12N\n" +
-	"\rExtendSession\x12\x1d.auth.v1.ExtendSessionRequest\x1a\x1e.auth.v1.ExtendSessionResponseB\x1fZ\x1dgogo/contracts/auth/v1;authv1b\x06proto3"
+	"\rExtendSession\x12\x1d.auth.v1.ExtendSessionRequest\x1a\x1e.auth.v1.ExtendSessionResponse\x12T\n" +
+	"\x0fCheckPermission\x12\x1f.auth.v1.CheckPermissionRequest\x1a .auth.v1.CheckPermissionResponse\x12E\n" +
+	"\n" +
+	"CreateRole\x12\x1a.auth.v1.CreateRoleRequest\x1a\x1b.auth.v1.CreateRoleResponse\x12T\n" +
+	"\x0fGrantPermission\x12\x1f.auth.v1.GrantPermissionRequest\x1a .auth.v1.GrantPermissionResponse\x12W\n" +
+	"\x10RevokePermission\x12 .auth.v1.RevokePermissionRequest\x1a!.auth.v1.RevokePermissionResponse\x12E\n" +
+	"\n" +
+	"AssignRole\x12\x1a.auth.v1.AssignRoleRequest\x1a\x1b.auth.v1.AssignRoleResponse\x12c\n" +
+	"\x14RevokeRoleAssignment\x12$.auth.v1.RevokeRoleAssignmentRequest\x1a%.auth.v1.RevokeRoleAssignmentResponse\x12i\n" +
+	"\x16ListAuthorizationRoles\x12&.auth.v1.ListAuthorizationRolesRequest\x1a'.auth.v1.ListAuthorizationRolesResponse\x12`\n" +
+	"\x13ListRoleAssignments\x12#.auth.v1.ListRoleAssignmentsRequest\x1a$.auth.v1.ListRoleAssignmentsResponse\x12r\n" +
+	"\x19ListTenantRoleAssignments\x12).auth.v1.ListTenantRoleAssignmentsRequest\x1a*.auth.v1.ListTenantRoleAssignmentsResponse\x12{\n" +
+	"\x1cListAuthorizationAdminEvents\x12,.auth.v1.ListAuthorizationAdminEventsRequest\x1a-.auth.v1.ListAuthorizationAdminEventsResponseB\x1fZ\x1dgogo/contracts/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -1536,42 +3069,65 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_auth_v1_auth_proto_rawDescData
 }
 
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_auth_v1_auth_proto_goTypes = []any{
-	(*Employee)(nil),                   // 0: auth.v1.Employee
-	(*Session)(nil),                    // 1: auth.v1.Session
-	(*RegisterEmployeeRequest)(nil),    // 2: auth.v1.RegisterEmployeeRequest
-	(*RegisterEmployeeResponse)(nil),   // 3: auth.v1.RegisterEmployeeResponse
-	(*GetEmployeeRequest)(nil),         // 4: auth.v1.GetEmployeeRequest
-	(*GetEmployeeResponse)(nil),        // 5: auth.v1.GetEmployeeResponse
-	(*GetEmployeeByEmailRequest)(nil),  // 6: auth.v1.GetEmployeeByEmailRequest
-	(*GetEmployeeByEmailResponse)(nil), // 7: auth.v1.GetEmployeeByEmailResponse
-	(*UpdateEmployeeRequest)(nil),      // 8: auth.v1.UpdateEmployeeRequest
-	(*UpdateEmployeeResponse)(nil),     // 9: auth.v1.UpdateEmployeeResponse
-	(*ListEmployeesRequest)(nil),       // 10: auth.v1.ListEmployeesRequest
-	(*ListEmployeesResponse)(nil),      // 11: auth.v1.ListEmployeesResponse
-	(*SetEmployeePINRequest)(nil),      // 12: auth.v1.SetEmployeePINRequest
-	(*SetEmployeePINResponse)(nil),     // 13: auth.v1.SetEmployeePINResponse
-	(*ActivateEmployeeRequest)(nil),    // 14: auth.v1.ActivateEmployeeRequest
-	(*ActivateEmployeeResponse)(nil),   // 15: auth.v1.ActivateEmployeeResponse
-	(*DeactivateEmployeeRequest)(nil),  // 16: auth.v1.DeactivateEmployeeRequest
-	(*DeactivateEmployeeResponse)(nil), // 17: auth.v1.DeactivateEmployeeResponse
-	(*LoginRequest)(nil),               // 18: auth.v1.LoginRequest
-	(*LoginResponse)(nil),              // 19: auth.v1.LoginResponse
-	(*LogoutRequest)(nil),              // 20: auth.v1.LogoutRequest
-	(*LogoutResponse)(nil),             // 21: auth.v1.LogoutResponse
-	(*ValidateSessionRequest)(nil),     // 22: auth.v1.ValidateSessionRequest
-	(*ValidateSessionResponse)(nil),    // 23: auth.v1.ValidateSessionResponse
-	(*ExtendSessionRequest)(nil),       // 24: auth.v1.ExtendSessionRequest
-	(*ExtendSessionResponse)(nil),      // 25: auth.v1.ExtendSessionResponse
-	(*timestamppb.Timestamp)(nil),      // 26: google.protobuf.Timestamp
+	(*Employee)(nil),                             // 0: auth.v1.Employee
+	(*Session)(nil),                              // 1: auth.v1.Session
+	(*RegisterEmployeeRequest)(nil),              // 2: auth.v1.RegisterEmployeeRequest
+	(*RegisterEmployeeResponse)(nil),             // 3: auth.v1.RegisterEmployeeResponse
+	(*GetEmployeeRequest)(nil),                   // 4: auth.v1.GetEmployeeRequest
+	(*GetEmployeeResponse)(nil),                  // 5: auth.v1.GetEmployeeResponse
+	(*GetEmployeeByEmailRequest)(nil),            // 6: auth.v1.GetEmployeeByEmailRequest
+	(*GetEmployeeByEmailResponse)(nil),           // 7: auth.v1.GetEmployeeByEmailResponse
+	(*UpdateEmployeeRequest)(nil),                // 8: auth.v1.UpdateEmployeeRequest
+	(*UpdateEmployeeResponse)(nil),               // 9: auth.v1.UpdateEmployeeResponse
+	(*ListEmployeesRequest)(nil),                 // 10: auth.v1.ListEmployeesRequest
+	(*ListEmployeesResponse)(nil),                // 11: auth.v1.ListEmployeesResponse
+	(*SetEmployeePINRequest)(nil),                // 12: auth.v1.SetEmployeePINRequest
+	(*SetEmployeePINResponse)(nil),               // 13: auth.v1.SetEmployeePINResponse
+	(*ActivateEmployeeRequest)(nil),              // 14: auth.v1.ActivateEmployeeRequest
+	(*ActivateEmployeeResponse)(nil),             // 15: auth.v1.ActivateEmployeeResponse
+	(*DeactivateEmployeeRequest)(nil),            // 16: auth.v1.DeactivateEmployeeRequest
+	(*DeactivateEmployeeResponse)(nil),           // 17: auth.v1.DeactivateEmployeeResponse
+	(*LoginRequest)(nil),                         // 18: auth.v1.LoginRequest
+	(*LoginResponse)(nil),                        // 19: auth.v1.LoginResponse
+	(*LogoutRequest)(nil),                        // 20: auth.v1.LogoutRequest
+	(*LogoutResponse)(nil),                       // 21: auth.v1.LogoutResponse
+	(*ValidateSessionRequest)(nil),               // 22: auth.v1.ValidateSessionRequest
+	(*ValidateSessionResponse)(nil),              // 23: auth.v1.ValidateSessionResponse
+	(*ExtendSessionRequest)(nil),                 // 24: auth.v1.ExtendSessionRequest
+	(*ExtendSessionResponse)(nil),                // 25: auth.v1.ExtendSessionResponse
+	(*CheckPermissionRequest)(nil),               // 26: auth.v1.CheckPermissionRequest
+	(*CheckPermissionResponse)(nil),              // 27: auth.v1.CheckPermissionResponse
+	(*CreateRoleRequest)(nil),                    // 28: auth.v1.CreateRoleRequest
+	(*CreateRoleResponse)(nil),                   // 29: auth.v1.CreateRoleResponse
+	(*GrantPermissionRequest)(nil),               // 30: auth.v1.GrantPermissionRequest
+	(*GrantPermissionResponse)(nil),              // 31: auth.v1.GrantPermissionResponse
+	(*RevokePermissionRequest)(nil),              // 32: auth.v1.RevokePermissionRequest
+	(*RevokePermissionResponse)(nil),             // 33: auth.v1.RevokePermissionResponse
+	(*AssignRoleRequest)(nil),                    // 34: auth.v1.AssignRoleRequest
+	(*AssignRoleResponse)(nil),                   // 35: auth.v1.AssignRoleResponse
+	(*RevokeRoleAssignmentRequest)(nil),          // 36: auth.v1.RevokeRoleAssignmentRequest
+	(*RevokeRoleAssignmentResponse)(nil),         // 37: auth.v1.RevokeRoleAssignmentResponse
+	(*AuthorizationRole)(nil),                    // 38: auth.v1.AuthorizationRole
+	(*ListAuthorizationRolesRequest)(nil),        // 39: auth.v1.ListAuthorizationRolesRequest
+	(*ListAuthorizationRolesResponse)(nil),       // 40: auth.v1.ListAuthorizationRolesResponse
+	(*RoleAssignment)(nil),                       // 41: auth.v1.RoleAssignment
+	(*ListRoleAssignmentsRequest)(nil),           // 42: auth.v1.ListRoleAssignmentsRequest
+	(*ListRoleAssignmentsResponse)(nil),          // 43: auth.v1.ListRoleAssignmentsResponse
+	(*ListTenantRoleAssignmentsRequest)(nil),     // 44: auth.v1.ListTenantRoleAssignmentsRequest
+	(*ListTenantRoleAssignmentsResponse)(nil),    // 45: auth.v1.ListTenantRoleAssignmentsResponse
+	(*AuthorizationAdminEvent)(nil),              // 46: auth.v1.AuthorizationAdminEvent
+	(*ListAuthorizationAdminEventsRequest)(nil),  // 47: auth.v1.ListAuthorizationAdminEventsRequest
+	(*ListAuthorizationAdminEventsResponse)(nil), // 48: auth.v1.ListAuthorizationAdminEventsResponse
+	(*timestamppb.Timestamp)(nil),                // 49: google.protobuf.Timestamp
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
-	26, // 0: auth.v1.Employee.created_at:type_name -> google.protobuf.Timestamp
-	26, // 1: auth.v1.Employee.updated_at:type_name -> google.protobuf.Timestamp
-	26, // 2: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	26, // 3: auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	26, // 4: auth.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	49, // 0: auth.v1.Employee.created_at:type_name -> google.protobuf.Timestamp
+	49, // 1: auth.v1.Employee.updated_at:type_name -> google.protobuf.Timestamp
+	49, // 2: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	49, // 3: auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	49, // 4: auth.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: auth.v1.RegisterEmployeeResponse.employee:type_name -> auth.v1.Employee
 	0,  // 6: auth.v1.GetEmployeeResponse.employee:type_name -> auth.v1.Employee
 	0,  // 7: auth.v1.GetEmployeeByEmailResponse.employee:type_name -> auth.v1.Employee
@@ -1582,35 +3138,67 @@ var file_auth_v1_auth_proto_depIdxs = []int32{
 	1,  // 12: auth.v1.ValidateSessionResponse.session:type_name -> auth.v1.Session
 	0,  // 13: auth.v1.ValidateSessionResponse.employee:type_name -> auth.v1.Employee
 	1,  // 14: auth.v1.ExtendSessionResponse.session:type_name -> auth.v1.Session
-	2,  // 15: auth.v1.AuthService.RegisterEmployee:input_type -> auth.v1.RegisterEmployeeRequest
-	4,  // 16: auth.v1.AuthService.GetEmployee:input_type -> auth.v1.GetEmployeeRequest
-	6,  // 17: auth.v1.AuthService.GetEmployeeByEmail:input_type -> auth.v1.GetEmployeeByEmailRequest
-	8,  // 18: auth.v1.AuthService.UpdateEmployee:input_type -> auth.v1.UpdateEmployeeRequest
-	10, // 19: auth.v1.AuthService.ListEmployees:input_type -> auth.v1.ListEmployeesRequest
-	12, // 20: auth.v1.AuthService.SetEmployeePIN:input_type -> auth.v1.SetEmployeePINRequest
-	14, // 21: auth.v1.AuthService.ActivateEmployee:input_type -> auth.v1.ActivateEmployeeRequest
-	16, // 22: auth.v1.AuthService.DeactivateEmployee:input_type -> auth.v1.DeactivateEmployeeRequest
-	18, // 23: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
-	20, // 24: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
-	22, // 25: auth.v1.AuthService.ValidateSession:input_type -> auth.v1.ValidateSessionRequest
-	24, // 26: auth.v1.AuthService.ExtendSession:input_type -> auth.v1.ExtendSessionRequest
-	3,  // 27: auth.v1.AuthService.RegisterEmployee:output_type -> auth.v1.RegisterEmployeeResponse
-	5,  // 28: auth.v1.AuthService.GetEmployee:output_type -> auth.v1.GetEmployeeResponse
-	7,  // 29: auth.v1.AuthService.GetEmployeeByEmail:output_type -> auth.v1.GetEmployeeByEmailResponse
-	9,  // 30: auth.v1.AuthService.UpdateEmployee:output_type -> auth.v1.UpdateEmployeeResponse
-	11, // 31: auth.v1.AuthService.ListEmployees:output_type -> auth.v1.ListEmployeesResponse
-	13, // 32: auth.v1.AuthService.SetEmployeePIN:output_type -> auth.v1.SetEmployeePINResponse
-	15, // 33: auth.v1.AuthService.ActivateEmployee:output_type -> auth.v1.ActivateEmployeeResponse
-	17, // 34: auth.v1.AuthService.DeactivateEmployee:output_type -> auth.v1.DeactivateEmployeeResponse
-	19, // 35: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	21, // 36: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
-	23, // 37: auth.v1.AuthService.ValidateSession:output_type -> auth.v1.ValidateSessionResponse
-	25, // 38: auth.v1.AuthService.ExtendSession:output_type -> auth.v1.ExtendSessionResponse
-	27, // [27:39] is the sub-list for method output_type
-	15, // [15:27] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	49, // 15: auth.v1.GrantPermissionRequest.expires_at:type_name -> google.protobuf.Timestamp
+	49, // 16: auth.v1.AssignRoleRequest.valid_from:type_name -> google.protobuf.Timestamp
+	49, // 17: auth.v1.AssignRoleRequest.expires_at:type_name -> google.protobuf.Timestamp
+	38, // 18: auth.v1.ListAuthorizationRolesResponse.roles:type_name -> auth.v1.AuthorizationRole
+	49, // 19: auth.v1.RoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
+	49, // 20: auth.v1.RoleAssignment.valid_from:type_name -> google.protobuf.Timestamp
+	49, // 21: auth.v1.RoleAssignment.expires_at:type_name -> google.protobuf.Timestamp
+	49, // 22: auth.v1.RoleAssignment.revoked_at:type_name -> google.protobuf.Timestamp
+	41, // 23: auth.v1.ListRoleAssignmentsResponse.assignments:type_name -> auth.v1.RoleAssignment
+	41, // 24: auth.v1.ListTenantRoleAssignmentsResponse.assignments:type_name -> auth.v1.RoleAssignment
+	49, // 25: auth.v1.AuthorizationAdminEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	46, // 26: auth.v1.ListAuthorizationAdminEventsResponse.events:type_name -> auth.v1.AuthorizationAdminEvent
+	2,  // 27: auth.v1.AuthService.RegisterEmployee:input_type -> auth.v1.RegisterEmployeeRequest
+	4,  // 28: auth.v1.AuthService.GetEmployee:input_type -> auth.v1.GetEmployeeRequest
+	6,  // 29: auth.v1.AuthService.GetEmployeeByEmail:input_type -> auth.v1.GetEmployeeByEmailRequest
+	8,  // 30: auth.v1.AuthService.UpdateEmployee:input_type -> auth.v1.UpdateEmployeeRequest
+	10, // 31: auth.v1.AuthService.ListEmployees:input_type -> auth.v1.ListEmployeesRequest
+	12, // 32: auth.v1.AuthService.SetEmployeePIN:input_type -> auth.v1.SetEmployeePINRequest
+	14, // 33: auth.v1.AuthService.ActivateEmployee:input_type -> auth.v1.ActivateEmployeeRequest
+	16, // 34: auth.v1.AuthService.DeactivateEmployee:input_type -> auth.v1.DeactivateEmployeeRequest
+	18, // 35: auth.v1.AuthService.Login:input_type -> auth.v1.LoginRequest
+	20, // 36: auth.v1.AuthService.Logout:input_type -> auth.v1.LogoutRequest
+	22, // 37: auth.v1.AuthService.ValidateSession:input_type -> auth.v1.ValidateSessionRequest
+	24, // 38: auth.v1.AuthService.ExtendSession:input_type -> auth.v1.ExtendSessionRequest
+	26, // 39: auth.v1.AuthService.CheckPermission:input_type -> auth.v1.CheckPermissionRequest
+	28, // 40: auth.v1.AuthService.CreateRole:input_type -> auth.v1.CreateRoleRequest
+	30, // 41: auth.v1.AuthService.GrantPermission:input_type -> auth.v1.GrantPermissionRequest
+	32, // 42: auth.v1.AuthService.RevokePermission:input_type -> auth.v1.RevokePermissionRequest
+	34, // 43: auth.v1.AuthService.AssignRole:input_type -> auth.v1.AssignRoleRequest
+	36, // 44: auth.v1.AuthService.RevokeRoleAssignment:input_type -> auth.v1.RevokeRoleAssignmentRequest
+	39, // 45: auth.v1.AuthService.ListAuthorizationRoles:input_type -> auth.v1.ListAuthorizationRolesRequest
+	42, // 46: auth.v1.AuthService.ListRoleAssignments:input_type -> auth.v1.ListRoleAssignmentsRequest
+	44, // 47: auth.v1.AuthService.ListTenantRoleAssignments:input_type -> auth.v1.ListTenantRoleAssignmentsRequest
+	47, // 48: auth.v1.AuthService.ListAuthorizationAdminEvents:input_type -> auth.v1.ListAuthorizationAdminEventsRequest
+	3,  // 49: auth.v1.AuthService.RegisterEmployee:output_type -> auth.v1.RegisterEmployeeResponse
+	5,  // 50: auth.v1.AuthService.GetEmployee:output_type -> auth.v1.GetEmployeeResponse
+	7,  // 51: auth.v1.AuthService.GetEmployeeByEmail:output_type -> auth.v1.GetEmployeeByEmailResponse
+	9,  // 52: auth.v1.AuthService.UpdateEmployee:output_type -> auth.v1.UpdateEmployeeResponse
+	11, // 53: auth.v1.AuthService.ListEmployees:output_type -> auth.v1.ListEmployeesResponse
+	13, // 54: auth.v1.AuthService.SetEmployeePIN:output_type -> auth.v1.SetEmployeePINResponse
+	15, // 55: auth.v1.AuthService.ActivateEmployee:output_type -> auth.v1.ActivateEmployeeResponse
+	17, // 56: auth.v1.AuthService.DeactivateEmployee:output_type -> auth.v1.DeactivateEmployeeResponse
+	19, // 57: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
+	21, // 58: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
+	23, // 59: auth.v1.AuthService.ValidateSession:output_type -> auth.v1.ValidateSessionResponse
+	25, // 60: auth.v1.AuthService.ExtendSession:output_type -> auth.v1.ExtendSessionResponse
+	27, // 61: auth.v1.AuthService.CheckPermission:output_type -> auth.v1.CheckPermissionResponse
+	29, // 62: auth.v1.AuthService.CreateRole:output_type -> auth.v1.CreateRoleResponse
+	31, // 63: auth.v1.AuthService.GrantPermission:output_type -> auth.v1.GrantPermissionResponse
+	33, // 64: auth.v1.AuthService.RevokePermission:output_type -> auth.v1.RevokePermissionResponse
+	35, // 65: auth.v1.AuthService.AssignRole:output_type -> auth.v1.AssignRoleResponse
+	37, // 66: auth.v1.AuthService.RevokeRoleAssignment:output_type -> auth.v1.RevokeRoleAssignmentResponse
+	40, // 67: auth.v1.AuthService.ListAuthorizationRoles:output_type -> auth.v1.ListAuthorizationRolesResponse
+	43, // 68: auth.v1.AuthService.ListRoleAssignments:output_type -> auth.v1.ListRoleAssignmentsResponse
+	45, // 69: auth.v1.AuthService.ListTenantRoleAssignments:output_type -> auth.v1.ListTenantRoleAssignmentsResponse
+	48, // 70: auth.v1.AuthService.ListAuthorizationAdminEvents:output_type -> auth.v1.ListAuthorizationAdminEventsResponse
+	49, // [49:71] is the sub-list for method output_type
+	27, // [27:49] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_auth_v1_auth_proto_init() }
@@ -1624,7 +3212,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   26,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

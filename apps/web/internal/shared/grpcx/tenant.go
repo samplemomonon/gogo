@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"gogo/internal/shared/authn"
 	"gogo/internal/shared/tenant"
 )
 
@@ -50,6 +51,15 @@ func tenantOutgoing() grpc.UnaryClientInterceptor {
 		if id, ok := tenant.FromContext(ctx); ok {
 			ctx = metadata.AppendToOutgoingContext(ctx, tenant.Header, string(id))
 		}
+		if id := authn.Session(ctx); id != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, authn.SessionHeader, id)
+		}
+		if caller := authn.Caller(ctx); caller != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, authn.CallerHeader, caller)
+		}
+		if credential := authn.ServiceCredential(ctx); credential != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, authn.CallerCredentialHeader, credential)
+		}
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
@@ -71,6 +81,15 @@ func tenantIncoming() grpc.UnaryServerInterceptor {
 		}
 		if values := md.Get(tenant.Header); len(values) > 0 && values[0] != "" {
 			ctx = tenant.WithID(ctx, tenant.ID(values[0]))
+		}
+		if values := md.Get(authn.SessionHeader); len(values) > 0 && values[0] != "" {
+			ctx = authn.WithSession(ctx, values[0])
+		}
+		if values := md.Get(authn.CallerHeader); len(values) > 0 && values[0] != "" {
+			ctx = authn.WithCaller(ctx, values[0])
+		}
+		if values := md.Get(authn.CallerCredentialHeader); len(values) > 0 && values[0] != "" {
+			ctx = authn.WithCallerCredential(ctx, values[0])
 		}
 		return handler(ctx, req)
 	}

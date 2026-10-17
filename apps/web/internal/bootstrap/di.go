@@ -12,6 +12,7 @@ import (
 	"gogo/internal/pages/auth"
 	authports "gogo/internal/pages/auth/application/ports"
 	authclient "gogo/internal/pages/auth/infrastructure/authclient"
+	"gogo/internal/pages/contentcms"
 	"gogo/internal/pages/home"
 	homeports "gogo/internal/pages/home/application/ports"
 	homelistingclient "gogo/internal/pages/home/infrastructure/listingclient"
@@ -20,10 +21,12 @@ import (
 	profileauthclient "gogo/internal/pages/profile/infrastructure/authclient"
 	"gogo/internal/pages/seller"
 	sellerports "gogo/internal/pages/seller/application/ports"
+	sellerauthclient "gogo/internal/pages/seller/infrastructure/authclient"
 	sellercatalogclient "gogo/internal/pages/seller/infrastructure/catalogclient"
 	sellerinventoryclient "gogo/internal/pages/seller/infrastructure/inventoryclient"
 	sellersalesclient "gogo/internal/pages/seller/infrastructure/salesclient"
 	"gogo/internal/shared/authconsumer"
+	"gogo/internal/shared/authn"
 	"gogo/internal/shared/breaker"
 	"gogo/internal/shared/config"
 	"gogo/internal/shared/events"
@@ -72,7 +75,8 @@ const (
 	serviceSellerSalesClient     = "gateway.sellerSalesClient"     // *sellersalesclient.Client
 	serviceListingClient         = "gateway.listingClient"         // *homelistingclient.Client
 	serviceAuthClient            = "gateway.authClient"            // *authconsumer.Client
-	serviceProductPlatform       = "gateway.productPlatform"       // *productPlatform
+	serviceSalesCapability       = "gateway.salesInventoryCapability"
+	serviceProductPlatform       = "gateway.productPlatform" // *productPlatform
 	// serviceProductPlatformBreakers is productconsumer.Breakers, the four platform
 	// breakers as one value, so a surface takes the whole set rather than four names.
 	serviceProductPlatformBreakers = "gateway.productPlatformBreakers"
@@ -119,6 +123,9 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	fdi.ProvideInstanceType[events.Bus](b, bus)
 	fdi.ProvideInstanceType[*slog.Logger](b, logger)
 	fdi.ProvideInstanceType[*module.Registry](b, module.NewRegistry(cfg.ServiceName, cfg.ServiceVersion))
+	fdi.Provide(b, serviceSalesCapability, func(*fdi.Container) (authn.Capability, error) {
+		return authn.NewCapability()
+	})
 
 	// Kernel views over the process primitives: one bus and one logger, two
 	// contracts each.
@@ -146,11 +153,20 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	// over its inventory.v1 contract on a bufconn transport, and the module joins
 	// the registry like any other.
 	fdi.ProvideNamed(b, upstreamInventory, func(c *fdi.Container) (*grpc.ClientConn, error) {
+		authorizer, err := fdi.ResolveAs[*authconsumer.Client](c, serviceAuthClient)
+		if err != nil {
+			return nil, err
+		}
+		capability, err := fdi.ResolveAs[authn.Capability](c, serviceSalesCapability)
+		if err != nil {
+			return nil, err
+		}
 		conn, closeConn, err := connectInventory(
 			gatewayParent(c),
 			gatewayConfig(c),
 			gatewayLogger(c),
 			gatewayRegistry(c),
+			moduleSecurity{authorizer: authorizer, capability: capability},
 		)
 		if err != nil {
 			return nil, err
@@ -171,6 +187,14 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		if err != nil {
 			return nil, err
 		}
+		authorizer, err := fdi.ResolveAs[*authconsumer.Client](c, serviceAuthClient)
+		if err != nil {
+			return nil, err
+		}
+		capability, err := fdi.ResolveAs[authn.Capability](c, serviceSalesCapability)
+		if err != nil {
+			return nil, err
+		}
 		conn, closeConn, err := connectSales(
 			gatewayParent(c),
 			gatewayConfig(c),
@@ -178,6 +202,7 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 			inventoryBreaker,
 			gatewayLogger(c),
 			gatewayRegistry(c),
+			moduleSecurity{authorizer: authorizer, capability: capability},
 		)
 		if err != nil {
 			return nil, err
@@ -295,6 +320,20 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	fdi.ProvideType[homeports.Listing](b, func(c *fdi.Container) (homeports.Listing, error) {
 		return fdi.ResolveAs[*homelistingclient.Client](c, serviceListingClient)
 	})
+	fdi.ProvideType[contentcms.Reader](b, func(c *fdi.Container) (contentcms.Reader, error) {
+		cfg := gatewayConfig(c)
+		if cfg.BuilderPublicAPIKey == "" {
+			return contentcms.DisabledReader(), nil
+		}
+		return contentcms.NewBuilderReader(cfg.BuilderModel, cfg.BuilderPublicAPIKey)
+	})
+	fdi.ProvideType[*contentcms.PageHandler](b, func(c *fdi.Container) (*contentcms.PageHandler, error) {
+		reader, err := fdi.ResolveType[contentcms.Reader](c)
+		if err != nil {
+			return nil, err
+		}
+		return contentcms.NewPageHandler(reader, gatewayLogger(c)), nil
+	})
 	fdi.ProvideType[sellerports.ProductCatalog](b, func(c *fdi.Container) (sellerports.ProductCatalog, error) {
 		return fdi.ResolveAs[*sellercatalogclient.Client](c, serviceSellerCatalogClient)
 	})
@@ -303,6 +342,13 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	})
 	fdi.ProvideType[sellerports.Sales](b, func(c *fdi.Container) (sellerports.Sales, error) {
 		return fdi.ResolveAs[*sellersalesclient.Client](c, serviceSellerSalesClient)
+	})
+	fdi.ProvideType[sellerports.EmployeeSessions](b, func(c *fdi.Container) (sellerports.EmployeeSessions, error) {
+		shared, err := fdi.ResolveAs[*authconsumer.Client](c, serviceAuthClient)
+		if err != nil {
+			return nil, err
+		}
+		return sellerauthclient.New(shared), nil
 	})
 	fdi.ProvideType[authports.Auth](b, func(c *fdi.Container) (authports.Auth, error) {
 		shared, err := fdi.ResolveAs[*authconsumer.Client](c, serviceAuthClient)
@@ -353,6 +399,10 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		if err != nil {
 			return nil, err
 		}
+		contentPage, err := fdi.ResolveType[*contentcms.PageHandler](c)
+		if err != nil {
+			return nil, err
+		}
 
 		billingModule, err := fdi.ResolveType[*billing.Module](c)
 		if err != nil {
@@ -375,6 +425,7 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 			registry,
 			breakers,
 			homePage,
+			contentPage,
 			sellerPage,
 			authPage,
 			profilePage,

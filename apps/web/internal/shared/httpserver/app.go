@@ -138,6 +138,9 @@ func buildRouter(
 	router.Mount("/assets", assets.Handler())
 	router.Mount("/module-registry", registryHandler(registry, logger))
 	router.Mount("/metrics", metrics.Handler())
+	// The web-vitals beacon receiver (see rum.go): POST only, no auth —
+	// it takes no action and stores only bounded aggregates.
+	router.Post("/rum", rumHandler())
 	// expvar exposes runtime internals on the public surface; it is
 	// deliberately absent in production unless explicitly enabled.
 	if cfg.EnableDebugEndpoint {

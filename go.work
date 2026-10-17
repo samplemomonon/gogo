@@ -16,6 +16,7 @@ go 1.27.1
 // dependency graph being independent are both deliberate: a service that could
 // only build inside this workspace could not be released on its own.
 use (
+	./design-system/web/ui
 	./apps/web
 	./contracts
 	./services/aggregator-service

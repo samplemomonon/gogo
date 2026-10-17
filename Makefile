@@ -34,8 +34,9 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
                -X gogo/internal/shared/version.Commit=$(COMMIT) \
                -X gogo/internal/shared/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch \
+.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products docs-site-build docs-site-preview \
 	module buf buf-lint buf-generate buf-check buf-breaking arch-graph \
+	arch-team-catalog \
 	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
 	up down restart logs ps reset smoke dev-pull
 
@@ -54,7 +55,9 @@ run: build
 
 # Development: watch templ + CSS changes and run the server.
 dev: templ css
-	@cd $(APP_DIR) && templ generate --watch & \
+	@bun --watch design-system/web/build.mjs & \
+	go -C design-system/web/ui tool templ generate --watch & \
+	cd $(APP_DIR) && templ generate --watch & \
 	bun run css:watch & \
 	$(GO) run $(PKG)
 
@@ -99,17 +102,31 @@ services-test:
 # `gofmt -l ./internal` walked all of it on every run.
 gofmt-check:
 	@dirs="$$($(GO) list -f '{{.Dir}}' ./... | sort -u)"; \
+	 dirs="$$dirs $$(go -C design-system/web/ui list -f '{{.Dir}}' ./... | sort -u)"; \
 	for svc in $(SERVICES); do \
 		dirs="$$dirs $$(cd "$(SERVICES_DIR)/$$svc" && GOWORK=off go list -f '{{.Dir}}' ./... | sort -u)"; \
 	done; \
 	test -z "$$(gofmt -l $$dirs)" || \
 		(echo "gofmt needed on:"; gofmt -l $$dirs; exit 1)
 
-check: vet test services-vet services-test gofmt-check
+arch-team-catalog:
+	$(GO) run ./cmd/teamcatalog
+
+# Customer terms and privacy documents are built separately from engineering
+# documentation. The site script blocks production builds until both pages are
+# approved by their content owners.
+docs-site-build:
+	npm --prefix docs/site run build
+
+docs-site-preview:
+	npm --prefix docs/site run preview
+
+check: vet test services-vet services-test gofmt-check arch-team-catalog
 	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
-	@before="$$(git status --porcelain -- apps/web)"; \
+	@before="$$(git status --porcelain -- apps/web design-system/web/ui)"; \
+	go -C design-system/web/ui tool templ generate >/dev/null 2>&1; \
 	(cd $(APP_DIR) && templ generate) >/dev/null 2>&1; \
-	after="$$(git status --porcelain -- apps/web)"; \
+	after="$$(git status --porcelain -- apps/web design-system/web/ui)"; \
 	if [ "$$before" = "$$after" ]; then \
 		echo "templates generated, up to date"; \
 	else \
@@ -219,12 +236,14 @@ buf: buf-generate
 
 fmt:
 	gofmt -w $$($(GO) list -f '{{.Dir}}' ./... | sort -u)
+	gofmt -w $$(go -C design-system/web/ui list -f '{{.Dir}}' ./... | sort -u)
 
 tidy:
 	$(GO) mod tidy
 
 # Regenerate Templ *_templ.go files from .templ sources.
 templ:
+	go -C design-system/web/ui tool templ generate
 	cd $(APP_DIR) && templ generate
 
 # Build the Tailwind stylesheet once or in watch mode.
@@ -233,6 +252,10 @@ css:
 
 css-watch:
 	bun run css:watch
+
+# Generate development categories and products through their owning services.
+faker-products:
+	bun run tools/product-faker/index.ts
 
 # Scaffold a new contract-compliant feature module:
 #   make module name=billing desc="Subscription billing and invoices"

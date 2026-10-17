@@ -5,6 +5,13 @@ package results
 
 import "time"
 
+// Employee is the authenticated identity used to attribute seller actions.
+type Employee struct {
+	ID   string
+	Name string
+	Role string
+}
+
 // Product is the console's product read model.
 //
 // Field notes, because the platform's contracts do not carry everything this shape

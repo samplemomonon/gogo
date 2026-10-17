@@ -56,8 +56,8 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 
 			@partials.Header(nav, path, term)
 
-			<main id="main" class="flex-1 w-full pb-20 md:pb-0">
-				<div class="container mx-auto px-4 py-8">
+			<main id="main" class="ds-shell-main flex-1 w-full">
+				<div class="ds-container py-8">
 					{ children... }
 				</div>
 			</main>
@@ -74,9 +74,11 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 			<div id="page-status" class="shell-status" role="status" aria-live="polite"></div>
 
 			<script src="/assets/js/htmx.min.js"></script>
+			<script src="/assets/js/web-vitals.attribution.iife.js"></script>
 			@partials.InlineScript(partials.HtmxConfigJS)
 			@partials.InlineScript(partials.FormGuardJS)
 			@partials.InlineScript(partials.DrawerTriggerJS)
+			@partials.InlineScript(partials.WebVitalsJS)
 		</body>
 	</html>
 }

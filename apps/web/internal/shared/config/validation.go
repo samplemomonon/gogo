@@ -117,6 +117,21 @@ func (c *AppConfig) Validate() error {
 	if len(strings.TrimSpace(c.ProductPlatformServiceToken)) < 16 {
 		errs = append(errs, errors.New("PRODUCT_PLATFORM_SERVICE_TOKEN must be set and contain at least 16 characters"))
 	}
+	if (strings.TrimSpace(c.BuilderPublicAPIKey) == "") != (strings.TrimSpace(c.BuilderModel) == "") {
+		errs = append(errs, errors.New("BUILDER_PUBLIC_API_KEY and BUILDER_CONTENT_MODEL must be configured together"))
+	}
+	if c.BuilderModel != "" {
+		validModel := true
+		for _, r := range c.BuilderModel {
+			if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+				validModel = false
+				break
+			}
+		}
+		if !validModel {
+			errs = append(errs, errors.New("BUILDER_CONTENT_MODEL must contain lowercase letters, digits, or hyphens"))
+		}
+	}
 
 	// The change feed's brokers are optional — with none, the gateway serves on cache
 	// TTLs alone — but each one that *is* configured must be host:port, so a typo fails

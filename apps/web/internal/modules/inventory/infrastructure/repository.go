@@ -34,7 +34,7 @@ type movementEntry struct {
 	value  domain.Movement
 }
 
-var _ ports.StockService = (*StockRepository)(nil)
+var _ ports.StockStore = (*StockRepository)(nil)
 
 func NewStockRepository() *StockRepository {
 	return &StockRepository{stocks: make(map[stockKey]domain.Stock)}
@@ -75,7 +75,7 @@ func (r *StockRepository) ListStocks(ctx context.Context, tenant domain.Tenant, 
 	return out, nil
 }
 
-func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, reference string) (*domain.Stock, *domain.Movement, error) {
+func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, serviceActor, reference string) (*domain.Stock, *domain.Movement, error) {
 	if err := domain.NewAdjustment(tenant, productID, kind, actor, reference); err != nil {
 		return nil, nil, err
 	}
@@ -97,9 +97,9 @@ func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant,
 
 	key := stockKey{tenant: tenant, productID: productID}
 	before := r.stocks[key].Quantity
-	after := before + delta
-	if after < 0 {
-		return nil, nil, domain.ErrInsufficientStock
+	after, err := domain.AdjustedQuantity(before, delta)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	now := time.Now()
@@ -107,16 +107,17 @@ func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant,
 	r.stocks[key] = stock
 
 	movement := domain.Movement{
-		ID:        uuid.NewString(),
-		ProductID: productID,
-		Kind:      kind,
-		Delta:     delta,
-		Before:    before,
-		After:     after,
-		Note:      note,
-		Actor:     actor,
-		Reference: reference,
-		CreatedAt: now,
+		ID:           uuid.NewString(),
+		ProductID:    productID,
+		Kind:         kind,
+		Delta:        delta,
+		Before:       before,
+		After:        after,
+		Note:         note,
+		Actor:        actor,
+		ServiceActor: serviceActor,
+		Reference:    reference,
+		CreatedAt:    now,
 	}
 	r.movements = append(r.movements, movementEntry{tenant: tenant, value: movement})
 

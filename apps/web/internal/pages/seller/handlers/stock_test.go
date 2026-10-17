@@ -39,8 +39,8 @@ func TestStockPageAsksForTheWholeLedgerAndTheRecentMovements(t *testing.T) {
 }
 
 // TestStockAdjustForwardsEveryFieldAndRedirects pins the adjustment contract:
-// product id, delta, kind, note and actor travel exactly as posted, and the
-// reference is not sent (the console mints none). Success redirects to the ledger.
+// product id, delta, kind and note travel from the form while the actor comes from
+// the validated session. The reference is not sent (the console mints none).
 func TestStockAdjustForwardsEveryFieldAndRedirects(t *testing.T) {
 	t.Parallel()
 
@@ -57,7 +57,7 @@ func TestStockAdjustForwardsEveryFieldAndRedirects(t *testing.T) {
 	}
 
 	got := inventory.lastAdjust
-	want := adjustCall{productID: "1", delta: 5, kind: "restock", note: "kiriman pagi", actor: "Siti", reference: ""}
+	want := adjustCall{productID: "1", delta: 5, kind: "restock", note: "kiriman pagi", actor: "employee-1", reference: ""}
 	if got != want {
 		t.Errorf("adjust call = %+v, want %+v", got, want)
 	}
