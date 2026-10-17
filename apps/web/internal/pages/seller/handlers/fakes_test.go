@@ -199,6 +199,16 @@ type fakeSales struct {
 	lastVoid     voidCall
 }
 
+type fakeEmployeeSessions struct{}
+
+func (fakeEmployeeSessions) Current(context.Context, string) (*results.Employee, error) {
+	return &results.Employee{ID: "employee-1", Name: "Budi", Role: "seller"}, nil
+}
+
+func (fakeEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+
 type checkoutCall struct {
 	items      []*results.TransactionItem
 	discount   int64
@@ -277,9 +287,10 @@ func newConsole(t *testing.T) (*chi.Mux, *fakeCatalog, *fakeInventory, *fakeSale
 		PaymentMethod: "Tunai", Cashier: "Budi", CreatedAt: time.Now(),
 	}}}
 
-	handler := handlers.NewHandler(catalog, inventory, sales, discardLogger())
+	handler := handlers.NewHandler(catalog, inventory, sales, fakeEmployeeSessions{}, discardLogger())
 	router := chi.NewRouter()
 	router.Route("/seller", func(r chi.Router) {
+		r.Use(handler.RequireEmployee)
 		r.Get("/", handler.Dashboard)
 		r.Get("/produk", handler.Products)
 		r.Post("/produk", handler.ProductCreate)

@@ -50,6 +50,25 @@ type Employee struct {
 	Role  string
 }
 
+type AuthorizationRole struct {
+	ID, Name, Description string
+	PermissionKeys        []string
+}
+
+type RoleAssignment struct {
+	ID, EmployeeID, RoleID, Reason string
+	AssignedBy, Source             string
+	AssignedAt, ValidFrom          time.Time
+	ExpiresAt, RevokedAt           *time.Time
+}
+
+type AuthorizationAdminEvent struct {
+	ID, Action, SubjectID, RoleID                       string
+	ActorEmployeeID, ActorDatabaseUser, ChangeReference string
+	Reason                                              string
+	OccurredAt                                          time.Time
+}
+
 // Credentials is a login attempt.
 type Credentials struct {
 	TenantID string
@@ -64,6 +83,12 @@ type Outcome struct {
 	Employee Employee
 }
 
+// Principal is the session-derived identity supplied to module PEPs.
+type Principal struct {
+	EmployeeID string
+	Name       string
+}
+
 // vocabulary is the auth contract's error vocabulary. It names no Conflict: the
 // contract has no write that can duplicate, and inventing a sentinel for an
 // answer it never produces would be a branch callers can never take.
@@ -72,7 +97,9 @@ var vocabulary = grpcconsumer.Vocabulary{
 	Invalid:         ErrInvalid,
 	Precondition:    ErrPrecondition,
 	Unauthenticated: ErrUnauthenticated,
+	Forbidden:       ErrForbidden,
 	Unavailable:     ErrAuthUnavailable,
+	Conflict:        ErrPolicyConflict,
 }
 
 // Client wraps the generated auth.v1 client and the shared call convention.
@@ -142,7 +169,7 @@ func (c *Client) Lookup(ctx context.Context, sessionID string) (Outcome, error) 
 		return c.auth.ValidateSession(ctx, &authv1.ValidateSessionRequest{SessionId: sessionID})
 	})
 	if err != nil {
-		if isSignedOut(err) {
+		if IsSignedOut(err) {
 			return Outcome{}, nil
 		}
 		return Outcome{}, err
@@ -150,9 +177,194 @@ func (c *Client) Lookup(ctx context.Context, sessionID string) (Outcome, error) 
 	return Outcome{Session: toSession(resp.GetSession()), Employee: toEmployee(resp.GetEmployee())}, nil
 }
 
+// CheckPermission asks the auth PDP to evaluate a permission against the
+// principal resolved from the supplied live session.
+func (c *Client) CheckPermission(ctx context.Context, sessionID, permissionKey string) (bool, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "check permission", func(ctx context.Context) (*authv1.CheckPermissionResponse, error) {
+		return c.auth.CheckPermission(ctx, &authv1.CheckPermissionRequest{
+			SessionId: sessionID, PermissionKey: permissionKey,
+		})
+	})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetAllowed(), nil
+}
+
+// Authorize resolves a live session and evaluates a permission. A denied or
+// absent session returns allowed=false; infrastructure failures remain errors.
+func (c *Client) Authorize(ctx context.Context, sessionID, permissionKey string) (Principal, bool, error) {
+	if sessionID == "" {
+		return Principal{}, false, nil
+	}
+	outcome, err := c.Lookup(ctx, sessionID)
+	if err != nil {
+		return Principal{}, false, err
+	}
+	if outcome.Employee.ID == "" || outcome.Session.ID == "" {
+		return Principal{}, false, nil
+	}
+	allowed, err := c.CheckPermission(ctx, sessionID, permissionKey)
+	principal := Principal{EmployeeID: outcome.Employee.ID, Name: outcome.Employee.Name}
+	if err != nil {
+		return Principal{}, false, err
+	}
+	return principal, allowed, nil
+}
+
+// ListEmployees returns a bounded tenant employee roster for authorized access
+// review. The tenant is derived by auth from sessionID.
+func (c *Client) ListEmployees(ctx context.Context, sessionID string, limit int) ([]Employee, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "list employees", func(ctx context.Context) (*authv1.ListEmployeesResponse, error) {
+		return c.auth.ListEmployees(ctx, &authv1.ListEmployeesRequest{SessionId: sessionID, Limit: int32(limit)})
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Employee, 0, len(resp.GetEmployees()))
+	for _, employee := range resp.GetEmployees() {
+		out = append(out, toEmployee(employee))
+	}
+	return out, nil
+}
+
+// CreateRole creates a tenant-local role through the auth PAP.
+func (c *Client) CreateRole(ctx context.Context, sessionID, name, description, changeReference string) (string, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "create authorization role", func(ctx context.Context) (*authv1.CreateRoleResponse, error) {
+		return c.auth.CreateRole(ctx, &authv1.CreateRoleRequest{SessionId: sessionID, Name: name, Description: description, ChangeReference: changeReference})
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetRoleId(), nil
+}
+
+func (c *Client) GrantPermission(ctx context.Context, sessionID, roleID, permissionKey string, expiresAt *time.Time, reason, changeReference string) (string, error) {
+	var expires *timestamppb.Timestamp
+	if expiresAt != nil {
+		expires = timestamppb.New(*expiresAt)
+	}
+	resp, err := grpcconsumer.Do(c.caller, ctx, "grant authorization permission", func(ctx context.Context) (*authv1.GrantPermissionResponse, error) {
+		return c.auth.GrantPermission(ctx, &authv1.GrantPermissionRequest{SessionId: sessionID, RoleId: roleID, PermissionKey: permissionKey, ExpiresAt: expires, Reason: reason, ChangeReference: changeReference})
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetGrantId(), nil
+}
+
+func (c *Client) RevokePermission(ctx context.Context, sessionID, grantID, reason, changeReference string) error {
+	return grpcconsumer.DoUnit(c.caller, ctx, "revoke authorization permission", func(ctx context.Context) error {
+		_, err := c.auth.RevokePermission(ctx, &authv1.RevokePermissionRequest{SessionId: sessionID, GrantId: grantID, Reason: reason, ChangeReference: changeReference})
+		return err
+	})
+}
+
+func (c *Client) AssignRole(ctx context.Context, sessionID, employeeID, roleID string, validFrom, expiresAt *time.Time, reason, changeReference string) (string, error) {
+	var from, expires *timestamppb.Timestamp
+	if validFrom != nil {
+		from = timestamppb.New(*validFrom)
+	}
+	if expiresAt != nil {
+		expires = timestamppb.New(*expiresAt)
+	}
+	resp, err := grpcconsumer.Do(c.caller, ctx, "assign authorization role", func(ctx context.Context) (*authv1.AssignRoleResponse, error) {
+		return c.auth.AssignRole(ctx, &authv1.AssignRoleRequest{SessionId: sessionID, EmployeeId: employeeID, RoleId: roleID, ValidFrom: from, ExpiresAt: expires, Reason: reason, ChangeReference: changeReference})
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetAssignmentId(), nil
+}
+
+func (c *Client) RevokeRoleAssignment(ctx context.Context, sessionID, assignmentID, reason, changeReference string) error {
+	return grpcconsumer.DoUnit(c.caller, ctx, "revoke authorization role assignment", func(ctx context.Context) error {
+		_, err := c.auth.RevokeRoleAssignment(ctx, &authv1.RevokeRoleAssignmentRequest{SessionId: sessionID, AssignmentId: assignmentID, Reason: reason, ChangeReference: changeReference})
+		return err
+	})
+}
+
+func (c *Client) ListAuthorizationRoles(ctx context.Context, sessionID string) ([]AuthorizationRole, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "list authorization roles", func(ctx context.Context) (*authv1.ListAuthorizationRolesResponse, error) {
+		return c.auth.ListAuthorizationRoles(ctx, &authv1.ListAuthorizationRolesRequest{SessionId: sessionID})
+	})
+	if err != nil {
+		return nil, err
+	}
+	roles := make([]AuthorizationRole, 0, len(resp.GetRoles()))
+	for _, role := range resp.GetRoles() {
+		roles = append(roles, AuthorizationRole{ID: role.GetId(), Name: role.GetName(), Description: role.GetDescription(), PermissionKeys: role.GetActivePermissionKeys()})
+	}
+	return roles, nil
+}
+
+func (c *Client) ListRoleAssignments(ctx context.Context, sessionID, employeeID string, includeHistory bool) ([]RoleAssignment, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "list role assignments", func(ctx context.Context) (*authv1.ListRoleAssignmentsResponse, error) {
+		return c.auth.ListRoleAssignments(ctx, &authv1.ListRoleAssignmentsRequest{SessionId: sessionID, EmployeeId: employeeID, IncludeHistory: includeHistory})
+	})
+	if err != nil {
+		return nil, err
+	}
+	assignments := make([]RoleAssignment, 0, len(resp.GetAssignments()))
+	for _, item := range resp.GetAssignments() {
+		assignment := RoleAssignment{ID: item.GetId(), EmployeeID: item.GetEmployeeId(), RoleID: item.GetRoleId(), Reason: item.GetReason(), AssignedBy: item.GetAssignedBy(), Source: item.GetSource(), AssignedAt: asTime(item.GetAssignedAt()), ValidFrom: asTime(item.GetValidFrom())}
+		if item.GetExpiresAt() != nil {
+			value := item.GetExpiresAt().AsTime()
+			assignment.ExpiresAt = &value
+		}
+		if item.GetRevokedAt() != nil {
+			value := item.GetRevokedAt().AsTime()
+			assignment.RevokedAt = &value
+		}
+		assignments = append(assignments, assignment)
+	}
+	return assignments, nil
+}
+
+// ListTenantRoleAssignments retrieves one bounded page of tenant-wide assignment history.
+func (c *Client) ListTenantRoleAssignments(ctx context.Context, sessionID string, pageSize uint32, pageToken string) ([]RoleAssignment, string, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "review tenant role assignments", func(ctx context.Context) (*authv1.ListTenantRoleAssignmentsResponse, error) {
+		return c.auth.ListTenantRoleAssignments(ctx, &authv1.ListTenantRoleAssignmentsRequest{SessionId: sessionID, PageSize: pageSize, PageToken: pageToken})
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	assignments := make([]RoleAssignment, 0, len(resp.GetAssignments()))
+	for _, item := range resp.GetAssignments() {
+		assignment := RoleAssignment{ID: item.GetId(), EmployeeID: item.GetEmployeeId(), RoleID: item.GetRoleId(), Reason: item.GetReason(), AssignedBy: item.GetAssignedBy(), Source: item.GetSource(), AssignedAt: asTime(item.GetAssignedAt()), ValidFrom: asTime(item.GetValidFrom())}
+		if item.GetExpiresAt() != nil {
+			value := item.GetExpiresAt().AsTime()
+			assignment.ExpiresAt = &value
+		}
+		if item.GetRevokedAt() != nil {
+			value := item.GetRevokedAt().AsTime()
+			assignment.RevokedAt = &value
+		}
+		assignments = append(assignments, assignment)
+	}
+	return assignments, resp.GetNextPageToken(), nil
+}
+
+// ListAuthorizationAdminEvents retrieves one bounded page of tenant policy administration audit history.
+func (c *Client) ListAuthorizationAdminEvents(ctx context.Context, sessionID string, pageSize uint32, pageToken string) ([]AuthorizationAdminEvent, string, error) {
+	resp, err := grpcconsumer.Do(c.caller, ctx, "review authorization administration events", func(ctx context.Context) (*authv1.ListAuthorizationAdminEventsResponse, error) {
+		return c.auth.ListAuthorizationAdminEvents(ctx, &authv1.ListAuthorizationAdminEventsRequest{SessionId: sessionID, PageSize: pageSize, PageToken: pageToken})
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	events := make([]AuthorizationAdminEvent, 0, len(resp.GetEvents()))
+	for _, item := range resp.GetEvents() {
+		events = append(events, AuthorizationAdminEvent{ID: item.GetId(), Action: item.GetAction(), SubjectID: item.GetSubjectId(), RoleID: item.GetRoleId(), ActorEmployeeID: item.GetActorEmployeeId(), ActorDatabaseUser: item.GetActorDatabaseUser(), ChangeReference: item.GetChangeReference(), Reason: item.GetReason(), OccurredAt: asTime(item.GetOccurredAt())})
+	}
+	return events, resp.GetNextPageToken(), nil
+}
+
 // isSignedOut reports whether err is the contract's answer that there is no such
 // usable session, rather than a failure to reach the service.
-func isSignedOut(err error) bool {
+// IsSignedOut reports whether the auth contract says the supplied session is
+// absent or no longer usable.
+func IsSignedOut(err error) bool {
 	return errors.Is(err, ErrNotFound) ||
 		errors.Is(err, ErrInvalid) ||
 		errors.Is(err, ErrPrecondition) ||

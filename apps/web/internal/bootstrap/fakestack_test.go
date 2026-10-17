@@ -29,6 +29,7 @@ import (
 	authinfra "gogo/internal/modules/auth/infrastructure"
 	"gogo/internal/modules/billing"
 	"gogo/internal/modules/inventory"
+	inventoryinfra "gogo/internal/modules/inventory/infrastructure"
 	"gogo/internal/modules/ops"
 	salescompose "gogo/internal/modules/sales/compose"
 	salesinventoryclient "gogo/internal/modules/sales/infrastructure/inventoryclient"
@@ -37,10 +38,13 @@ import (
 	"gogo/internal/pages/profile"
 	profileauthclient "gogo/internal/pages/profile/infrastructure/authclient"
 	"gogo/internal/pages/seller"
+	sellerports "gogo/internal/pages/seller/application/ports"
+	sellerresults "gogo/internal/pages/seller/application/results"
 	sellercatalogclient "gogo/internal/pages/seller/infrastructure/catalogclient"
 	sellerinventoryclient "gogo/internal/pages/seller/infrastructure/inventoryclient"
 	sellersalesclient "gogo/internal/pages/seller/infrastructure/salesclient"
 	"gogo/internal/shared/authconsumer"
+	"gogo/internal/shared/authn"
 	"gogo/internal/shared/breaker"
 	"gogo/internal/shared/config"
 	"gogo/internal/shared/events"
@@ -51,6 +55,31 @@ import (
 	"gogo/internal/shared/module"
 	"gogo/internal/shared/productconsumer"
 )
+
+type integrationEmployeeSessions struct{}
+
+var _ sellerports.EmployeeSessions = integrationEmployeeSessions{}
+
+func (integrationEmployeeSessions) Current(context.Context, string) (*sellerresults.Employee, error) {
+	return &sellerresults.Employee{ID: "integration-employee", Name: "Integration", Role: "admin"}, nil
+}
+
+func (integrationEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+
+// integrationAuthorizer stands in for the auth service's PDP at the module
+// boundary. The seller console already fakes its session port
+// (integrationEmployeeSessions), so the modules' authorizer is faked to match:
+// it grants every permission and answers with the same integration principal.
+// What these tests pin is the gateway's wiring — the right client reaches the
+// right contract with the sale's context — not auth policy, which auth's own
+// adapter and module tests pin.
+type integrationAuthorizer struct{}
+
+func (integrationAuthorizer) Authorize(context.Context, string, string) (authconsumer.Principal, bool, error) {
+	return authconsumer.Principal{EmployeeID: "integration-employee", Name: "Integration"}, true, nil
+}
 
 // This file stands up the gateway's *external* dependencies for the integration tests:
 // the four product-platform services. They are in-process fakes rather than the real
@@ -656,7 +685,15 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewMemoryBus()
 
-	inventoryModule := inventory.NewModule(logger)
+	// The capability sales presents when it adjusts stock in-process: generated
+	// once and shared with both ends, exactly as the composition root does.
+	capability, err := authn.NewCapability()
+	if err != nil {
+		t.Fatalf("authn.NewCapability returned error: %v", err)
+	}
+
+	inventoryModule := inventory.NewModuleWithDeps(inventoryinfra.NewStockRepository(), nil, logger,
+		inventory.Security{Authorizer: integrationAuthorizer{}, SalesCapability: capability})
 	inventoryConn, closeInventoryServer, err := grpcx.InProcess(inventoryModule.RegisterGRPC)
 	if err != nil {
 		t.Fatalf("grpcx.InProcess (inventory) returned error: %v", err)
@@ -665,7 +702,7 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 	inventoryBreaker := breaker.NewDefault()
 
 	salesModule, closeSales, err := salescompose.Build(
-		t.Context(), cfg, salesinventoryclient.New(inventoryConn, inventoryBreaker), logger,
+		t.Context(), cfg, salesinventoryclient.New(inventoryConn, inventoryBreaker, capability), logger, integrationAuthorizer{},
 	)
 	if err != nil {
 		t.Fatalf("salescompose.Build returned error: %v", err)
@@ -717,6 +754,7 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 			sellercatalogclient.New(conns, breakers),
 			sellerinventoryclient.New(inventoryConn, inventoryBreaker),
 			sellersalesclient.New(salesConn, salesBreaker),
+			integrationEmployeeSessions{},
 			logger,
 		),
 		profile.New(

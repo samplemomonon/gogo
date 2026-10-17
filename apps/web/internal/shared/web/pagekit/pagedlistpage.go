@@ -118,6 +118,11 @@ type PagedListPage[T any] struct {
 	// back to DefaultPageLimit.
 	PageLimit int
 
+	// Streaming delivers full-page responses progressively (see
+	// render.Page.Streaming). HTMX fragment responses stay buffered: their
+	// swap is atomic by contract. Off by default; a page opts in.
+	Streaming bool
+
 	Composer *render.Composer
 	Logger   *slog.Logger
 }
@@ -180,6 +185,15 @@ func (h *PagedListPage[T]) WithErrorStatus(classify func(err error) int) *PagedL
 	return h
 }
 
+// WithStreaming opts full-page responses into progressive delivery (see
+// render.Page.Streaming), so the page shell reaches the client before the
+// listing's fetch completes on a cache miss. HTMX fragment responses remain
+// buffered regardless: their swap is atomic by htmx contract.
+func (h *PagedListPage[T]) WithStreaming() *PagedListPage[T] {
+	h.Streaming = true
+	return h
+}
+
 // statusFor answers the HTTP status for a failed fetch: whatever the page's classifier
 // says, defaulting to 500.
 func (h *PagedListPage[T]) statusFor(err error) int {
@@ -209,9 +223,13 @@ func (h *PagedListPage[T]) Handle(w http.ResponseWriter, r *http.Request) {
 	island := render.Island(h.pagedKey(query), nil, h.Contract)
 
 	// Fragment fast path: a cached HTMX swap needs no data, so skip the fetch
-	// entirely.
+	// entirely. It bypasses the composer, so it sets the same negotiation
+	// headers the composer would: the same URL answers a document or a
+	// fragment, and a shared cache must know that (render.SetVary).
 	if rctx.IsHTMX {
-		if data, ok := h.Composer.CachedFragment(r.Context(), island); ok {
+		if data, ok := h.Composer.CachedIsland(r.Context(), island); ok {
+			render.SetVary(w)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			_, _ = w.Write(data)
 			return
 		}
@@ -231,6 +249,7 @@ func (h *PagedListPage[T]) Handle(w http.ResponseWriter, r *http.Request) {
 	pageDoc := &render.Page{
 		Layout:     func(inner templ.Component) templ.Component { return h.Layout(inner, items, nav) },
 		Components: []*render.Component{island},
+		Streaming:  h.Streaming,
 	}
 
 	if err := h.Composer.RenderNavigation(r.Context(), w, pageDoc, rctx); err != nil {

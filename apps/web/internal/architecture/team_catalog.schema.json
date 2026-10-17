@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gogo.dev/schemas/team-catalog-v1.json",
+  "title": "Gogo Team Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "scope", "teams", "units", "contracts"],
+  "properties": {
+    "apiVersion": { "const": "gogo.dev/v1" },
+    "kind": { "const": "TeamCatalog" },
+    "scope": { "type": "string", "minLength": 1 },
+    "teams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "type"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9_-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["stream-aligned", "platform", "enabling", "complicated-subsystem"] }
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "team", "tier", "context", "complexity", "rung"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["module", "page", "composition", "service"] },
+          "team": { "type": "string", "minLength": 1 },
+          "tier": { "enum": ["composition", "business", "platform", "foundation"] },
+          "context": { "type": ["string", "null"] },
+          "complexity": { "enum": ["simple", "complicated", "complex"] },
+          "rung": { "type": "integer", "minimum": 0, "maximum": 4 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "tier": { "const": "business" } } },
+            "then": { "properties": { "context": { "type": "string", "minLength": 1 } } },
+            "else": { "properties": { "context": { "type": "null" } } }
+          }
+        ]
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "proto", "service", "provider", "consumers", "breaking", "interaction"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "const": "grpc" },
+          "proto": { "type": "string", "minLength": 1 },
+          "service": { "type": "string", "minLength": 1 },
+          "provider": { "type": "string", "minLength": 1 },
+          "consumers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+          "breaking": { "enum": ["FILE", "PACKAGE", "WIRE_JSON", "WIRE"] },
+          "interaction": { "enum": ["collaboration", "x-as-a-service", "facilitation"] }
+        }
+      }
+    }
+  }
+}

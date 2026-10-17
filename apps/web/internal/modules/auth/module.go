@@ -25,9 +25,9 @@ type Module struct {
 
 // NewModule wires the auth module around an explicit employee/session store.
 // ping backs the health report; pass nil for the in-memory store.
-func NewModule(store ports.EmployeeStore, sessionStore ports.SessionStore, ping func(context.Context) error, logger *slog.Logger) *Module {
+func NewModule(store ports.EmployeeStore, sessionStore ports.SessionStore, ping func(context.Context) error, logger *slog.Logger, authorization ...ports.AuthorizationStore) *Module {
 	return &Module{
-		svc:    application.NewService(store, sessionStore, 0, 0),
+		svc:    application.NewService(store, sessionStore, 0, 0, authorization...),
 		logger: logger,
 		ping:   ping,
 	}

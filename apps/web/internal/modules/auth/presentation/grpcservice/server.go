@@ -4,6 +4,8 @@ package grpcservice
 import (
 	"context"
 	"log/slog"
+	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -37,68 +39,75 @@ func tenantOf(ctx context.Context) domain.Tenant {
 }
 
 func (s *service) RegisterEmployee(ctx context.Context, req *authv1.RegisterEmployeeRequest) (*authv1.RegisterEmployeeResponse, error) {
-	employee, err := s.svc.RegisterEmployee(ctx, tenantOf(ctx), req.GetId(), req.GetName(), req.GetEmail(), req.GetPin(), domain.Role(req.GetRole()))
-	if err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.RegisterEmployeeResponse{Employee: s.toProtoEmployee(employee)}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "RegisterEmployee")
 }
 
 func (s *service) GetEmployee(ctx context.Context, req *authv1.GetEmployeeRequest) (*authv1.GetEmployeeResponse, error) {
-	employee, err := s.svc.GetEmployee(ctx, tenantOf(ctx), req.GetId())
-	if err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.GetEmployeeResponse{Employee: s.toProtoEmployee(employee)}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "GetEmployee")
 }
 
 func (s *service) GetEmployeeByEmail(ctx context.Context, req *authv1.GetEmployeeByEmailRequest) (*authv1.GetEmployeeByEmailResponse, error) {
-	employee, err := s.svc.GetEmployeeByEmail(ctx, tenantOf(ctx), req.GetEmail())
-	if err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.GetEmployeeByEmailResponse{Employee: s.toProtoEmployee(employee)}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "GetEmployeeByEmail")
 }
 
 func (s *service) UpdateEmployee(ctx context.Context, req *authv1.UpdateEmployeeRequest) (*authv1.UpdateEmployeeResponse, error) {
-	employee, err := s.svc.UpdateEmployee(ctx, tenantOf(ctx), req.GetId(), req.GetName(), req.GetEmail(), domain.Role(req.GetRole()))
-	if err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.UpdateEmployeeResponse{Employee: s.toProtoEmployee(employee)}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "UpdateEmployee")
 }
 
 func (s *service) ListEmployees(ctx context.Context, req *authv1.ListEmployeesRequest) (*authv1.ListEmployeesResponse, error) {
-	employees, err := s.svc.ListEmployees(ctx, tenantOf(ctx), int(req.GetLimit()))
+	session, err := s.authorizeSession(ctx, req.GetSessionId(), "authz.employee.read")
+	if err != nil {
+		return nil, err
+	}
+	employees, err := s.svc.ListEmployees(ctx, domain.Tenant(session.TenantID), int(req.GetLimit()))
 	if err != nil {
 		return nil, s.toStatus(err)
 	}
 	out := make([]*authv1.Employee, 0, len(employees))
-	for _, e := range employees {
-		out = append(out, s.toProtoEmployee(e))
+	for _, employee := range employees {
+		out = append(out, s.toProtoEmployee(employee))
 	}
 	return &authv1.ListEmployeesResponse{Employees: out}, nil
 }
 
 func (s *service) SetEmployeePIN(ctx context.Context, req *authv1.SetEmployeePINRequest) (*authv1.SetEmployeePINResponse, error) {
-	if err := s.svc.SetEmployeePIN(ctx, tenantOf(ctx), req.GetId(), req.GetPin()); err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.SetEmployeePINResponse{}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "SetEmployeePIN")
 }
 
 func (s *service) ActivateEmployee(ctx context.Context, req *authv1.ActivateEmployeeRequest) (*authv1.ActivateEmployeeResponse, error) {
-	if err := s.svc.ActivateEmployee(ctx, tenantOf(ctx), req.GetId()); err != nil {
-		return nil, s.toStatus(err)
-	}
-	return &authv1.ActivateEmployeeResponse{}, nil
+	return nil, s.employeeAdministrationUnavailable(ctx, "ActivateEmployee")
 }
 
 func (s *service) DeactivateEmployee(ctx context.Context, req *authv1.DeactivateEmployeeRequest) (*authv1.DeactivateEmployeeResponse, error) {
-	if err := s.svc.DeactivateEmployee(ctx, tenantOf(ctx), req.GetId()); err != nil {
+	return nil, s.employeeAdministrationUnavailable(ctx, "DeactivateEmployee")
+}
+
+// employeeAdministrationUnavailable closes legacy RPCs that have no session
+// and permission fields. Employee reads and writes must not bypass the dynamic
+// authorization model. Login/session and policy administration use separate
+// supported RPCs.
+func (s *service) employeeAdministrationUnavailable(ctx context.Context, method string) error {
+	s.logger.WarnContext(ctx, "legacy employee administration RPC rejected", "method", method)
+	return status.Error(codes.Unimplemented, "employee administration requires a session-authorized API")
+}
+
+func (s *service) authorizeSession(ctx context.Context, sessionID, permission string) (*domain.Session, error) {
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, status.Error(codes.Unauthenticated, "session required")
+	}
+	session, employee, err := s.svc.ValidateSession(ctx, sessionID)
+	if err != nil {
 		return nil, s.toStatus(err)
 	}
-	return &authv1.DeactivateEmployeeResponse{}, nil
+	allowed, err := s.svc.CheckPermission(ctx, sessionID, permission)
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	if !allowed {
+		s.logger.WarnContext(ctx, "authorization denied", "tenant_id", session.TenantID, "subject_id", employee.ID, "permission", permission, "service", "auth")
+		return nil, status.Error(codes.PermissionDenied, "permission denied")
+	}
+	return session, nil
 }
 
 func (s *service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
@@ -130,6 +139,141 @@ func (s *service) ExtendSession(ctx context.Context, req *authv1.ExtendSessionRe
 		return nil, s.toStatus(err)
 	}
 	return &authv1.ExtendSessionResponse{Session: s.toProtoSession(session)}, nil
+}
+
+func (s *service) CheckPermission(ctx context.Context, req *authv1.CheckPermissionRequest) (*authv1.CheckPermissionResponse, error) {
+	allowed, err := s.svc.CheckPermission(ctx, req.GetSessionId(), req.GetPermissionKey())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.CheckPermissionResponse{Allowed: allowed}, nil
+}
+
+func optionalTime(ts *timestamppb.Timestamp) (*time.Time, error) {
+	if ts == nil {
+		return nil, nil
+	}
+	if err := ts.CheckValid(); err != nil {
+		return nil, domain.ErrInvalidPolicyChange
+	}
+	value := ts.AsTime()
+	return &value, nil
+}
+
+func (s *service) CreateRole(ctx context.Context, req *authv1.CreateRoleRequest) (*authv1.CreateRoleResponse, error) {
+	roleID, err := s.svc.CreateRole(ctx, req.GetSessionId(), req.GetName(), req.GetDescription(), req.GetChangeReference())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.CreateRoleResponse{RoleId: roleID}, nil
+}
+
+func (s *service) GrantPermission(ctx context.Context, req *authv1.GrantPermissionRequest) (*authv1.GrantPermissionResponse, error) {
+	expiresAt, err := optionalTime(req.GetExpiresAt())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	grantID, err := s.svc.GrantPermission(ctx, req.GetSessionId(), req.GetRoleId(), req.GetPermissionKey(), expiresAt, req.GetReason(), req.GetChangeReference())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.GrantPermissionResponse{GrantId: grantID}, nil
+}
+
+func (s *service) RevokePermission(ctx context.Context, req *authv1.RevokePermissionRequest) (*authv1.RevokePermissionResponse, error) {
+	if err := s.svc.RevokePermission(ctx, req.GetSessionId(), req.GetGrantId(), req.GetReason(), req.GetChangeReference()); err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.RevokePermissionResponse{}, nil
+}
+
+func (s *service) AssignRole(ctx context.Context, req *authv1.AssignRoleRequest) (*authv1.AssignRoleResponse, error) {
+	validFrom, err := optionalTime(req.GetValidFrom())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	expiresAt, err := optionalTime(req.GetExpiresAt())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	assignmentID, err := s.svc.AssignRole(ctx, req.GetSessionId(), req.GetEmployeeId(), req.GetRoleId(), validFrom, expiresAt, req.GetReason(), req.GetChangeReference())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.AssignRoleResponse{AssignmentId: assignmentID}, nil
+}
+
+func (s *service) RevokeRoleAssignment(ctx context.Context, req *authv1.RevokeRoleAssignmentRequest) (*authv1.RevokeRoleAssignmentResponse, error) {
+	if err := s.svc.RevokeRoleAssignment(ctx, req.GetSessionId(), req.GetAssignmentId(), req.GetReason(), req.GetChangeReference()); err != nil {
+		return nil, s.toStatus(err)
+	}
+	return &authv1.RevokeRoleAssignmentResponse{}, nil
+}
+
+func (s *service) ListAuthorizationRoles(ctx context.Context, req *authv1.ListAuthorizationRolesRequest) (*authv1.ListAuthorizationRolesResponse, error) {
+	roles, err := s.svc.ListAuthorizationRoles(ctx, req.GetSessionId())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	response := &authv1.ListAuthorizationRolesResponse{Roles: make([]*authv1.AuthorizationRole, 0, len(roles))}
+	for _, role := range roles {
+		response.Roles = append(response.Roles, &authv1.AuthorizationRole{Id: role.ID, Name: role.Name, Description: role.Description, ActivePermissionKeys: role.Permissions})
+	}
+	return response, nil
+}
+
+func (s *service) ListRoleAssignments(ctx context.Context, req *authv1.ListRoleAssignmentsRequest) (*authv1.ListRoleAssignmentsResponse, error) {
+	assignments, err := s.svc.ListRoleAssignments(ctx, req.GetSessionId(), req.GetEmployeeId(), req.GetIncludeHistory())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	response := &authv1.ListRoleAssignmentsResponse{Assignments: make([]*authv1.RoleAssignment, 0, len(assignments))}
+	for _, assignment := range assignments {
+		item := &authv1.RoleAssignment{
+			Id: assignment.ID, EmployeeId: assignment.EmployeeID, RoleId: assignment.RoleID,
+			Reason: assignment.Reason, AssignedAt: timestamppb.New(assignment.AssignedAt),
+			ValidFrom: timestamppb.New(assignment.ValidFrom), AssignedBy: assignment.AssignedBy, Source: assignment.Source,
+		}
+		if assignment.ExpiresAt != nil {
+			item.ExpiresAt = timestamppb.New(*assignment.ExpiresAt)
+		}
+		if assignment.RevokedAt != nil {
+			item.RevokedAt = timestamppb.New(*assignment.RevokedAt)
+		}
+		response.Assignments = append(response.Assignments, item)
+	}
+	return response, nil
+}
+
+func (s *service) ListTenantRoleAssignments(ctx context.Context, req *authv1.ListTenantRoleAssignmentsRequest) (*authv1.ListTenantRoleAssignmentsResponse, error) {
+	assignments, next, err := s.svc.ListTenantRoleAssignments(ctx, req.GetSessionId(), int(req.GetPageSize()), req.GetPageToken())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	response := &authv1.ListTenantRoleAssignmentsResponse{Assignments: make([]*authv1.RoleAssignment, 0, len(assignments)), NextPageToken: next}
+	for _, assignment := range assignments {
+		item := &authv1.RoleAssignment{Id: assignment.ID, EmployeeId: assignment.EmployeeID, RoleId: assignment.RoleID, Reason: assignment.Reason, AssignedAt: timestamppb.New(assignment.AssignedAt), ValidFrom: timestamppb.New(assignment.ValidFrom), AssignedBy: assignment.AssignedBy, Source: assignment.Source}
+		if assignment.ExpiresAt != nil {
+			item.ExpiresAt = timestamppb.New(*assignment.ExpiresAt)
+		}
+		if assignment.RevokedAt != nil {
+			item.RevokedAt = timestamppb.New(*assignment.RevokedAt)
+		}
+		response.Assignments = append(response.Assignments, item)
+	}
+	return response, nil
+}
+
+func (s *service) ListAuthorizationAdminEvents(ctx context.Context, req *authv1.ListAuthorizationAdminEventsRequest) (*authv1.ListAuthorizationAdminEventsResponse, error) {
+	events, next, err := s.svc.ListAuthorizationAdminEvents(ctx, req.GetSessionId(), int(req.GetPageSize()), req.GetPageToken())
+	if err != nil {
+		return nil, s.toStatus(err)
+	}
+	response := &authv1.ListAuthorizationAdminEventsResponse{Events: make([]*authv1.AuthorizationAdminEvent, 0, len(events)), NextPageToken: next}
+	for _, event := range events {
+		response.Events = append(response.Events, &authv1.AuthorizationAdminEvent{Id: event.ID, Action: event.Action, SubjectId: event.SubjectID, RoleId: event.RoleID, ActorEmployeeId: event.ActorEmployeeID, ActorDatabaseUser: event.ActorDatabaseUser, ChangeReference: event.ChangeReference, Reason: event.Reason, OccurredAt: timestamppb.New(event.OccurredAt)})
+	}
+	return response, nil
 }
 
 func (s *service) toProtoEmployee(e *domain.Employee) *authv1.Employee {
@@ -175,6 +319,10 @@ func (s *service) toStatus(err error) error {
 		return status.Error(codes.FailedPrecondition, domain.Message(err))
 	case domain.KindUnauthenticated:
 		return status.Error(codes.Unauthenticated, domain.Message(err))
+	case domain.KindForbidden:
+		return status.Error(codes.PermissionDenied, domain.Message(err))
+	case domain.KindConflict:
+		return status.Error(codes.AlreadyExists, domain.Message(err))
 	default:
 		s.logger.Error("auth grpc internal error", "error", err)
 		return status.Error(codes.Internal, domain.Message(err))

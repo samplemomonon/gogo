@@ -8,6 +8,7 @@ import (
 	"time"
 
 	inventory "gogo/internal/modules/inventory"
+	"gogo/internal/modules/inventory/infrastructure"
 	inventorypostgres "gogo/internal/modules/inventory/infrastructure/postgres"
 	"gogo/internal/shared/config"
 )
@@ -19,9 +20,10 @@ func Build(
 	parent context.Context,
 	cfg *config.AppConfig,
 	logger *slog.Logger,
+	security ...inventory.Security,
 ) (*inventory.Module, func(), error) {
 	if cfg.DatabaseURL == "" {
-		return inventory.NewModule(logger), func() {}, nil
+		return inventory.NewModuleWithDeps(infrastructure.NewStockRepository(), nil, logger, security...), func() {}, nil
 	}
 
 	ctx, cancel := context.WithTimeout(parent, cfg.DBPingTimeout+10*time.Second)
@@ -38,5 +40,5 @@ func Build(
 
 	repo := inventorypostgres.NewStockRepository(pool)
 	logger.Info("inventory backed by postgres")
-	return inventory.NewModuleWithDeps(repo, repo.Ping, logger), func() { pool.Close() }, nil
+	return inventory.NewModuleWithDeps(repo, repo.Ping, logger, security...), func() { pool.Close() }, nil
 }

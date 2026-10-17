@@ -1,0 +1,159 @@
+/* Generated from design-system/tokens/tokens.json. Do not edit by hand. */
+:root,
+:root[data-theme="gogo"] {
+  --ds-color-neutral-0: oklch(99.5% 0.002 280);
+  --ds-color-neutral-50: oklch(96.8% 0.005 280);
+  --ds-color-neutral-100: oklch(91.5% 0.01 280);
+  --ds-color-neutral-200: oklch(84% 0.012 280);
+  --ds-color-neutral-300: oklch(75% 0.014 280);
+  --ds-color-neutral-400: oklch(65% 0.016 280);
+  --ds-color-neutral-500: oklch(55% 0.017 280);
+  --ds-color-neutral-600: oklch(45% 0.018 280);
+  --ds-color-neutral-700: oklch(35% 0.019 280);
+  --ds-color-neutral-800: oklch(27% 0.02 280);
+  --ds-color-neutral-900: oklch(21% 0.02 280);
+  --ds-color-brand-primary: oklch(51% 0.22 283);
+  --ds-color-brand-secondary: oklch(48% 0.115 196);
+  --ds-color-brand-accent: oklch(58% 0.17 42);
+  --ds-color-canvas: oklch(96.8% 0.005 280);
+  --ds-color-surface: oklch(99.5% 0.002 280);
+  --ds-color-surface-raised: oklch(99.5% 0.002 280);
+  --ds-color-text: oklch(21% 0.02 280);
+  --ds-color-text-muted: oklch(47% 0.015 280);
+  --ds-color-border: oklch(91.5% 0.01 280);
+  --ds-color-action-primary: oklch(51% 0.22 283);
+  --ds-color-action-primary-content: oklch(98% 0.012 283);
+  --ds-color-brand-secondary: oklch(48% 0.115 196);
+  --ds-color-brand-secondary-content: oklch(98% 0.01 196);
+  --ds-color-brand-accent: oklch(58% 0.17 42);
+  --ds-color-brand-accent-content: oklch(98% 0.012 42);
+  --ds-color-neutral: oklch(25% 0.02 280);
+  --ds-color-neutral-content: oklch(97% 0.005 280);
+  --ds-color-info: oklch(52% 0.16 244);
+  --ds-color-info-content: oklch(98% 0.01 244);
+  --ds-color-success: oklch(52% 0.14 155);
+  --ds-color-success-content: oklch(98% 0.01 155);
+  --ds-color-warning: oklch(54% 0.14 70);
+  --ds-color-warning-content: oklch(98% 0.012 70);
+  --ds-color-critical: oklch(53% 0.21 26);
+  --ds-color-critical-content: oklch(98% 0.01 26);
+  --ds-content-max: 80rem;
+  --ds-reading-max: 65ch;
+  --ds-page-gutter-min: 16px;
+  --ds-page-gutter-max: 32px;
+  --ds-page-gutter: clamp(var(--ds-page-gutter-min), 4vw, var(--ds-page-gutter-max));
+  --ds-target-min: 44px;
+  --ds-breakpoint-compact: 40rem;
+  --ds-breakpoint-expanded: 48rem;
+  --ds-breakpoint-wide: 80rem;
+  --ds-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ds-type-family-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --ds-type-family-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ds-type-weight-regular: 400;
+  --ds-type-weight-medium: 500;
+  --ds-type-weight-semibold: 600;
+  --ds-type-weight-bold: 700;
+  --ds-type-leading-body: 1.5;
+  --ds-type-leading-heading: 1.2;
+  --ds-component-control-height-compact: 32px;
+  --ds-component-control-height-default: 40px;
+  --ds-component-control-height-comfortable: 44px;
+  --ds-component-control-radius: var(--radius-md);
+  --ds-component-card-radius: var(--radius-lg);
+  --ds-component-focus-width: 2px;
+  --ds-component-focus-offset: 2px;
+}
+
+:root[data-theme="gogo-dark"] {
+  --ds-color-canvas: oklch(16% 0.012 280);
+  --ds-color-surface: oklch(21% 0.016 280);
+  --ds-color-surface-raised: oklch(28% 0.022 280);
+  --ds-color-text: oklch(95% 0.008 280);
+  --ds-color-text-muted: oklch(70% 0.012 280);
+  --ds-color-border: oklch(28% 0.022 280);
+  --ds-color-action-primary: oklch(74% 0.17 283);
+  --ds-color-action-primary-content: oklch(16% 0.05 283);
+  --ds-color-brand-secondary: oklch(76% 0.115 196);
+  --ds-color-brand-secondary-content: oklch(16% 0.035 196);
+  --ds-color-brand-accent: oklch(76% 0.15 42);
+  --ds-color-brand-accent-content: oklch(18% 0.05 42);
+  --ds-color-neutral: oklch(28% 0.02 280);
+  --ds-color-neutral-content: oklch(94% 0.008 280);
+  --ds-color-info: oklch(74% 0.14 244);
+  --ds-color-info-content: oklch(18% 0.04 244);
+  --ds-color-success: oklch(76% 0.15 155);
+  --ds-color-success-content: oklch(18% 0.045 155);
+  --ds-color-warning: oklch(80% 0.14 75);
+  --ds-color-warning-content: oklch(20% 0.05 75);
+  --ds-color-critical: oklch(72% 0.18 26);
+  --ds-color-critical-content: oklch(18% 0.05 26);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+  --ds-color-canvas: oklch(16% 0.012 280);
+  --ds-color-surface: oklch(21% 0.016 280);
+  --ds-color-surface-raised: oklch(28% 0.022 280);
+  --ds-color-text: oklch(95% 0.008 280);
+  --ds-color-text-muted: oklch(70% 0.012 280);
+  --ds-color-border: oklch(28% 0.022 280);
+  --ds-color-action-primary: oklch(74% 0.17 283);
+  --ds-color-action-primary-content: oklch(16% 0.05 283);
+  --ds-color-brand-secondary: oklch(76% 0.115 196);
+  --ds-color-brand-secondary-content: oklch(16% 0.035 196);
+  --ds-color-brand-accent: oklch(76% 0.15 42);
+  --ds-color-brand-accent-content: oklch(18% 0.05 42);
+  --ds-color-neutral: oklch(28% 0.02 280);
+  --ds-color-neutral-content: oklch(94% 0.008 280);
+  --ds-color-info: oklch(74% 0.14 244);
+  --ds-color-info-content: oklch(18% 0.04 244);
+  --ds-color-success: oklch(76% 0.15 155);
+  --ds-color-success-content: oklch(18% 0.045 155);
+  --ds-color-warning: oklch(80% 0.14 75);
+  --ds-color-warning-content: oklch(20% 0.05 75);
+  --ds-color-critical: oklch(72% 0.18 26);
+  --ds-color-critical-content: oklch(18% 0.05 26);
+  }
+}
+
+@theme {
+  --spacing-0: 0;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-panel: 0 1px 3px 0 oklch(0% 0 0 / 0.04), 0 1px 2px -1px oklch(0% 0 0 / 0.04);
+  --shadow-raised: 0 4px 6px -1px oklch(0% 0 0 / 0.07), 0 2px 4px -2px oklch(0% 0 0 / 0.05);
+  --shadow-floating: 0 10px 15px -3px oklch(0% 0 0 / 0.08), 0 4px 6px -4px oklch(0% 0 0 / 0.04);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasized: cubic-bezier(0.87, 0, 0.13, 1);
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --leading-body: 1.5;
+  --leading-heading: 1.2;
+  --breakpoint-compact: 40rem;
+  --breakpoint-expanded: 48rem;
+  --breakpoint-wide: 80rem;
+}

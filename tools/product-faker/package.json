@@ -1,0 +1,8 @@
+{
+  "name": "gogo-product-faker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "bun run index.ts"
+  }
+}

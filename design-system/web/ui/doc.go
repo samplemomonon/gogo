@@ -1,16 +1,16 @@
-// Package ui is the design-system boundary: the lowest visual layer of the
-// web surface.
+// Package ui is the reusable web component adapter, consumed by the web app
+// from the repository-root design-system module.
 //
-// Dependency contract (one-way):
+// Dependency contract:
 //
-//	internal/pages/**      ─┐
-//	internal/modules/**    ─┼─▶ web/ui     (this package)
-//	internal/shared/web/** ─┘
+//	apps/web/internal/pages/**       ─┐
+//	apps/web/internal/modules/**     ─┼─▶ gogo.design/system/web/ui
+//	apps/web/internal/shared/web/**  ─┘
 //
-// This package may import only the standard library, github.com/a-h/templ and
-// internal/shared/money. It must never import pages, modules, shell, pagekit,
-// render or any domain package, so a primitive can be composed by any surface
-// without coupling that surface to another.
+// This standalone module may import only the standard library and
+// github.com/a-h/templ. Its location outside apps/web/internal makes that
+// dependency boundary structural: components cannot reach into private web
+// application packages.
 //
 // The class constants in classes.go are the single source of truth for the
 // daisyUI/Tailwind strings that were previously copy-pasted across views. When
@@ -38,6 +38,7 @@
 //   - A container whose caller may need its own id / hx-* attributes takes
 //     attrs templ.Attributes after its other parameters.
 //
-// The boundary above is enforced by the "ui primitives depend on no app code"
-// test in internal/architecture.
+// Cross-platform tokens and governance live beside this package in the root
+// design-system. This package owns web markup and behavior; native clients map
+// the same semantic tokens to native components.
 package ui

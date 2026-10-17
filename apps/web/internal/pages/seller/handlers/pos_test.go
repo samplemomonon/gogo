@@ -71,8 +71,8 @@ func TestCheckoutForwardsTheBasketAtCataloguePrices(t *testing.T) {
 	if *item != want {
 		t.Errorf("basket line = %+v, want %+v", *item, want)
 	}
-	if got.discount != 0 || got.paid != 50000 || got.method != "Tunai" || got.cashier != "Budi" || got.employeeID != "" {
-		t.Errorf("payment fields = %+v, want discount 0, paid 50000, Tunai/Budi and no employee", got)
+	if got.discount != 0 || got.paid != 50000 || got.method != "Tunai" || got.cashier != "Budi" || got.employeeID != "employee-1" {
+		t.Errorf("payment fields = %+v, want discount 0, paid 50000, Tunai/Budi and validated employee id", got)
 	}
 
 	if inventory.adjustCalls != 0 {
@@ -205,15 +205,18 @@ func TestCheckoutFailureReRendersTheTillAt200(t *testing.T) {
 	}
 }
 
-// TestTransactionVoidForwardsTheActorAndReason pins that a void is attributable:
-// the id comes from the path, and the actor and reason the form carries travel to
-// the sales module so the voided sale can be audited.
-func TestTransactionVoidForwardsTheActorAndReason(t *testing.T) {
+// TestTransactionVoidAttributesTheSessionEmployee pins that a void is
+// attributable: the id comes from the path, and the actor comes from the
+// validated session — never from the form, which a browser can forge. The form's
+// reason still travels to the sales module so the voided sale can be audited.
+func TestTransactionVoidAttributesTheSessionEmployee(t *testing.T) {
 	t.Parallel()
 
 	router, _, _, sales := newConsole(t)
 
-	rec := do(t, router, postReq("/seller/transaksi/77/void", "voidedBy=Siti&reason=salah+input"))
+	// voidedBy is planted in the form to prove the handler ignores it in favour
+	// of the session's employee.
+	rec := do(t, router, postReq("/seller/transaksi/77/void", "voidedBy=forged&reason=salah+input"))
 
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("void status = %d, want 303", rec.Code)
@@ -222,8 +225,8 @@ func TestTransactionVoidForwardsTheActorAndReason(t *testing.T) {
 		t.Errorf("Location = %q, want /seller/transaksi", got)
 	}
 	got := sales.lastVoid
-	if got.id != "77" || got.by != "Siti" || got.reason != "salah input" {
-		t.Errorf("void call = %+v, want 77/Siti/salah input", got)
+	if got.id != "77" || got.by != "employee-1" || got.reason != "salah input" {
+		t.Errorf("void call = %+v, want 77/employee-1/salah input", got)
 	}
 }
 

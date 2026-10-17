@@ -19,6 +19,7 @@ import (
 	"gogo/internal/modules/sales/application/ports"
 	"gogo/internal/modules/sales/domain"
 	"gogo/internal/modules/sales/infrastructure"
+	"gogo/internal/shared/authconsumer"
 	"gogo/internal/shared/grpcx"
 	"gogo/internal/shared/module"
 )
@@ -43,8 +44,18 @@ func (noopStock) Adjust(context.Context, domain.Tenant, string, int, string, str
 	return nil
 }
 
+// allowAllAuthorizer stands in for the auth service's PDP. The wire tests are
+// about the module's contract, not the deny-by-default edge (which the adapter
+// tests pin), so they wire the same permissive shape compose.Build receives in
+// production.
+type allowAllAuthorizer struct{}
+
+func (allowAllAuthorizer) Authorize(context.Context, string, string) (authconsumer.Principal, bool, error) {
+	return authconsumer.Principal{EmployeeID: "employee-1", Name: "Kasir"}, true, nil
+}
+
 func newModule(ping func(context.Context) error) *sales.Module {
-	return sales.NewModule(infrastructure.NewStore(), noopStock{}, ping, discardLogger())
+	return sales.NewModule(infrastructure.NewStore(), noopStock{}, ping, discardLogger(), allowAllAuthorizer{})
 }
 
 // TestManifest pins the module's federated contract: the identity the registry

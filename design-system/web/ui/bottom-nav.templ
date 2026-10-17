@@ -30,10 +30,10 @@ type BottomNavOptions struct {
 templ BottomNav(spec BottomNavOptions) {
 	if len(spec.Items) > 0 {
 		<nav
-			class="fixed inset-x-0 bottom-0 z-40 border-t border-base-300/60 bg-base-100 md:hidden pb-[env(safe-area-inset-bottom)]"
+			class="fixed inset-x-0 bottom-0 z-40 border-t border-base-300/60 bg-base-100 md:hidden pb-[var(--ds-safe-bottom)]"
 			aria-label="Navigasi bawah"
 		>
-			<ul class="mx-auto flex max-w-md items-stretch justify-around px-2">
+			<ul class="ds-container mx-auto flex max-w-md items-stretch justify-around px-2">
 				for _, item := range spec.Items {
 					@bottomNavTab(item, spec.Path)
 				}
@@ -47,7 +47,7 @@ templ bottomNavTab(item BottomNavItem, path string) {
 		if IsActiveNav(item.Href, path) {
 			<a
 				href={ templ.URL(item.Href) }
-				class="flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-primary"
+				class="ds-touch-target flex flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-primary"
 				aria-current="page"
 			>
 				@bottomNavTabContent(item)
@@ -55,7 +55,7 @@ templ bottomNavTab(item BottomNavItem, path string) {
 		} else {
 			<a
 				href={ templ.URL(item.Href) }
-				class="flex min-h-14 flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-base-content/60 hover:text-base-content transition-colors"
+				class="ds-touch-target flex flex-col items-center justify-center gap-0.5 py-1.5 text-xs font-medium text-base-content/60 hover:text-base-content transition-colors"
 			>
 				@bottomNavTabContent(item)
 			</a>

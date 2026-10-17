@@ -5,8 +5,13 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"reflect"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 
 	"gogo/internal/shared/kernel"
 )
@@ -58,22 +63,38 @@ func NewInMemoryLogger() *InMemoryLogger {
 
 // Log records an audit entry.
 func (l *InMemoryLogger) Log(ctx context.Context, log *AuditLog) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if log == nil {
+		return errors.New("audit log is nil")
+	}
+	entry, err := prepareAuditLog(log)
+	if err != nil {
+		return fmt.Errorf("prepare audit log: %w", err)
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if log.ID == "" {
-		log.ID = generateID()
+	if entry.ID == "" {
+		entry.ID = uuid.NewString()
 	}
-	if log.Timestamp.IsZero() {
-		log.Timestamp = time.Now()
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now().UTC()
 	}
 
-	l.logs = append(l.logs, log)
+	l.logs = append(l.logs, entry)
 	return nil
 }
 
 // Query retrieves audit logs matching the filter.
 func (l *InMemoryLogger) Query(ctx context.Context, filter *Filter) ([]*AuditLog, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if filter == nil {
+		filter = &Filter{}
+	}
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -83,13 +104,48 @@ func (l *InMemoryLogger) Query(ctx context.Context, filter *Filter) ([]*AuditLog
 		if !matchesFilter(log, filter) {
 			continue
 		}
-		result = append(result, log)
+		entry, err := cloneAuditLog(log)
+		if err != nil {
+			return nil, fmt.Errorf("clone audit result: %w", err)
+		}
+		result = append(result, entry)
 		if filter.Limit > 0 && len(result) >= filter.Limit {
 			break
 		}
 	}
 
 	return result, nil
+}
+
+func cloneAuditLog(log *AuditLog) (*AuditLog, error) {
+	copy := *log
+	if log.Changes != nil {
+		encoded, err := json.Marshal(log.Changes)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(encoded, &copy.Changes); err != nil {
+			return nil, err
+		}
+	}
+	return &copy, nil
+}
+
+func prepareAuditLog(log *AuditLog) (*AuditLog, error) {
+	if log == nil {
+		return nil, errors.New("audit log is nil")
+	}
+	entry, err := cloneAuditLog(log)
+	if err != nil {
+		return nil, err
+	}
+	if entry.ID == "" {
+		entry.ID = uuid.NewString()
+	}
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now().UTC()
+	}
+	return entry, nil
 }
 
 func matchesFilter(log *AuditLog, filter *Filter) bool {
@@ -126,6 +182,9 @@ func NewMiddleware(logger Logger) *Middleware {
 
 // Wrap wraps an operation with audit logging.
 func (m *Middleware) Wrap(ctx context.Context, action string, entityType string, entityID string, fn func() error) error {
+	if m == nil || m.logger == nil {
+		return errors.New("audit logger is not configured")
+	}
 	userID := extractUserID(ctx)
 
 	log := &AuditLog{
@@ -142,20 +201,26 @@ func (m *Middleware) Wrap(ctx context.Context, action string, entityType string,
 		log.ErrorMessage = err.Error()
 	}
 
-	_ = m.logger.Log(ctx, log)
-	return err
+	return errors.Join(err, m.logger.Log(ctx, log))
 }
 
 // WrapWithChanges wraps an operation and records changes.
 func (m *Middleware) WrapWithChanges(ctx context.Context, action string, entityType string, entityID string, before, after interface{}, fn func() error) error {
+	if m == nil || m.logger == nil {
+		return errors.New("audit logger is not configured")
+	}
 	userID := extractUserID(ctx)
+	changes, changeErr := computeChanges(before, after)
+	if changeErr != nil {
+		return changeErr
+	}
 
 	log := &AuditLog{
 		UserID:     userID,
 		Action:     action,
 		EntityType: entityType,
 		EntityID:   entityID,
-		Changes:    computeChanges(before, after),
+		Changes:    changes,
 		Status:     "success",
 	}
 
@@ -165,31 +230,44 @@ func (m *Middleware) WrapWithChanges(ctx context.Context, action string, entityT
 		log.ErrorMessage = err.Error()
 	}
 
-	_ = m.logger.Log(ctx, log)
-	return err
+	return errors.Join(err, m.logger.Log(ctx, log))
 }
 
-func computeChanges(before, after interface{}) map[string]interface{} {
-	// Simple implementation - in production use a proper diff library
-	beforeJSON, _ := json.Marshal(before)
-	afterJSON, _ := json.Marshal(after)
+func computeChanges(before, after interface{}) (map[string]interface{}, error) {
+	beforeJSON, err := json.Marshal(before)
+	if err != nil {
+		return nil, fmt.Errorf("marshal before audit value: %w", err)
+	}
+	afterJSON, err := json.Marshal(after)
+	if err != nil {
+		return nil, fmt.Errorf("marshal after audit value: %w", err)
+	}
 
 	var beforeMap, afterMap map[string]interface{}
-	json.Unmarshal(beforeJSON, &beforeMap)
-	json.Unmarshal(afterJSON, &afterMap)
+	if err := json.Unmarshal(beforeJSON, &beforeMap); err != nil {
+		return nil, fmt.Errorf("decode before audit value: %w", err)
+	}
+	if err := json.Unmarshal(afterJSON, &afterMap); err != nil {
+		return nil, fmt.Errorf("decode after audit value: %w", err)
+	}
 
 	changes := make(map[string]interface{})
 	for key, afterVal := range afterMap {
 		beforeVal, exists := beforeMap[key]
-		if !exists || beforeVal != afterVal {
+		if !exists || !reflect.DeepEqual(beforeVal, afterVal) {
 			changes[key] = map[string]interface{}{
 				"from": beforeVal,
 				"to":   afterVal,
 			}
 		}
 	}
+	for key, beforeVal := range beforeMap {
+		if _, exists := afterMap[key]; !exists {
+			changes[key] = map[string]interface{}{"from": beforeVal, "to": nil}
+		}
+	}
 
-	return changes
+	return changes, nil
 }
 
 func extractUserID(ctx context.Context) string {
@@ -200,10 +278,6 @@ func extractUserID(ctx context.Context) string {
 		}
 	}
 	return "system"
-}
-
-func generateID() string {
-	return time.Now().Format("20060102150405.000000")
 }
 
 // EventBusLogger publishes audit logs as events.
@@ -222,12 +296,22 @@ func NewEventBusLogger(eventBus kernel.EventBus, fallback Logger) *EventBusLogge
 
 // Log publishes an audit event.
 func (l *EventBusLogger) Log(ctx context.Context, log *AuditLog) error {
+	if l == nil || l.eventBus == nil {
+		return errors.New("audit event bus is not configured")
+	}
+	if log == nil {
+		return errors.New("audit log is nil")
+	}
+	entry, err := prepareAuditLog(log)
+	if err != nil {
+		return fmt.Errorf("prepare audit log: %w", err)
+	}
 	// Publish to event bus for real-time processing
-	l.eventBus.Publish(ctx, kernel.NewBaseEvent("audit.logged", log))
+	l.eventBus.Publish(ctx, kernel.NewBaseEvent("audit.logged", entry))
 
 	// Also store in fallback for querying
 	if l.fallback != nil {
-		return l.fallback.Log(ctx, log)
+		return l.fallback.Log(ctx, entry)
 	}
 
 	return nil

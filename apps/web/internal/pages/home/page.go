@@ -47,9 +47,12 @@ type Page struct {
 // here, which is deliberately out of scope: a 30s lag on a storefront grid does not
 // justify a Kafka dependency in the gateway.
 func New(listing ports.Listing, logger *slog.Logger) *Page {
+	// One composer per page: every island of the page (the listing and each
+	// product's detail region) shares one page-scoped cache.
+	composer := pagekit.NewComposer()
 	return &Page{
-		handler: homelist.NewHandler(listing, pagekit.NewComposer(), logger),
-		detail:  homedetail.NewHandler(listing, logger),
+		handler: homelist.NewHandler(listing, composer, logger),
+		detail:  homedetail.NewHandler(listing, composer, logger),
 	}
 }
 

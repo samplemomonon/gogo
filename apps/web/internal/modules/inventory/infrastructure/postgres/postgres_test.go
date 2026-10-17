@@ -169,7 +169,7 @@ func TestAdjustStockValidatesBeforeTouchingTheDatabase(t *testing.T) {
 	repo := inventorypostgres.NewStockRepository(unreachablePool(t))
 	ctx := testContext(t)
 
-	stock, movement, err := repo.AdjustStock(ctx, "", "p-1", 1, "receive", "", "tester", "")
+	stock, movement, err := repo.AdjustStock(ctx, "", "p-1", 1, "receive", "", "tester", "", "")
 	if !errors.Is(err, domain.ErrInvalidTenant) {
 		t.Errorf("missing tenant = %v, want ErrInvalidTenant", err)
 	}
@@ -180,7 +180,7 @@ func TestAdjustStockValidatesBeforeTouchingTheDatabase(t *testing.T) {
 		t.Error("a rejected adjustment returned a stock or movement")
 	}
 
-	stock, movement, err = repo.AdjustStock(ctx, "acme", "  ", 1, "receive", "", "tester", "")
+	stock, movement, err = repo.AdjustStock(ctx, "acme", "  ", 1, "receive", "", "tester", "", "")
 	if !errors.Is(err, domain.ErrInvalidProductID) {
 		t.Errorf("missing product = %v, want ErrInvalidProductID", err)
 	}
@@ -198,7 +198,7 @@ func TestAdjustStockFailsCleanlyOnAnUnreachablePool(t *testing.T) {
 
 	repo := inventorypostgres.NewStockRepository(unreachablePool(t))
 
-	stock, movement, err := repo.AdjustStock(testContext(t), "acme", "p-1", 1, "receive", "note", "tester", "ref-1")
+	stock, movement, err := repo.AdjustStock(testContext(t), "acme", "p-1", 1, "receive", "note", "tester", "", "ref-1")
 
 	if err == nil {
 		t.Fatal("AdjustStock succeeded against an unreachable pool")

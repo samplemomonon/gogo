@@ -23,6 +23,17 @@ does not combine modules into one deployable application. Each service keeps
 its own `go.mod` and can be built on its own. See
 [`docs/MONOREPO_STRUCTURE.md`](docs/MONOREPO_STRUCTURE.md) for the directory map
 and the rule for deciding when a service needs a separate repository.
+The platform-owned, cross-client tokens and UI primitives live in
+[`design-system/`](design-system/README.md); web-specific integration remains
+under `apps/web/internal/shared/web`.
+Platform-wide editorial pages use the read-only Builder.io contract in
+[`docs/CMS_CONTENT_MODEL.md`](docs/CMS_CONTENT_MODEL.md). Customer terms and
+privacy are a separate, publication-gated Rspress SSG in [`docs/site/`](docs/site/README.md).
+The measured performance baseline is intentionally pending a representative
+staging workload; see [`docs/PERFORMANCE_BASELINE.md`](docs/PERFORMANCE_BASELINE.md).
+The ISO/IEC 27001:2022 engineering control gaps are tracked in
+[`docs/ISO27001_CONTROL_BASELINE.md`](docs/ISO27001_CONTROL_BASELINE.md); this
+register is not a certification claim.
 
 From the repository root, use `make build`, `make check`, and `make up` to work
 across the gateway and services. For a service-specific command, change into
@@ -37,15 +48,15 @@ that service directory first.
 - ✅ **Home storefront** as a page at `/`: a read-only product grid that **reads through the platform's contracts** (browse for the grid, search when `?q=` is 3+ characters) and renders it with its own views. A browse outage returns **503**; a search outage returns a working storefront with search off — the breakers are per-upstream, not global
 - ✅ Storefront product detail at `/catalog/{id}`: server-rendered product description, brand, price and stock from the listing projection; missing products return 404 and an unavailable catalog returns 503
 - ✅ **Seller console** as a page at `/seller`: product and category management against the platform, a stock ledger with full-form mutations, **point-of-sale** (`/seller/kasir`) and **sales history with void** (`/seller/transaksi`) — it never imports module runtime code, it consumes the **product platform contracts** plus **`inventory.v1`** and **`sales.v1`**. A dedicated **inventory module** owns stock and the atomic, idempotent adjustment ledger
-- 📡 **Product change feed**: `productevents` consumes the platform's Kafka topic `product.events.v1` and republishes it as `product.changed.*` on the in-process bus, so a product changed in *another* deployment still drops this one's island caches. Optional (`KAFKA_BROKERS`); without it the gateway serves on cache TTLs alone — correct, just staler
-- ✅ **Islands rendering engine**: component-level rendering strategy — SSG/ISR/SSR/CSR per island, contract-driven planner, revalidation TTL cache, page composer — see below
+- 📡 **Product change feed**: `productevents` consumes the platform's Kafka topic `product.events.v1` and republishes it as `product.changed.*` on the in-process bus, so a product changed in *another* deployment still reaches this process's subscribers (the billing activity feed). Optional (`KAFKA_BROKERS`); island caches are TTL-bounded in this build, so without it change-driven activity lags — correct, just staler
+- ✅ **Islands rendering engine**: component-level rendering strategy — SSG/ISR/SSR/CSR per island, contract-driven planner, revalidation TTL cache, page composer, whole-document **streaming** with per-island **Load/Timeout/Fallback** fault tolerance, per-island `Server-Timing` + expvar metrics, and **field web-vitals** collected at `POST /rum` — see below
 - ✅ Embedded static assets (`go:embed`) — no runtime filesystem dependency for CSS/JS
 - ✅ Structured request logging, request IDs, panic recovery, compression and per-request timeouts
 - ✅ Graceful shutdown orchestrates module lifecycle (reverse-order `Stop`) in addition to HTTP draining
 - ✅ Startup configuration validation (`config.Validate()`) fails fast on invalid ports, timeouts or identity
 - ✅ In-memory, concurrency-safe repository + bounded LRU TTL cache behind swappable ports
 - ✅ Paged product listing end to end, threaded from the platform's browse contract through `productconsumer` into the home page's read model; short queries (< 3 chars) fall through to browse rather than a pointless search round trip
-- ✅ Crawlable paginated storefront (`/?page=N`) with server-rendered prev/next + numbered nav — one ISR cache entry per page, cleared together by prefix invalidation on `product.changed.*`
+- ✅ Crawlable paginated storefront (`/?page=N`) with server-rendered prev/next + numbered nav — one ISR cache entry per page, TTL-bounded (30s); the storefront does not consume the product event stream (the write side is another process — see `internal/pages/home/page.go`)
 - ✅ Storefront search (`/?q=term`, 3+ characters) served by `product-search-service`, with the term preserved across pages. One breaker per upstream, so search failing does not take the browse grid down with it
 - ✅ `cmd/modulegen` scaffolds a new contract-compliant module in seconds (`make module name=billing desc="…"`)
 - ✅ Unit, package and end-to-end tests (run with `-race`)
@@ -63,6 +74,7 @@ Each surface renders its own pages from its own read model.
 | -------- | ----------------------------- | -------- | ------ | -------------------------------------------------- |
 | `GET`    | `/`                           | home     | public | Storefront product grid (ISR island; paginated via `/?page=N`, searchable via `/?q=term` with 3+ characters). Browse and search have **separate breakers**: a browse outage returns 503, a search outage returns a working storefront with search off |
 | `GET`    | `/catalog/{id}`               | home     | public | Product detail page (SSR from `productlisting.v1`; 404 for missing products, 503 when the catalog is unavailable) |
+| `GET`    | `/pages/{slug}`               | editorial | public | Published CMS page, rendered server-side from the allowlisted editorial block contract; 404 when Builder.io is disabled or the slug is absent |
 | `GET`    | `/login`                      | auth     | public | Sign-in form (consumes `auth.v1` Login; writes the session cookie) |
 | `POST`   | `/login`                      | auth     | public | Verify credentials and set the session cookie (Post/Redirect/Get) |
 | `POST`   | `/logout`                     | auth     | public | Clear the session cookie and return to the signed-out view |
@@ -89,6 +101,7 @@ Each surface renders its own pages from its own read model.
 | `GET`    | `/module-registry`            | gateway  | ops    | Federated module manifests (JSON, or HTML for browsers) |
 | `GET`    | `/metrics`                    | gateway  | ops    | Prometheus-text counters (requests by method/status/route, in-flight, durations, uptime) |
 | `GET`    | `/debug/vars`                 | gateway  | ops    | Same counters as JSON via `expvar` (`gogo_http`)       |
+| `POST`   | `/rum`                        | gateway  | ops    | Web-vitals beacon receiver (no auth; bounded aggregates under `gogo_rum_web_vitals`, surfaced at `/metrics`) |
 
 The `/seller*` routes return HTML; every machine call travels over a gRPC wire
 contract, never over HTTP — `product.v1`, `category.v1`, `inventory.v1` and
@@ -447,6 +460,27 @@ Rendering Planner  ──►  Rendering Decision (SSG | ISR | SSR | CSR)
   revalidated HTML. `RenderComponent` serves single-island fragments; mutations
   invalidate affected islands via the module event bus.
 
+- **Streaming (full documents only)** — a page may opt in (`…WithStreaming()`);
+  the shell renders first and each island is flushed as it completes. HTMX
+  fragment responses are always buffered so a swap stays atomic. The status
+  line and `Trailer: Server-Timing` are declared before the first flush —
+  after it, an island error can only truncate the document, which is why
+  fallible islands are expected to degrade via `Fallback`, not fail.
+
+- **Fault tolerance per island** — `Component.Load` (server-side fetch, never
+  run on a cache hit), `Component.Timeout` (streamed islands default to 3 s),
+  and `Component.Fallback` (rendered when Load or the render fails; the
+  substitution is still counted under its failure cause *and* as a fallback).
+  An island without a fallback fails the render: buffered responses return a
+  clean error before any bytes are written, a streamed one is truncated.
+
+- **Per-island measurement** — every island is wrapped in a `ds-island`
+  marker and reports `Server-Timing` (`island-<family>;dur=…`), aggregated in
+  the expvar `gogo_render_islands` (renders, fallbacks, timeouts, durations).
+  Real-browser LCP/INP/CLS/FCP/TTFB arrive at `POST /rum` from the vendored
+  [web-vitals](https://github.com/GoogleChrome/web-vitals) attribution build,
+  attributed to the owning island and aggregated in `gogo_rum_web_vitals`.
+
 - **Cached HTMX fragment fast path** — a page's list handler (the shared
   `pagekit` `PagedListPage`/`ListPage`) answers an HTMX fragment request
   straight from the island cache when it is warm, with **no data fetch on the
@@ -473,7 +507,8 @@ for product events. Mapping to what this repo still serves:
 
 | Island                          | Page          | Strategy | Invalidation                                  |
 | ------------------------------- | ------------- | -------- | --------------------------------------------- |
-| `home.product-grid`             | `/` (`/?page=N`) | ISR 30s | every product change — **the home page owns this island**; it is paginated (one cache entry per page) and invalidated by prefix via its own `product.changed.*` subscription |
+| `home.product-grid`             | `/` (`/?page=N`) | ISR 30s | TTL expiry only — the page does not consume the product event stream; the write side is another process (`internal/pages/home/page.go`) |
+| `home.product-detail`           | `/catalog/{id}` | ISR 30s | TTL expiry only (same page-owned TTL bound, one entry per product id) |
 | `billing.activity`              | `/billing`    | SSR     | — (always fresh; fed by the same `product.changed.*` events) |
 
 The product-detail islands (`detail.{id}.product-info`, `.price`, `.stock`)
@@ -750,6 +785,7 @@ Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (
 | `make services-test` | Race-enabled tests for the four platform services, including their architecture tests |
 | `make templ`   | Regenerate `*_templ.go` from `.templ` sources      |
 | `make css`     | Compile the Tailwind stylesheet                    |
+| `make faker-products` | Seed development categories and products through the platform APIs |
 | `make module`  | Scaffold a module: `make module name=billing desc="…"` |
 | `make tidy`    | `go mod tidy`                                      |
 | `make docker-build` | Build the production image (multi-stage, non-root) |

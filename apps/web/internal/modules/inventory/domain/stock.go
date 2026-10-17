@@ -36,16 +36,17 @@ type Stock struct {
 
 // Movement is one append-only ledger entry.
 type Movement struct {
-	ID        string
-	ProductID string
-	Kind      string
-	Delta     int
-	Before    int
-	After     int
-	Note      string
-	Actor     string
-	Reference string
-	CreatedAt time.Time
+	ID           string
+	ProductID    string
+	Kind         string
+	Delta        int
+	Before       int
+	After        int
+	Note         string
+	Actor        string
+	ServiceActor string
+	Reference    string
+	CreatedAt    time.Time
 }
 
 // NewAdjustment validates an adjustment request before it reaches persistence.
@@ -57,6 +58,17 @@ func NewAdjustment(tenant Tenant, productID string, kind, actor, reference strin
 		return ErrInvalidProductID
 	}
 	return nil
+}
+
+// AdjustedQuantity applies the stock invariant to a proposed change. Adapters
+// with concurrent writers must enforce the equivalent predicate atomically in
+// storage as well (Postgres uses a conditional UPDATE under the row lock).
+func AdjustedQuantity(current, delta int) (int, error) {
+	after := current + delta
+	if after < 0 {
+		return current, ErrInsufficientStock
+	}
+	return after, nil
 }
 
 // Classify maps an inventory error to a coarse kind the presentation adapters

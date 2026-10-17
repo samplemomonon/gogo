@@ -9,7 +9,7 @@
 >
 > Where an item below is *undecided*, any behaviour in the code that appears to enforce an answer is an artefact of the undecided state, and is recorded as such rather than presented as an invariant.
 
-Three items were open. All three are now closed — see
+The original three items were open. All three are now closed — see
 `docs/ADR_AGGREGATOR_BOUNDARIES.md`. Their original text is kept below, unchanged,
 because what the register looked like *while* they were open is the useful part:
 it shows which code was enforcing an undecided answer, and where.
@@ -19,6 +19,8 @@ it shows which code was enforcing an undecided answer, and where.
 | **OD-1** | Fail-closed allowlist and `forbidigo` as the enforcement mechanism | project owner | nothing — it is a strengthening | not started |
 | **OD-2** | May the aggregator hold a cache or read model? | project owner | the scope of the aggregator's architecture rule | **test currently permits it — unratified** |
 | **OD-3** | Must `type Mutation` be part of the permanent aggregator contract? | product / API contract owner | closing the schema TODO in the aggregator's architecture test | **test currently requires it — temporary, marked** |
+| **OD-4** | Should seller permissions be fixed per built-in role or managed dynamically? | project owner | no longer blocks the model | **closed: multiple tenant-scoped role assignments; permissions are managed metadata** |
+| **OD-5** | How is the first tenant policy administrator provisioned? | deployment/security owner | safe role and permission administration | **no bootstrap authority or ceremony is configured** |
 
 ---
 
@@ -120,6 +122,49 @@ Which of those is true is a question about the product and the API contract, not
 | 1 | The `Mutation` root must exist | Keep the assertion; record why, and which mutations are permanently unavailable |
 | 2 | The `Mutation` root must not exist | Remove the assertion *and* the test that exists only to enforce its presence |
 | 3 | Deferred | Name the decision owner and a review date, so the TODO does not become permanent by being left alone |
+
+---
+
+## OD-4 · Seller role permissions — **Closed by owner 2026-10-16**
+
+**Decision.** Roles are tenant-scoped, dynamically created metadata. A user may
+hold multiple role assignments. Permissions are granted to roles through
+managed metadata; built-in labels such as `admin`, `seller`, and `viewer` have
+no implicit authority. The previous static read/write question is superseded by
+this model. The seller routes already require a valid session and use the
+validated employee identity for attribution; the PDP/PEP and dynamic grant
+management are still to be implemented.
+
+**Security constraint.** Deny by default. Do not ship a temporary static grant
+for one of the legacy role labels. Until dynamic authorization is wired, session
+authentication does not represent authorization coverage; seller write access
+must be restricted at deployment to provisioned operators.
+
+---
+
+## OD-5 · Bootstrap the first policy administrator
+
+**Status: OPEN.** A default-deny authorization system needs one controlled way
+to grant the first permission-management capability. A candidate bootstrap
+procedure exists in code, but no operator identity or production approval path
+has been approved.
+
+**Implementation baseline (2026-10-16; pending owner ratification):** a
+one-time operator CLI using a separate `AUTHZ_DATABASE_URL`, an active employee
+in the target tenant, and an approved change reference. It records PostgreSQL
+`session_user`, and requires a unique operator database login to attribute the
+action to a human. The command and transactional safeguards are implemented;
+they must not be treated as an approved production procedure until the owner
+records the decision here.
+
+**Options:** a one-time operator CLI under deployment access; federation to an
+organization IdP; or an explicitly approved tenant-provisioning workflow. The
+chosen method must identify the operator, target tenant and subject, write
+reviewable evidence, and prevent repeat bootstrap after the authority exists.
+
+**Owner:** deployment/security owner. **Blocks:** production bootstrap and
+operational use of the PAP, plus production authorization rollout. The APIs
+remain deny-by-default and require the unprovisioned PAP permissions.
 
 ---
 

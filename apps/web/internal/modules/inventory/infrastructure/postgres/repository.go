@@ -20,7 +20,7 @@ type StockRepository struct {
 	pool *pgxpool.Pool
 }
 
-var _ ports.StockService = (*StockRepository)(nil)
+var _ ports.StockStore = (*StockRepository)(nil)
 
 func NewStockRepository(pool *pgxpool.Pool) *StockRepository {
 	return &StockRepository{pool: pool}
@@ -83,7 +83,7 @@ func (r *StockRepository) ListStocks(ctx context.Context, tenant domain.Tenant, 
 	return out, nil
 }
 
-func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, reference string) (*domain.Stock, *domain.Movement, error) {
+func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant, productID string, delta int, kind, note, actor, serviceActor, reference string) (*domain.Stock, *domain.Movement, error) {
 	if err := domain.NewAdjustment(tenant, productID, kind, actor, reference); err != nil {
 		return nil, nil, err
 	}
@@ -135,21 +135,22 @@ func (r *StockRepository) AdjustStock(ctx context.Context, tenant domain.Tenant,
 	}
 
 	movement := &domain.Movement{
-		ID:        uuid.NewString(),
-		ProductID: productID,
-		Kind:      kind,
-		Delta:     delta,
-		Before:    after - delta,
-		After:     after,
-		Note:      note,
-		Actor:     actor,
-		Reference: reference,
+		ID:           uuid.NewString(),
+		ProductID:    productID,
+		Kind:         kind,
+		Delta:        delta,
+		Before:       after - delta,
+		After:        after,
+		Note:         note,
+		Actor:        actor,
+		ServiceActor: serviceActor,
+		Reference:    reference,
 	}
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO inventory_movements (id, tenant_id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, reference)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		`INSERT INTO inventory_movements (id, tenant_id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, service_actor, reference)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		movement.ID, string(tenant), movement.ProductID, movement.Kind, movement.Delta,
-		movement.Before, movement.After, movement.Note, movement.Actor, movement.Reference,
+		movement.Before, movement.After, movement.Note, movement.Actor, movement.ServiceActor, movement.Reference,
 	); err != nil {
 		return nil, nil, fmt.Errorf("postgres: record movement: %w", err)
 	}
@@ -165,7 +166,7 @@ func (r *StockRepository) ListMovements(ctx context.Context, tenant domain.Tenan
 	if limit <= 0 {
 		limit = 100
 	}
-	query := `SELECT id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, reference, created_at
+	query := `SELECT id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, service_actor, reference, created_at
 	          FROM inventory_movements WHERE tenant_id = $1`
 	args := []any{string(tenant)}
 	if productID != "" {
@@ -184,7 +185,7 @@ func (r *StockRepository) ListMovements(ctx context.Context, tenant domain.Tenan
 	for rows.Next() {
 		var movement domain.Movement
 		if err := rows.Scan(&movement.ID, &movement.ProductID, &movement.Kind, &movement.Delta,
-			&movement.Before, &movement.After, &movement.Note, &movement.Actor,
+			&movement.Before, &movement.After, &movement.Note, &movement.Actor, &movement.ServiceActor,
 			&movement.Reference, &movement.CreatedAt); err != nil {
 			return nil, fmt.Errorf("postgres: scan movement: %w", err)
 		}
@@ -196,11 +197,11 @@ func (r *StockRepository) ListMovements(ctx context.Context, tenant domain.Tenan
 func findMovementByReference(ctx context.Context, tx pgx.Tx, tenant, reference string) (*domain.Movement, error) {
 	var movement domain.Movement
 	err := tx.QueryRow(ctx,
-		`SELECT id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, reference, created_at
+		`SELECT id, product_id, kind, quantity_delta, quantity_before, quantity_after, note, actor, service_actor, reference, created_at
 		 FROM inventory_movements WHERE tenant_id = $1 AND reference = $2`,
 		tenant, reference,
 	).Scan(&movement.ID, &movement.ProductID, &movement.Kind, &movement.Delta,
-		&movement.Before, &movement.After, &movement.Note, &movement.Actor,
+		&movement.Before, &movement.After, &movement.Note, &movement.Actor, &movement.ServiceActor,
 		&movement.Reference, &movement.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

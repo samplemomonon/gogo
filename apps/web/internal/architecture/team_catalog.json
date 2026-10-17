@@ -1,0 +1,175 @@
+{
+  "apiVersion": "gogo.dev/v1",
+  "kind": "TeamCatalog",
+  "scope": "gateway",
+  "teams": [
+    { "id": "T1", "name": "Catalogue", "type": "stream-aligned" },
+    { "id": "T2", "name": "Merchant Console", "type": "stream-aligned" },
+    { "id": "T3", "name": "Storefront", "type": "stream-aligned" },
+    { "id": "T4", "name": "Identity", "type": "stream-aligned" },
+    { "id": "T5", "name": "Gateway Platform", "type": "platform" }
+  ],
+  "units": [
+    {
+      "path": "apps/web/internal/modules/inventory",
+      "kind": "module",
+      "team": "T2",
+      "tier": "business",
+      "context": "inventory",
+      "complexity": "complicated",
+      "rung": 2
+    },
+    {
+      "path": "apps/web/internal/modules/sales",
+      "kind": "module",
+      "team": "T2",
+      "tier": "business",
+      "context": "sales",
+      "complexity": "complicated",
+      "rung": 2
+    },
+    {
+      "path": "apps/web/internal/pages/seller",
+      "kind": "page",
+      "team": "T2",
+      "tier": "business",
+      "context": "seller",
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/pages/home",
+      "kind": "page",
+      "team": "T3",
+      "tier": "business",
+      "context": "home",
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/modules/auth",
+      "kind": "module",
+      "team": "T4",
+      "tier": "business",
+      "context": "auth",
+      "complexity": "complicated",
+      "rung": 2
+    },
+    {
+      "path": "apps/web/internal/pages/auth",
+      "kind": "page",
+      "team": "T4",
+      "tier": "business",
+      "context": "auth",
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/pages/profile",
+      "kind": "page",
+      "team": "T4",
+      "tier": "business",
+      "context": "profile",
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/modules/billing",
+      "kind": "module",
+      "team": "T5",
+      "tier": "business",
+      "context": "billing",
+      "complexity": "simple",
+      "rung": 1
+    },
+    {
+      "path": "apps/web/internal/modules/ops",
+      "kind": "module",
+      "team": "T5",
+      "tier": "business",
+      "context": "ops",
+      "complexity": "simple",
+      "rung": 1
+    },
+    {
+      "path": "apps/web/internal/pages/contentcms",
+      "kind": "page",
+      "team": "T5",
+      "tier": "business",
+      "context": "contentcms",
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/shared",
+      "kind": "module",
+      "team": "T5",
+      "tier": "foundation",
+      "context": null,
+      "complexity": "complicated",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/internal/bootstrap",
+      "kind": "composition",
+      "team": "T5",
+      "tier": "composition",
+      "context": null,
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "apps/web/cmd",
+      "kind": "composition",
+      "team": "T5",
+      "tier": "foundation",
+      "context": null,
+      "complexity": "simple",
+      "rung": 0
+    },
+    {
+      "path": "design-system/web/ui",
+      "kind": "module",
+      "team": "T5",
+      "tier": "foundation",
+      "context": null,
+      "complexity": "simple",
+      "rung": 0
+    }
+  ],
+  "contracts": [
+    {
+      "id": "inventory.v1/InventoryService",
+      "kind": "grpc",
+      "proto": "contracts/proto/inventory/v1/inventory.proto",
+      "service": "InventoryService",
+      "provider": "apps/web/internal/modules/inventory",
+      "consumers": [
+        "apps/web/internal/modules/sales",
+        "apps/web/internal/pages/seller"
+      ],
+      "breaking": "PACKAGE",
+      "interaction": "x-as-a-service"
+    },
+    {
+      "id": "sales.v1/SalesService",
+      "kind": "grpc",
+      "proto": "contracts/proto/sales/v1/sales.proto",
+      "service": "SalesService",
+      "provider": "apps/web/internal/modules/sales",
+      "consumers": ["apps/web/internal/pages/seller"],
+      "breaking": "PACKAGE",
+      "interaction": "x-as-a-service"
+    },
+    {
+      "id": "auth.v1/AuthService",
+      "kind": "grpc",
+      "proto": "contracts/proto/auth/v1/auth.proto",
+      "service": "AuthService",
+      "provider": "apps/web/internal/modules/auth",
+      "consumers": ["apps/web/internal/shared"],
+      "breaking": "PACKAGE",
+      "interaction": "x-as-a-service"
+    }
+  ]
+}

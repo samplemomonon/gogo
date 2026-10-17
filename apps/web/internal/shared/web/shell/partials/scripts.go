@@ -221,3 +221,71 @@ const HtmxConfigJS = `
   });
 })();
 `
+
+// WebVitalsJS reports the five core web-vitals metrics to the gateway's
+// /rum beacon, attributed to the island the metric belongs to.
+//
+// Attribution is what makes the numbers actionable: "LCP is 4s" names no
+// owner, while "LCP is 4s and the element is inside home.product-grid" names
+// one. LCP and INP carry the responsible element in the vendored attribution
+// build; CLS, FCP and TTFB are page-level and report as "page".
+//
+// The payload carries no cookies, no identifiers and no user agent — just the
+// metric, the island name (from the composer's data-island marker) and the
+// query-stripped path. navigator.sendBeacon is the transport because it
+// survives the page-unload boundary the vitals fire at; fetch(keepalive) is
+// the fallback for the rare browser that refuses the beacon queue.
+const WebVitalsJS = `
+(function () {
+  if (!window.webVitals || !navigator.sendBeacon) {
+    return;
+  }
+
+  function islandOf(element) {
+    if (!element || typeof element.closest !== "function") {
+      return "page";
+    }
+    var island = element.closest("[data-island]");
+    return island ? island.getAttribute("data-island") : "page";
+  }
+
+  function report(metric, island) {
+    var payload = {
+      metric: metric.name,
+      value: metric.value,
+      rating: metric.rating,
+      delta: metric.delta,
+      id: metric.id,
+      navigationType: metric.navigationType,
+      island: island,
+      path: location.pathname
+    };
+    var body = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    var queued = false;
+    try {
+      queued = navigator.sendBeacon("/rum", body);
+    } catch (e) {
+      queued = false;
+    }
+    if (!queued) {
+      fetch("/rum", { method: "POST", body: body, keepalive: true }).catch(function () {});
+    }
+  }
+
+  window.webVitals.onLCP(function (metric) {
+    report(metric, islandOf(metric.attribution && metric.attribution.element));
+  });
+  window.webVitals.onINP(function (metric) {
+    report(metric, islandOf(metric.attribution && metric.attribution.interactionTargetElement));
+  });
+  window.webVitals.onCLS(function (metric) {
+    report(metric, "page");
+  });
+  window.webVitals.onFCP(function (metric) {
+    report(metric, "page");
+  });
+  window.webVitals.onTTFB(function (metric) {
+    report(metric, "page");
+  });
+})();
+`

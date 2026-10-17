@@ -17,7 +17,9 @@ import (
 	"gogo/internal/pages/seller/httperr"
 	"gogo/internal/pages/seller/views/pages"
 	"gogo/internal/pages/seller/views/partials"
+	"gogo/internal/shared/authn"
 	"gogo/internal/shared/web/render"
+	"gogo/internal/shared/web/session"
 )
 
 // Handler serves the seller console's routes.
@@ -25,6 +27,7 @@ type Handler struct {
 	catalog   ports.ProductCatalog
 	inventory ports.Inventory
 	sales     ports.Sales
+	employees ports.EmployeeSessions
 	logger    *slog.Logger
 	created   *createdProductFlashes
 }
@@ -57,10 +60,64 @@ func (h *Handler) listStocks(ctx context.Context, products []*results.Product) (
 	return h.inventory.ListStocks(ctx, ids)
 }
 
-func NewHandler(catalog ports.ProductCatalog, inventory ports.Inventory, sales ports.Sales, logger *slog.Logger) *Handler {
+func NewHandler(catalog ports.ProductCatalog, inventory ports.Inventory, sales ports.Sales, employees ports.EmployeeSessions, logger *slog.Logger) *Handler {
 	return &Handler{
-		catalog: catalog, inventory: inventory, sales: sales, logger: logger,
+		catalog: catalog, inventory: inventory, sales: sales, employees: employees, logger: logger,
 		created: newCreatedProductFlashes(),
+	}
+}
+
+type employeeContextKey struct{}
+
+func employeeFromContext(r *http.Request) *results.Employee {
+	employee, _ := r.Context().Value(employeeContextKey{}).(*results.Employee)
+	return employee
+}
+
+// RequireEmployee protects the seller console with the auth service's session
+// validation. The browser-supplied cookie is only a session reference; identity
+// and actor fields always come from the validated response.
+func (h *Handler) RequireEmployee(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.employees == nil {
+			h.logger.Error("seller employee session resolver is not configured")
+			http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		employee, err := h.employees.Current(r.Context(), session.Read(r))
+		if err != nil {
+			h.logger.Error("seller session validation failed", "error", err)
+			http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if employee == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		ctx := context.WithValue(r.Context(), employeeContextKey{}, employee)
+		ctx = authn.WithSession(ctx, session.Read(r))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// RequirePermission is a route PEP. It asks auth's PDP using the same opaque
+// session cookie as the identity check; an outage fails closed and is distinct
+// from an explicit deny.
+func (h *Handler) RequirePermission(permissionKey string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			allowed, err := h.employees.CheckPermission(r.Context(), session.Read(r), permissionKey)
+			if err != nil {
+				h.logger.Error("seller permission check failed", "permission", permissionKey, "error", err)
+				http.Error(w, "Authorization unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if !allowed {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

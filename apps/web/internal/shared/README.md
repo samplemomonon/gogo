@@ -24,7 +24,6 @@ ketika satu module (misal `catalog`) dihapus:
 | `web/pagekit`    | Page composition helpers: composer, event→invalidate, generic ListPage/PagedListPage |
 | `web/session`    | Cookie session (nama, atribut, read/clear); Secure berasal dari deployment |
 | `web/navigation` | Model nav shell bersama; item page lalu module, plus fakta per-request untuk active state |
-| `web/ui`         | Design system: lapisan visual terendah, primitif HTMX (`ui.ErrorAlert`, `ui.Stat`, `ui.ConfirmButton`, …) |
 | `version`        | Versi service yang di-inject linker saat build container (`-X …version.Version`), fallback ke placeholder dev |
 | `foundation`     | Kernel gateway: context, DI, logger dan kontrak module     |
 | `kernel`         | Primitif kernel gateway                                   |
@@ -38,3 +37,13 @@ ketika satu module (misal `catalog`) dihapus:
 Aturan penempatan: kalau sebuah kode masih berguna saat `catalog` dihapus, ia
 tidak boleh hidup di dalam `catalog`. Yang hanya dipakai satu module (misal
 `httperr`, `islandkeys`, `form`) tetap tinggal di module tersebut.
+
+## Design system
+
+Primitive web sekarang berada di root [`design-system/web/ui`](../../../../design-system/web/ui/README.md)
+sebagai Go module tersendiri. Kontrak token, kebijakan perubahan, dan release
+notes berada di root [`design-system/`](../../../../design-system/README.md).
+`internal/shared/web` hanya menyimpan integrasi web milik aplikasi ini
+(navigation, shell, rendering, dan asset serving). Mobile dan desktop membuat
+adapter native saat klien tersebut runnable. Batas ini menjaga paket private
+Go tidak menjadi API palsu untuk klien lain.

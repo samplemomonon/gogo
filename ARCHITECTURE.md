@@ -80,7 +80,7 @@ and commit the result. A boundary change then shows up in review as a diff.
 | 2 | Runtime code under `internal/modules/**` **never** imports `internal/pages/**`. Modules do not know the gateway's read side exists. |
 | 3 | Runtime code under `internal/modules/**` **never** imports another module. Modules communicate through events on the bus, and the shared event vocabulary — type constants and payload structs — lives in the versioned `contracts/<name>/v1` module that both sides import. Today no module imports another. |
 | 4 | Only `internal/bootstrap` imports both `internal/pages/**` and `internal/modules/**`. It is the composition root. |
-| 5 | Runtime code under `internal/shared/web/ui/**` **never** imports app or domain code (`internal/pages/**`, `internal/modules/**`, `cmd/**`, other `internal/shared/**` packages, or `contracts/**`). The design-system primitives depend only on the standard library, templ and `internal/shared/money`, so any surface can compose them without coupling. Enforced by the `ui primitives depend on no app code` architecture test (see `internal/shared/web/ui/doc.go`). |
+| 5 | The platform-owned `design-system/web/ui` Go module **never** imports application or domain packages. Its standalone module can depend only on the standard library and Templ; web pages, modules and shell compose it through `gogo.design/system/web/ui`. Cross-platform tokens and governance live at repository-root `design-system/`. |
 | 6 | The product platform's contracts (`contracts/product/v1`, `productlisting/v1`, `productsearch/v1`, `category/v1`) are imported by exactly one package: `internal/shared/productconsumer`. `internal/bootstrap` is the sole exception — it dials the four connections and hands them to the kit. No page, module or other shared package may import them. |
 | 7 | No package under `internal/modules/catalog/`, `internal/modules/product*` or `internal/modules/listing/` may exist. The platform owns the product aggregate ([D-018](#d-018)); nothing here holds product state or writes a product. |
 
@@ -139,11 +139,10 @@ aggregate. `internal/shared/productevents` consumes the platform's Kafka topic
 `product.events.v1` and republishes each record onto the in-process bus in
 gogo's own vocabulary (`product.changed.created`, `.updated`, `.deleted`).
 That is the only channel by which a product change reaches this process — and
-it is what makes a change made *outside* gogo (in product-service, by another
-deployment) invalidate an island cache here. Both halves are optional in the
-right way: `KAFKA_BROKERS` unset means no consumer and no republication, which
-is correct but means caches expire on their TTL (30s for the storefront grid)
-instead of immediately.
+it is what lets the billing activity feed report writes made *outside* gogo
+(in product-service, by another deployment). `KAFKA_BROKERS` is optional:
+unset means no consumer and no republication, so change-driven activity lags
+until its next read; the storefront grid is TTL-bounded either way (30 s).
 
 `ErrSkip` is the deliberate escape hatch: a record this version does not
 understand is skipped and logged, not fatal, so a platform that adds an event
@@ -582,8 +581,9 @@ have made every page 503 for any single outage, which is strictly worse.
 
 **What survived, deliberately:** inventory, sales/POS, auth, billing and ops stay
 as in-process modules. They are gogo's own aggregates and no platform service
-duplicates them. Billing and the storefront subscribe to `product.changed.*` for
-the activity feed and cache invalidation.
+duplicates them. Billing subscribes to `product.changed.*` for the activity
+feed; the storefront grid is TTL-bounded (30 s) and deliberately does not
+consume the event stream (`internal/pages/home/page.go`).
 
 **What went, and why.** `media` and `reporting` were removed. Neither was gogo's
 to own:

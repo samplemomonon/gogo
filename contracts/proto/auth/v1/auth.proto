@@ -83,6 +83,8 @@ message UpdateEmployeeResponse {
 message ListEmployeesRequest {
   string tenant_id = 1;
   int32 limit = 2;
+  // Session used for authorization. Tenant is always resolved from this session.
+  string session_id = 3;
 }
 
 // ListEmployeesResponse returns a list of employees.
@@ -160,6 +162,120 @@ message ExtendSessionResponse {
   Session session = 1;
 }
 
+// CheckPermissionRequest asks the auth service to evaluate a supported
+// capability against the current employee roles for this authenticated session.
+message CheckPermissionRequest {
+  string session_id = 1;
+  string permission_key = 2;
+}
+
+// CheckPermissionResponse returns the deny-by-default decision.
+message CheckPermissionResponse {
+  bool allowed = 1;
+}
+
+message CreateRoleRequest {
+  string session_id = 1;
+  string name = 2;
+  string description = 3;
+  string change_reference = 4;
+}
+message CreateRoleResponse { string role_id = 1; }
+
+message GrantPermissionRequest {
+  string session_id = 1;
+  string role_id = 2;
+  string permission_key = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  string reason = 5;
+  string change_reference = 6;
+}
+message GrantPermissionResponse { string grant_id = 1; }
+
+message RevokePermissionRequest {
+  string session_id = 1;
+  string grant_id = 2;
+  string reason = 3;
+  string change_reference = 4;
+}
+message RevokePermissionResponse {}
+
+message AssignRoleRequest {
+  string session_id = 1;
+  string employee_id = 2;
+  string role_id = 3;
+  google.protobuf.Timestamp valid_from = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  string reason = 6;
+  string change_reference = 7;
+}
+message AssignRoleResponse { string assignment_id = 1; }
+
+message RevokeRoleAssignmentRequest {
+  string session_id = 1;
+  string assignment_id = 2;
+  string reason = 3;
+  string change_reference = 4;
+}
+message RevokeRoleAssignmentResponse {}
+
+message AuthorizationRole {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string active_permission_keys = 4;
+}
+message ListAuthorizationRolesRequest { string session_id = 1; }
+message ListAuthorizationRolesResponse { repeated AuthorizationRole roles = 1; }
+
+message RoleAssignment {
+  string id = 1;
+  string employee_id = 2;
+  string role_id = 3;
+  string reason = 4;
+  google.protobuf.Timestamp assigned_at = 5;
+  google.protobuf.Timestamp valid_from = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp revoked_at = 8;
+  string assigned_by = 9;
+  string source = 10;
+}
+message ListRoleAssignmentsRequest {
+  string session_id = 1;
+  string employee_id = 2;
+  bool include_history = 3;
+}
+message ListRoleAssignmentsResponse { repeated RoleAssignment assignments = 1; }
+message ListTenantRoleAssignmentsRequest {
+  string session_id = 1;
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+message ListTenantRoleAssignmentsResponse {
+  repeated RoleAssignment assignments = 1;
+  string next_page_token = 2;
+}
+message AuthorizationAdminEvent {
+  string id = 1;
+  string action = 2;
+  string subject_id = 3;
+  string role_id = 4;
+  string actor_employee_id = 5;
+  string actor_database_user = 6;
+  string change_reference = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+  string reason = 9;
+}
+message ListAuthorizationAdminEventsRequest {
+  string session_id = 1;
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+message ListAuthorizationAdminEventsResponse {
+  repeated AuthorizationAdminEvent events = 1;
+  string next_page_token = 2;
+}
+
 service AuthService {
   rpc RegisterEmployee(RegisterEmployeeRequest) returns (RegisterEmployeeResponse);
   rpc GetEmployee(GetEmployeeRequest) returns (GetEmployeeResponse);
@@ -173,4 +289,14 @@ service AuthService {
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
   rpc ExtendSession(ExtendSessionRequest) returns (ExtendSessionResponse);
+  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse);
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse);
+  rpc GrantPermission(GrantPermissionRequest) returns (GrantPermissionResponse);
+  rpc RevokePermission(RevokePermissionRequest) returns (RevokePermissionResponse);
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse);
+  rpc RevokeRoleAssignment(RevokeRoleAssignmentRequest) returns (RevokeRoleAssignmentResponse);
+  rpc ListAuthorizationRoles(ListAuthorizationRolesRequest) returns (ListAuthorizationRolesResponse);
+  rpc ListRoleAssignments(ListRoleAssignmentsRequest) returns (ListRoleAssignmentsResponse);
+  rpc ListTenantRoleAssignments(ListTenantRoleAssignmentsRequest) returns (ListTenantRoleAssignmentsResponse);
+  rpc ListAuthorizationAdminEvents(ListAuthorizationAdminEventsRequest) returns (ListAuthorizationAdminEventsResponse);
 }

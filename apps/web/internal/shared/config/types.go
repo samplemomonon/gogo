@@ -94,6 +94,11 @@ type AppConfig struct {
 	// the product platform's authenticated gRPC endpoints.
 	ProductPlatformServiceToken string
 
+	// Builder.io editorial read configuration. The public key only reads
+	// published public content; no write or preview credential is supported.
+	BuilderPublicAPIKey string
+	BuilderModel        string
+
 	// KafkaBrokers are the brokers carrying the product platform's change stream
 	// (`product.events.v1`), comma-separated "host:port". When empty the gateway runs
 	// with no change feed and its island caches rely on their TTL alone — a

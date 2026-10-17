@@ -1,0 +1,16 @@
+{
+  "name": "@gogo/legal-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rspress dev",
+    "build": "node scripts/check-publication.mjs && rspress build",
+    "preview": "rspress preview"
+  },
+  "devDependencies": {
+    "@rspress/core": "2.0.23"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

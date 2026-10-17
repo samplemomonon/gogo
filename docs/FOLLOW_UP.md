@@ -53,7 +53,7 @@ After D-017 retired the superseded generics, three packages remain unwired:
 
 | Package | Capability | Decision needed |
 | --- | --- | --- |
-| `foundation/audit` | Structured audit log (compliance for payments / PII) | **Recommended to adopt** for an ecommerce system: who changed what, when. Wire it on the money/PII paths (checkout, void, employee/PIN changes) or delete it. |
+| `foundation/audit` | Structured audit log (compliance for payments / PII) | Logger safety is hardened, but the adapter is still in-memory and unused. Adopt only after the organization approves event scope, actor identity source, transaction boundaries, access, and retention; then write durably on selected money/PII paths. Do not treat inventory movement records as general audit coverage. |
 | `foundation/specification` | Predicate composition for business rules | Adopt for storefront/seller filters, or delete (YAGNI). |
 | `foundation/validation` | Rule/struct-tag validator | The codebase validates in domain constructors (e.g. `domain.NewEmployee`). Adopt, or delete in favour of that style. |
 

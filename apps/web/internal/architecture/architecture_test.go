@@ -564,25 +564,6 @@ func TestImportBoundaries(t *testing.T) {
 		}
 	})
 
-	// The design-system primitive layer (internal/shared/web/ui) is the lowest
-	// visual layer: pages, modules and shell partials all compose it, so it must
-	// not depend on any of them (or on any other app/domain code) — only the
-	// standard library, templ and money. See internal/shared/web/ui/doc.go.
-	t.Run("ui primitives depend on no app code", func(t *testing.T) {
-		const uiPkg = "gogo/internal/shared/web/ui"
-		allowed := map[string]bool{uiPkg: true, "gogo/internal/shared/money": true}
-		var offending []string
-		for _, p := range closure(g, uiPkg) {
-			if strings.HasPrefix(p, "gogo/") && !allowed[p] {
-				offending = append(offending, p)
-			}
-		}
-		sort.Strings(offending)
-		if len(offending) > 0 {
-			t.Errorf("internal/shared/web/ui imports app code; the design-system boundary must stay lowest:\n  %s",
-				strings.Join(offending, "\n  "))
-		}
-	})
 }
 
 // TestParserIsHonest is a guard on the guard. Every rule above is phrased as
@@ -591,7 +572,7 @@ func TestImportBoundaries(t *testing.T) {
 //
 // This asserts the graph is the shape we expect from gogo's real layout: the
 // top-level layers are all populated, and the known-good structure is present
-// (bootstrap reaches pages and modules; the ui package reaches money).
+// (bootstrap reaches pages and modules).
 // If Gazelle's output format ever changes shape, this fails before the rule
 // checks get a chance to pass on nothing.
 //
@@ -633,7 +614,6 @@ func TestParserIsHonest(t *testing.T) {
 	// the product-platform boundary: the shared consumer kit must reach the four
 	// contracts it speaks, and a graph that lost them would still pass the older checks.
 	for _, edge := range [][2]string{
-		{"gogo/internal/shared/web/render", "gogo/internal/shared/web/ui"},
 		{"gogo/internal/bootstrap", "gogo/internal/pages/home"},
 		{"gogo/internal/shared/productconsumer", "gogo/contracts/product/v1"},
 		{"gogo/internal/shared/productconsumer", "gogo/contracts/productlisting/v1"},

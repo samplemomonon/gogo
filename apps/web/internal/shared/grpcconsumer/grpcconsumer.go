@@ -57,6 +57,8 @@ type Vocabulary struct {
 	Invalid error
 	// Conflict is a rejection because the write would duplicate an existing row.
 	Conflict error
+	// Forbidden is a refusal because the authenticated caller lacks authority.
+	Forbidden error
 	// Precondition is a rejection because the domain rule refuses the write
 	// (e.g. an adjustment that would drive stock below zero).
 	Precondition error
@@ -215,6 +217,8 @@ func (v Vocabulary) sentinelFor(code codes.Code) error {
 		return v.Invalid
 	case codes.AlreadyExists:
 		return v.Conflict
+	case codes.PermissionDenied:
+		return v.Forbidden
 	case codes.FailedPrecondition:
 		return v.Precondition
 	case codes.Unauthenticated:
@@ -234,7 +238,7 @@ func transportFailure(err error) error {
 	}
 	switch status.Code(err) {
 	case codes.NotFound, codes.InvalidArgument, codes.AlreadyExists,
-		codes.FailedPrecondition, codes.Unauthenticated:
+		codes.FailedPrecondition, codes.Unauthenticated, codes.PermissionDenied:
 		return nil
 	default:
 		return err

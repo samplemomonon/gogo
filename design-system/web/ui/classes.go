@@ -169,7 +169,7 @@ const (
 	// GridClass is the responsive card grid a listing uses. The storefront grid
 	// spelled its own column steps; the shared one keeps a list of cards
 	// consistent wherever it appears.
-	GridClass = "grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+	GridClass = "grid grid-cols-2 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-5"
 
 	// Sidebar chrome, grouped so the column's sections read the same way.
 	SidebarPanelClass        = "flex min-h-full w-full flex-col bg-base-100 border-r border-base-300/60"

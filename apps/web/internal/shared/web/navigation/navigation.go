@@ -16,7 +16,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"gogo/internal/shared/web/ui"
+	"gogo.design/system/web/ui"
 )
 
 // Item is one link of the shared shell navigation: what the shell renders

@@ -1,10 +1,12 @@
 @import "tailwindcss";
-/* Class sources, relative to this file: modules and pages carry the feature
-   templates, shared/web the shell. Explicit paths keep the build independent
-   of the working directory (the Docker assets stage runs from /src). */
+@import "../../../../../../../design-system/web/tokens.css";
+/* Class sources, relative to this file: modules and pages carry features,
+   shared/web carries shell integration, and root design-system owns shared
+   web primitives. Explicit paths make the Docker build cwd-independent. */
 @source "../../../../modules";
 @source "../../../../pages";
 @source "../../../web";
+@source "../../../../../../../design-system/web/ui";
 @plugin "daisyui" {
   themes: false;
 }
@@ -38,40 +40,40 @@
   default: true;
   color-scheme: light;
 
-  --color-base-100: oklch(99.5% 0.002 280);
-  --color-base-200: oklch(96.8% 0.005 280);
-  --color-base-300: oklch(91.5% 0.01 280);
-  --color-base-content: oklch(21% 0.02 280);
+  --color-base-100: var(--ds-color-surface);
+  --color-base-200: var(--ds-color-canvas);
+  --color-base-300: var(--ds-color-border);
+  --color-base-content: var(--ds-color-text);
 
   /* Indigo-violet: the storefront's brand voice (prices, primary CTAs). */
-  --color-primary: oklch(51% 0.22 283);
-  --color-primary-content: oklch(98% 0.012 283);
+  --color-primary: var(--ds-color-action-primary);
+  --color-primary-content: var(--ds-color-action-primary-content);
 
   /* Deep teal: the admin console's voice, so the two surfaces stay legible
      as distinct places without changing layout. */
-  --color-secondary: oklch(48% 0.115 196);
-  --color-secondary-content: oklch(98% 0.01 196);
+  --color-secondary: var(--ds-color-brand-secondary);
+  --color-secondary-content: var(--ds-color-brand-secondary-content);
 
-  --color-accent: oklch(58% 0.17 42);
-  --color-accent-content: oklch(98% 0.012 42);
+  --color-accent: var(--ds-color-brand-accent);
+  --color-accent-content: var(--ds-color-brand-accent-content);
 
-  --color-neutral: oklch(25% 0.02 280);
-  --color-neutral-content: oklch(97% 0.005 280);
+  --color-neutral: var(--ds-color-neutral);
+  --color-neutral-content: var(--ds-color-neutral-content);
 
-  --color-info: oklch(52% 0.16 244);
-  --color-info-content: oklch(98% 0.01 244);
-  --color-success: oklch(52% 0.14 155);
-  --color-success-content: oklch(98% 0.01 155);
-  --color-warning: oklch(54% 0.14 70);
-  --color-warning-content: oklch(98% 0.012 70);
-  --color-error: oklch(53% 0.21 26);
-  --color-error-content: oklch(98% 0.01 26);
+  --color-info: var(--ds-color-info);
+  --color-info-content: var(--ds-color-info-content);
+  --color-success: var(--ds-color-success);
+  --color-success-content: var(--ds-color-success-content);
+  --color-warning: var(--ds-color-warning);
+  --color-warning-content: var(--ds-color-warning-content);
+  --color-error: var(--ds-color-critical);
+  --color-error-content: var(--ds-color-critical-content);
 
   /* Slightly softer corners than stock daisyUI: the cards, fields and panels
      all read as one system instead of stock squares next to round badges. */
-  --radius-selector: 0.5rem;
-  --radius-field: 0.625rem;
-  --radius-box: 0.875rem;
+  --radius-selector: var(--radius-sm);
+  --radius-field: var(--radius-md);
+  --radius-box: var(--radius-lg);
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -86,34 +88,34 @@
   color-scheme: dark;
 
   /* Elevation layering: base-200 (canvas) < base-100 (surfaces) < base-300 (borders/elevations) */
-  --color-base-100: oklch(21% 0.016 280);
-  --color-base-200: oklch(16% 0.012 280);
-  --color-base-300: oklch(28% 0.022 280);
-  --color-base-content: oklch(95% 0.008 280);
+  --color-base-100: var(--ds-color-surface);
+  --color-base-200: var(--ds-color-canvas);
+  --color-base-300: var(--ds-color-border);
+  --color-base-content: var(--ds-color-text);
 
   /* Accents lighten in dark mode so they clear AA against the dark surfaces */
-  --color-primary: oklch(74% 0.17 283);
-  --color-primary-content: oklch(16% 0.05 283);
-  --color-secondary: oklch(76% 0.115 196);
-  --color-secondary-content: oklch(16% 0.035 196);
-  --color-accent: oklch(76% 0.15 42);
-  --color-accent-content: oklch(18% 0.05 42);
+  --color-primary: var(--ds-color-action-primary);
+  --color-primary-content: var(--ds-color-action-primary-content);
+  --color-secondary: var(--ds-color-brand-secondary);
+  --color-secondary-content: var(--ds-color-brand-secondary-content);
+  --color-accent: var(--ds-color-brand-accent);
+  --color-accent-content: var(--ds-color-brand-accent-content);
 
-  --color-neutral: oklch(28% 0.02 280);
-  --color-neutral-content: oklch(94% 0.008 280);
+  --color-neutral: var(--ds-color-neutral);
+  --color-neutral-content: var(--ds-color-neutral-content);
 
-  --color-info: oklch(74% 0.14 244);
-  --color-info-content: oklch(18% 0.04 244);
-  --color-success: oklch(76% 0.15 155);
-  --color-success-content: oklch(18% 0.045 155);
-  --color-warning: oklch(80% 0.14 75);
-  --color-warning-content: oklch(20% 0.05 75);
-  --color-error: oklch(72% 0.18 26);
-  --color-error-content: oklch(18% 0.05 26);
+  --color-info: var(--ds-color-info);
+  --color-info-content: var(--ds-color-info-content);
+  --color-success: var(--ds-color-success);
+  --color-success-content: var(--ds-color-success-content);
+  --color-warning: var(--ds-color-warning);
+  --color-warning-content: var(--ds-color-warning-content);
+  --color-error: var(--ds-color-critical);
+  --color-error-content: var(--ds-color-critical-content);
 
-  --radius-selector: 0.5rem;
-  --radius-field: 0.625rem;
-  --radius-box: 0.875rem;
+  --radius-selector: var(--radius-sm);
+  --radius-field: var(--radius-md);
+  --radius-box: var(--radius-lg);
 
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -130,14 +132,6 @@
    rather than being one-off values sprinkled through the views.
 --------------------------------------------------------------------------- */
 @theme {
-  --font-sans:
-    "Inter var", "Inter", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji";
-  --font-mono:
-    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
-
   /* Panel chrome. Elevation scale with ambient tone bleed. */
   --shadow-panel: 0 1px 3px 0 oklch(0% 0 0 / 0.04), 0 1px 2px -1px oklch(0% 0 0 / 0.04);
   --shadow-raised: 0 4px 6px -1px oklch(0% 0 0 / 0.07), 0 2px 4px -2px oklch(0% 0 0 / 0.05);
@@ -287,6 +281,27 @@
       );
   }
 
+  /* Shared layout primitives: use these instead of per-page width and gutter
+     guesses. Native clients map the same content and reading widths to their
+     own layout containers. */
+  .ds-container {
+    width: min(100% - (2 * var(--ds-page-gutter)), var(--ds-content-max));
+    margin-inline: auto;
+  }
+  .ds-reading-width {
+    max-width: var(--ds-reading-max);
+  }
+  .ds-touch-target {
+    min-width: var(--ds-target-min);
+    min-height: var(--ds-target-min);
+  }
+  .ds-shell-main {
+    padding-bottom: calc(4.5rem + var(--ds-safe-bottom));
+  }
+  @media (min-width: 48rem) {
+    .ds-shell-main { padding-bottom: 0; }
+  }
+
   /* Subtle depth for a hero, so it does not read as a flat tinted block. */
   .bg-hero-veil {
     background-image: radial-gradient(
@@ -303,7 +318,7 @@
 
   /* Button tactile interaction */
   .btn {
-    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
+    transition: transform 120ms var(--ease-standard), background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
   }
   .btn:active:not(:disabled) {
     transform: scale(0.97);
@@ -375,7 +390,7 @@
     font-size: 0.875rem;
     font-weight: 600;
     box-shadow: var(--shadow-float);
-    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 150ms var(--ease-standard);
   }
   .skip-link:focus-visible {
     transform: translateY(0);
@@ -452,6 +467,14 @@
     to {
       background-position: -200% 0;
     }
+  }
+
+  /* The marker the composer wraps every server island in. It exists for
+     measurement and RUM attribution (data-island), not for layout:
+     display:contents keeps the wrapper out of the parent's layout, so the
+     island's own markup participates directly. */
+  .ds-island {
+    display: contents;
   }
 
   /* Chromium / Safari scrollbar. `scrollbar-width` above covers Firefox. */

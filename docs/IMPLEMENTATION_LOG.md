@@ -221,7 +221,7 @@ working as intended.
 
 | # | Finding | Where | Severity |
 |---|---|---|---|
-| 1 | `inventory`'s oversell invariant lives in SQL, not in `domain/`; `ports.StockService` is satisfied by repositories, and there is no `application/service.go` | `internal/modules/inventory` | **design** — needs the Phase 0 vertical slice, not a refactor |
+| 1 | ~~`inventory` has no application service and duplicates the oversell policy~~ | `internal/modules/inventory` | **CLOSED by Phase 0 pilot work** — see §6.1 |
 | 2 | `bootstrap` reaches `sales/infrastructure` | `sales_connection.go:30` | design — §5.2 |
 | 3 | ~~`aggregator-service` owns no persistence, and nothing checks it~~ | — | **CLOSED.** Tripwire written at `services/aggregator-service/internal/architecture/`. See §8 |
 | 4 | ~~`media.v1` has no breaker in the gateway~~ | — | **NOT A FINDING — verified and withdrawn.** `productconsumer.Connections` has exactly four upstreams: Write, Browse, Search, Category. The gateway never calls `media.v1`; `media-service` is reached by `aggregator-service`, a different binary. A breaker would guard a dependency that does not exist. The `units.yaml` comment already had this right; the log entry was wrong |
@@ -229,6 +229,21 @@ working as intended.
 | 6 | ~~B6 (monorepo vs polyrepo) undecided; services were nested under the gateway's `internal/`~~ | PRD §2.6 | **CLOSED.** Selected a monorepo with separate Go modules; gateway moved to `apps/web`, services to `services/`. See [`MONOREPO_STRUCTURE.md`](./MONOREPO_STRUCTURE.md) |
 | 7 | `devenv.lock` exists for 2 of 6 units; the two `devenv.nix` files are still `devenv init` scaffolds | `services/*/devenv.nix` | small |
 | 8 | 675 MB of `.devenv` state still on disk (git- and docker-ignored) | two service directories | cosmetic — yours to delete |
+
+### 6.1 Phase 0 pilot progress — inventory application boundary
+
+The inventory path now has an application service between gRPC and persistence.
+`application.Service` implements the delivery-facing `StockService`, validates
+adjustment scope through the domain, and delegates the atomic write to a
+`StockRepository`. The in-memory adapter uses `domain.AdjustedQuantity` for the
+oversell rule; Postgres retains its conditional `UPDATE ... quantity + delta >= 0`
+as the concurrency-safe enforcement mechanism. The module constructor always
+wraps its injected repository with the application service.
+
+This closes finding 1's missing application layer and defines the invariant in
+domain code while preserving the database's atomic guard. The seller flow's
+existing gRPC connection and event path remain the vertical slice to verify as
+the broader PRD pilot is completed.
 
 ---
 
@@ -817,3 +832,256 @@ claimed the grid renders a barcode line (no contract carries a barcode and no
 view renders it) and that the pagination component is written against
 `NextCursor` (the UI pages by number, and pagekit's handler discards the cursor
 slot its Fetch contract declares). The comments now say what the code does.
+
+## 13. Audit foundation safety pass
+
+The general audit logger was not wired to a durable store. Its in-memory adapter
+retained caller-owned pointers, returned pointers callers could mutate, used
+timestamp-only IDs, and could panic while diffing nested JSON values. The
+middleware also discarded persistence errors. The safety pass now snapshots
+entries on write/read, uses UUID IDs and UTC timestamps, handles nil filters,
+respects context cancellation, captures added/changed/removed JSON fields, and
+surfaces audit logging errors alongside operation errors. Event publication and
+fallback storage share the same prepared event identity.
+
+This does **not** close the durable audit control: middleware remains unused and
+in-memory, and post-operation logging is not transactionally coupled to domain
+writes. The inventory movement ledger is durable for stock adjustments only.
+General audit adoption still requires the event scope, actor source, transaction
+boundary, access policy, and retention to be decided by their owners.
+
+## 14. Seller session boundary
+
+The seller console routes now validate the session cookie through the auth
+contract before serving the console. Inventory adjustments, checkout and void
+records take their actor identity from that validated employee; form fields no
+longer choose the stock actor, cashier, or voiding employee. Auth dependency
+failures return an unavailable response instead of treating the caller as
+anonymous. This establishes authentication and attribution, not authorization
+coverage. The static role-matrix question was superseded by the owner's decision
+that roles and grants must be dynamic and users may hold several roles; see
+`docs/ADR_IDENTITY_AUTHORIZATION.md` and OD-4 in `docs/OPEN_DECISIONS.md`.
+
+## 15. Dynamic identity and authorization baseline
+
+The owner selected dynamic, multi-role access. The architecture baseline now
+separates PEP, PDP, PIP, and PAP; uses tenant-scoped RBAC for composable grants
+and code-enforced ABAC for active identity, tenant equality, and domain
+invariants; and leaves relationship authorization behind a PIP boundary until
+an authoritative store-membership relationship exists. Legacy role names grant
+no implicit permissions. The first policy-administrator bootstrap is OD-5 and
+must be ratified before provisioning the first production policy administrator
+or enabling authorization in production. The PAP endpoints remain default-deny
+without that provisioned authority.
+
+## 16. One-time policy-administrator bootstrap
+
+Added `apps/web/cmd/authzbootstrap` and an auth Postgres bootstrap operation.
+The operator supplies a separate database URL, tenant, active employee, and
+change reference. The operation serializes attempts by tenant, atomically
+creates the reserved policy-admin role, grants only the three PAP capabilities,
+assigns the role, and writes an event containing PostgreSQL `session_user`.
+Legacy roles remain unprivileged. OD-5 stays open: the deployment/security
+owner must ratify operator identity and production procedure before this command
+is used in production. A shared database login cannot attribute the action to
+an individual human.
+
+## 17. Deny-by-default seller authorization
+
+Added `CheckPermission` to the auth contract. The auth application resolves the
+principal from a live session, then the Postgres PDP joins current active
+employee, tenant role assignments, roles, and permission grants with their
+time bounds. Unknown permission keys and the in-memory auth adapter deny. The
+seller route PEP now maps each read and write route to a code-owned permission
+key; an explicit deny returns 403 and an auth/PDP outage returns 503. The
+permission catalog migration introduces seller dashboard, catalog, category,
+inventory, checkout, and void capabilities.
+
+This is route-level enforcement only. Durable decision evidence and checks in
+service-owned mutation use cases remain required before production
+authorization coverage can be claimed.
+
+## 18. Dynamic policy administration APIs
+
+Added session-authorized auth RPCs to create tenant roles, grant/revoke known
+permissions, and assign/revoke roles for active employees. The tenant is always
+resolved from the session; requests cannot nominate a tenant or actor. Temporal
+grants and assignments, mandatory reason/change reference, a tenant advisory
+lock, and transactional audit events preserve a reviewable history. Expired
+rows are closed before reissue, and the last active holder of each PAP
+capability cannot be removed. Authorized reads expose active roles with grants
+and per-employee assignments with optional history. `AUTHZ_DATABASE_URL`
+bootstrap remains a deployment procedure under OD-5 review; these PAP APIs are
+intended for the bootstrapped authority.
+
+## 19. Sales and inventory service-boundary authorization
+
+Internal gRPC now carries the seller's opaque session reference across the
+private in-process transport. Sales reads, checkout, and void resolve the live
+session and check their existing permission keys at the sales contract
+boundary. Cashier and void actor fields come from that resolved identity;
+request actor fields are ignored. Inventory reads and direct stock adjustments
+enforce inventory permissions at its contract boundary. The sales-owned stock
+adapter marks stock effects so inventory checks checkout/void permission while
+still recording the employee as the movement actor.
+
+The sales adapter presents a random process-local capability over private
+`bufconn`; this is not network service authentication. Inventory movements now
+persist employee subject and service actor separately. Before network
+separation, replace the in-process capability with authenticated service
+identity and a scoped delegated credential. Sales/inventory permission denials
+also produce structured logs with tenant, subject, permission, and module; they
+exclude session identifiers. Central durable log collection, tamper protection,
+retention, and review remain deployment controls to implement.
+
+## 20. Close legacy employee administration RPCs
+
+The auth contract still contains employee CRUD RPCs whose requests have no
+session or permission fields and have no application consumers. The server now
+returns `Unimplemented` for those legacy methods instead of allowing an
+unauthenticated bypass around session-bound policy administration. Login,
+session validation, and PAP methods remain available. A future employee
+lifecycle API must define explicit capabilities and derive tenant/actor from a
+validated session.
+
+## 21. Session-bound employee roster read
+
+Added `authz.employee.read` to the permission catalog and bound
+`ListEmployees` to a live session. The auth service resolves the tenant from
+that session and ignores the request's legacy tenant field. The shared auth
+consumer can request the roster without importing protobuf types. The endpoint
+supports access-review tooling; employee create/update/PIN lifecycle remains
+disabled until a separately authorized lifecycle contract is designed.
+
+## 22. Tenant-wide role assignment review
+
+Added `ListTenantRoleAssignments`, a session-bound read API requiring the
+separate `authz.assignment.review` permission. It returns active and historical
+assignments in bounded pages using a stable `(assigned_at, assignment_id)`
+keyset cursor, with a tenant-leading index. The existing per-employee query
+continues to require assignment-management authority. This provides data for a
+review; it does not itself schedule, attest, or retain periodic review evidence.
+
+## 23. Assignment review provenance
+
+Both per-employee and tenant-wide assignment reads now return the recorded
+assigner identifier and assignment source alongside reason and validity dates.
+The fields are projected from the existing tenant-scoped history table, and
+the protobuf contract exposes them to review clients. This improves reviewer
+context without creating a separate audit authority or asserting that the
+recorded identifier always maps to a human operator.
+
+## 24. Read-only policy administration audit history
+
+Added a paginated auth RPC for durable `authorization_admin_events`, guarded by
+the separate `authz.audit.read` capability. It derives tenant scope from the
+validated session and returns the recorded actor, database principal, action,
+subject/role, change reference, and timestamp in stable keyset order. It covers
+policy-administration events only; it is not a general authorization-decision
+log or an integrity, retention, or review-evidence system.
+
+## 25. PAP audit event reason
+
+Policy grant, revoke, and assignment events now persist the reason already
+required by their commands, and the audit read API returns it. Automatic closure
+of expired grants/assignments records a fixed factual reason. Role creation
+continues to have an empty reason because its existing contract asks only for a
+change reference. Existing event rows migrate with an empty reason; they are
+not backfilled from mutable grant/assignment rows.
+
+## 26. Prevent ordinary PAP audit event mutation
+
+Migration `0009_authorization_audit_append_only.sql` adds database triggers
+that reject `UPDATE`, `DELETE`, and `TRUNCATE` against policy administration
+events. This guards ordinary DML paths without assuming a deployment role
+name. A database owner or superuser can still alter the table or disable its
+triggers; external immutable storage and verified retention remain operational
+controls, so this is not tamper-proof or WORM evidence.
+
+## 27. Fragment delivery: streaming and per-island fault tolerance
+
+The render composer now supports whole-document streaming and per-island
+failure handling, per `docs/ADR_FRAGMENT_DELIVERY_AND_MEASUREMENT.md` (owner
+ratified 2026-10-17). Streaming is opt-in per page (`Page.Streaming`) and only
+applies to full documents — HTMX fragments stay buffered so a swap stays
+atomic. A streamed page holds the layout shell and flushes each island as it
+completes, with the status line and `Trailer: Server-Timing` declared before
+the first flush; after the first flush an island error can only truncate the
+document, which is why every fallible island is expected to degrade, not fail.
+
+Fault tolerance is per island: `Component.Load` (server-side fetch, never
+called on a cache hit), `Component.Timeout` (explicit; streamed islands get a
+3 s default so one slow upstream cannot stall a document), and
+`Component.Fallback` (rendered with the island context's values but no
+deadline, since the deadline that fired is why it runs; a fallback-served
+island is counted under its failure cause *and* as a fallback, so substitution
+is visible and never masquerades as a healthy render). An island without a
+fallback fails the render: buffered responses return a clean error before
+anything is written; a streamed response is truncated. The home page streams;
+the product-detail page is deliberately buffered because its honest statuses
+(404/503) must be decided before the response begins — recorded in the ADR.
+
+Measurement rides along: every island render reports `Server-Timing`
+(sanitized name, duration, fallback description), and the expvar
+`gogo_render_islands` aggregates renders, fallbacks, timeouts, errors and
+duration per island family, with Prometheus rows at `/metrics`. Client-mode
+placeholders are never counted — they are not renders. The pagekit
+cached-fragment fast path now also sets `Vary` and `Content-Type` on cache
+hits, closing a header gap where the fast path bypassed the composer's header
+assembly.
+
+## 28. Field measurement: web-vitals beacons at POST /rum
+
+The gateway now receives its first field data. A vendored web-vitals v4.2.4
+attribution build (Apache-2.0, license header preserved, `assets/js/`) observes
+LCP/INP/CLS/FCP/TTFB in real browsers and beacons each metric to `POST /rum`,
+attributing it to the island that owned the element (`[data-island]`), or to
+`page` for document-level metrics. The receiver is deliberately dumb: POST
+only, 4 KiB body cap, strict metric and rating sets, no auth (it stores
+bounded aggregates and nothing else), 204 on acceptance.
+
+Island labels are normalized before aggregation so client input cannot mint
+cardinality: names out of grammar become `unknown`, valid names aggregate
+under their family (part before `:`, which drops paged coordinates and cache
+keys), digit-only dotted segments collapse to `{id}`, and a 64-family cap
+bounds the map. The path is accepted for wire compatibility and deliberately
+neither stored nor logged. Aggregates land in the expvar
+`gogo_rum_web_vitals` (`metric|island|rating → count, value_sum`) and surface
+beside the island server timings at `/metrics` — server and client halves of
+the same per-fragment measurement, per the ADR's measurement decision. Every
+island is now wrapped in a `ds-island` marker element so client attribution
+has an anchor.
+
+## 29. Ownership catalog completed, scope widened to the gateway
+
+`team_catalog.json` now describes the whole gateway release unit (scope
+`gateway`, replacing the single-flow `seller-stock-adjustment`), per ADR
+decision 4: 14 units across T2–T5 with kind, tier, bounded context, complexity
+and ladder rung — including `internal/pages/home` (T3), the identity module
+and surfaces (T4), and platform-foundation units T5 (shared, bootstrap, cmd,
+design-system/web/ui, billing/ops/contentcms as derived-but-recorded). The
+`auth.v1/AuthService` contract row was added because the validator accepted it
+from the existing import edges (provider `internal/modules/auth`, consumer
+`internal/shared`), which is the ADR's stated condition; `authconsumer` stays
+a shared-module consumer kit, not a T4 contract. No CODEOWNERS is emitted —
+the repository has no organisational data, per the PRD. `make
+arch-team-catalog` passes; `import_graph.txt` was regenerated, since the graph
+is derived from the working tree and both the auth-boundary edges and the
+page-composition edges existed in it uncommitted. The regen also surfaced one
+open layer violation from the in-flight auth work: `internal/bootstrap`
+imports `modules/inventory/presentation/grpcservice` directly instead of going
+through the module's compose or root package — owner T5/T2, not fixed here.
+
+## 30. Naming ambiguity pass — what changed and what deliberately did not
+
+Per ADR decision 5: `render/templutil.go` → `render/html.go` (no `util` file
+names), `Composer.CachedFragment` → `Composer.CachedIsland` (an island's bytes;
+“fragment” stays reserved for HTMX response fragments),
+`renderClient` → `renderClientPlaceholder` (names what it renders). The
+`Load`/`FetchURL` pair keeps its names and now documents its contrast on the
+struct — `Load` runs server-side inside composition, `FetchURL` is fetched by
+the browser for Client-mode islands — so neither verb is ambiguous alone.
+Deliberately unchanged: the two `products/{list,detail}` packages (aliased at
+import sites; trigger: a third `detail` package) and `views/pages` directory
+names (load-bearing in generated-code paths). A repository-wide search
+confirms no references to the old names remain.

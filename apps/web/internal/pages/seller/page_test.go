@@ -32,10 +32,21 @@ func discardLogger() *slog.Logger {
 }
 
 var (
-	_ ports.ProductCatalog = (*fakeCatalog)(nil)
-	_ ports.Inventory      = (*fakeInventory)(nil)
-	_ ports.Sales          = (*fakeSales)(nil)
+	_ ports.ProductCatalog   = (*fakeCatalog)(nil)
+	_ ports.Inventory        = (*fakeInventory)(nil)
+	_ ports.Sales            = (*fakeSales)(nil)
+	_ ports.EmployeeSessions = pageEmployeeSessions{}
 )
+
+type pageEmployeeSessions struct{}
+
+func (pageEmployeeSessions) Current(context.Context, string) (*results.Employee, error) {
+	return &results.Employee{ID: "employee-1", Name: "Budi", Role: "seller"}, nil
+}
+
+func (pageEmployeeSessions) CheckPermission(context.Context, string, string) (bool, error) {
+	return true, nil
+}
 
 // fakeCatalog is an in-memory ProductCatalog over the console's own read and write
 // models. Writes and reads go to the same store here, which a real deployment does not
@@ -194,7 +205,7 @@ func newRouter(t *testing.T) (*chi.Mux, *fakeCatalog, *fakeInventory, *fakeSales
 		PaymentMethod: "Tunai", Cashier: "Budi", CreatedAt: time.Now(),
 	}}}
 
-	page := seller.New(catalog, inventory, sales, discardLogger())
+	page := seller.New(catalog, inventory, sales, pageEmployeeSessions{}, discardLogger())
 	router := chi.NewRouter()
 	page.RegisterRoutes(router)
 	return router, catalog, inventory, sales

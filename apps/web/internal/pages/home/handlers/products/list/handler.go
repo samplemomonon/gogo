@@ -68,7 +68,7 @@ func NewHandler(listing ports.Listing, composer *render.Composer, logger *slog.L
 			20,
 			composer,
 			logger,
-		).WithErrorStatus(classifyFetchError),
+		).WithErrorStatus(classifyFetchError).WithStreaming(),
 	}
 }
 

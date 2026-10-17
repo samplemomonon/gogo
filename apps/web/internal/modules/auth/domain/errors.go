@@ -14,6 +14,8 @@ const (
 	KindInvalid
 	KindFailedPrecondition
 	KindUnauthenticated
+	KindForbidden
+	KindConflict
 )
 
 // Classify classifies err.
@@ -25,13 +27,19 @@ func Classify(err error) Kind {
 	switch {
 	case err == nil:
 		return KindInternal
-	case errors.Is(err, ErrEmployeeNotFound), errors.Is(err, ErrSessionNotFound):
+	case errors.Is(err, ErrEmployeeNotFound), errors.Is(err, ErrSessionNotFound), errors.Is(err, ErrPolicyTargetNotFound):
 		return KindNotFound
 	case errors.Is(err, ErrInvalidCredentials):
 		return KindUnauthenticated
 	case errors.Is(err, ErrInvalidPIN), errors.Is(err, ErrExpired):
 		return KindFailedPrecondition
 	case errors.Is(err, ErrInvalidEmployee), errors.Is(err, ErrInvalidSession):
+		return KindInvalid
+	case errors.Is(err, ErrPolicyDenied):
+		return KindForbidden
+	case errors.Is(err, ErrPolicyConflict):
+		return KindConflict
+	case errors.Is(err, ErrInvalidPolicyChange):
 		return KindInvalid
 	default:
 		return KindInternal
@@ -68,6 +76,14 @@ func Message(err error) string {
 		return "invalid employee"
 	case errors.Is(err, ErrInvalidSession):
 		return "invalid session"
+	case errors.Is(err, ErrPolicyDenied):
+		return "policy administration permission denied"
+	case errors.Is(err, ErrPolicyTargetNotFound):
+		return "policy target not found"
+	case errors.Is(err, ErrPolicyConflict):
+		return "policy change conflicts with existing state"
+	case errors.Is(err, ErrInvalidPolicyChange):
+		return "invalid policy change"
 	default:
 		return "something went wrong"
 	}

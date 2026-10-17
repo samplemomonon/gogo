@@ -121,6 +121,8 @@ func Load() (*AppConfig, error) {
 		ProductSearchAddress:        envString("PRODUCT_SEARCH_ADDRESS", ""),
 		CategoryAddress:             envString("CATEGORY_ADDRESS", ""),
 		ProductPlatformServiceToken: envString("PRODUCT_PLATFORM_SERVICE_TOKEN", ""),
+		BuilderPublicAPIKey:         envString("BUILDER_PUBLIC_API_KEY", ""),
+		BuilderModel:                envString("BUILDER_CONTENT_MODEL", ""),
 
 		KafkaBrokers: loadCSV("KAFKA_BROKERS", ""),
 

@@ -402,11 +402,25 @@ Then add the **six rules that currently have no test** — the ones `ARCHITECTUR
 
 **Does not do:** not a general graph tool, not a new language.
 
-### P5 · `team_catalog.yaml` + validator — *~2 days, start only after P4*
+### P5 · Team catalog + validator — pilot in progress
 
-Per PRD §8 and §12 Phase 1. One metadata file declaring team, tier, rung, context, contracts, interaction mode; validated against `import_graph.txt` so declared edges cannot drift from real ones.
+The pilot uses `apps/web/internal/architecture/team_catalog.json` and a strict,
+standard-library Go validator (`apps/web/cmd/teamcatalog`). `make check` runs
+the validator through `make arch-team-catalog`. The pilot declares ownership
+for the inventory, sales, seller, and bootstrap units, then compares the
+inventory and sales contract consumers with the generated Go import edges in
+`import_graph.txt`. The companion JSON Schema is for editor/tooling support;
+the Go validator is the enforced gate.
 
-**This is the phase to start only after P4**, because the rule table is the mechanism it plugs into. Building the catalog before the validator would produce a second source of truth — the exact failure PRD §8.1 exists to prevent.
+The Team Topologies PRD's T1–T5 labels remain explicit placeholders because
+the repository contains no real team directory. The catalog describes
+ownership and contract topology; it does not configure inventory, checkout,
+authorization, payment, or other domain policies. Those remain code-owned and
+must be changed through their owning domain use cases.
+
+**Next:** expand the catalog one stream at a time only after the pilot validator
+proves reusable. Runtime product-type schemas remain the separate P7 business
+metadata capability and must not be folded into this architecture catalog.
 
 ### P6 · Revisit rung-3 promotions — *on trigger, not on schedule*
 
@@ -472,6 +486,69 @@ Product Service deployment; a seller creates a product using that type; the
 write service validates and persists the published schema version; Listing and
 Search project the event; and storefront SSR displays the projected values.
 
+### P8 · Dynamic identity and authorization — *high-priority security track*
+
+See [`ADR_IDENTITY_AUTHORIZATION.md`](./ADR_IDENTITY_AUTHORIZATION.md). The
+owner selected tenant-scoped roles that can be created dynamically and assigned
+many-to-many to users. The implementation baseline combines RBAC grants with
+code-enforced tenant/identity conditions, and requires service-level checks in
+addition to gateway enforcement. It does not give `admin`, `seller`, or
+`viewer` implicit rights.
+
+**Progress:** auth-service session validation now protects seller routes and
+actor attribution is session-derived. Migration `0002_authorization_metadata.sql`
+adds normalized role, permission-catalog, role-grant, and temporal user-role
+assignment tables. It preserves legacy role assignments without granting
+permissions. A one-time operator bootstrap CLI is implemented; its deployment
+identity and approval ceremony remain subject to OD-5 ratification. Application
+ports and contract APIs now include a session-bound permission decision. The
+Postgres PDP evaluates active tenant role assignments and grants, and seller
+routes enforce explicit read/write capabilities. Session-authorized PAP APIs
+now create roles, grant/revoke supported permissions, and assign/revoke roles
+with optional expiry; read APIs return tenant roles, current grants, and an
+employee's assignment history. Sales and inventory gRPC boundaries now repeat
+permission checks for reads and mutations. Sales derives cashier/void actor
+from the validated session; inventory ignores request actor fields. Sales stock
+effects carry that session and are authorized against checkout/void permissions.
+The sales-to-inventory caller uses a random process-local capability over
+private `bufconn`; this is not a network service credential. Inventory now
+persists employee subject and service actor separately. Remote delegation
+remains open.
+
+**Blocked before production authorization:** ratify the controlled first
+policy-administrator bootstrap method and operator identity (OD-5 in
+`OPEN_DECISIONS.md`). The proposed CLI is not a production-approved ceremony.
+The new capability catalog and default-deny enforcement are in place, but no
+business permissions are granted by legacy roles. OD-5 remains a production
+authorization blocker. Before splitting sales and inventory across the network,
+   replace the in-process capability with authenticated service identity and a
+restricted delegated credential. Legacy employee CRUD RPCs without session and
+permission fields are disabled; only roster read is available through a
+session-bound `authz.employee.read` check. Employee lifecycle management needs
+a session-bound contract and explicitly granted capabilities.
+
+**Implementation order:**
+
+1. ✅ Persist multi-role assignments and permission grants; preserve legacy
+   assignments without granting permissions.
+2. ✅ Implement a session-bound, tenant-scoped deny-by-default PDP and seller
+   route PEP.
+3. ✅ Enforce session and permission checks at sales/inventory gRPC boundaries;
+   derive audit actor from validated identity.
+4. ✅ Add PAP APIs with audited role creation, permission grant/revoke,
+   temporal assignment/revoke, and role/assignment reads.
+5. Add ReBAC only when the authoritative merchant/store relationship model has
+   an owner and explicit lifecycle. Keep policy cache optimization gated on
+   baseline measurements.
+6. Before remote deployment, authenticate service identity, constrain
+   delegated credentials, and persist both subject and service attribution.
+
+**Team ownership:** T4 Identity owns employee/session and authorization
+capabilities in this phase; T5 Gateway Platform consumes the PEP interface;
+T2 Merchant Console owns seller resource decisions and supplies domain facts.
+This is an architecture assignment to the existing placeholders, not a claim
+that real team members or on-call owners have been assigned.
+
 ---
 
 ## 5. Sequencing
@@ -496,7 +573,7 @@ Search project the event; and storefront SSR displays the projected values.
 | Declaring domain rules as configuration | §1.4 — the entire metadata-driven opportunity is in Q4, which contains no rules |
 | Adding a unit to `services/` | Give it its own `go.mod`, deployment config, project descriptor, and explicit `go.work` entry |
 | Editing `internal/bootstrap` by hand | P3 exists so this stops being possible |
-| Treating `team_catalog.yaml` as documentation | it is validated input to a test; if it can drift, it must not exist yet |
+| Treating the team catalog as documentation | it is validated input to `make check`; if it can drift, it must not exist yet |
 | Promoting a unit to rung 3 without recording a trigger | an unrecorded trigger is indistinguishable from a default |
 
 ---
@@ -546,6 +623,40 @@ P7 does not depend on changing the monorepo layout. It does depend on
 confirming which existing identity claim/role the gateway uses to authorize
 administrator actions. Do not infer admin authorization from the
 service-to-service token.
+
+## 6b. Production platform constraints — recorded 2026-10-16
+
+- **Runtime target:** Kubernetes. The repository already has Kustomize manifests,
+  health probes, a PDB, an HPA, and pod resource requests/limits under
+  `deploy/k8s/`.
+- **Logs:** applications write structured JSON to stdout. Central collection is
+  a platform concern; the application should not depend on a Loki client or a
+  per-request log shipping call. Alloy/Loki deployment placement and endpoint
+  are not recorded yet. The collector mode (for example, node-level file
+  collection or Kubernetes API-based pod collection) also needs to be chosen by
+  the platform owner against cluster permissions and CPU/network budgets; Alloy
+  documents the API collection trade-off explicitly
+  ([Kubernetes log collection](https://grafana.com/docs/alloy/latest/collect/logs-in-kubernetes/)).
+- **Metrics:** applications expose Prometheus format at `/metrics`; the cluster
+  monitoring stack scrapes it. Keep metric labels bounded and avoid IDs or raw
+  paths as labels.
+- **Loki cardinality:** use a small set of stable labels such as cluster,
+  namespace, service, and environment. Request, tenant, user, and order IDs stay
+  in the JSON record or structured metadata, not indexed labels, following
+  [Grafana's Loki label guidance](https://grafana.com/docs/loki/latest/get-started/labels/).
+- **Sizing remains evidence-based:** peak request rate, log volume, retention,
+  and latency/resource budgets are not specified. Do not size HPA, Loki storage,
+  or Prometheus retention from national scale as a proxy; record real workload
+  assumptions and measure before tuning.
+- **Readiness policy needs reconciliation:** storefront documentation promises
+  browse remains available when search is down, while `/readyz` currently
+  aggregates every upstream breaker. A failed readiness probe removes that pod
+  from normal service traffic in Kubernetes
+  ([probe behavior](https://kubernetes.io/docs/concepts/workloads/pods/probes/)).
+  Decide which dependencies are required for serving traffic before changing
+  readiness; keep this separate from liveness and report optional dependency
+  degradation through metrics/logs. This is an observed requirements conflict,
+  not a readiness policy chosen by this plan.
 
 ## 7. References
 
