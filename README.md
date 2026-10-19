@@ -29,6 +29,8 @@ under `apps/web/internal/shared/web`.
 Platform-wide editorial pages use the read-only Builder.io contract in
 [`docs/CMS_CONTENT_MODEL.md`](docs/CMS_CONTENT_MODEL.md). Customer terms and
 privacy are a separate, publication-gated Rspress SSG in [`docs/site/`](docs/site/README.md).
+Ownership and the business rules for every content surface are recorded in
+[`docs/DECISION_CONTENT_SURFACES.md`](docs/DECISION_CONTENT_SURFACES.md).
 The measured performance baseline is intentionally pending a representative
 staging workload; see [`docs/PERFORMANCE_BASELINE.md`](docs/PERFORMANCE_BASELINE.md).
 The ISO/IEC 27001:2022 engineering control gaps are tracked in
