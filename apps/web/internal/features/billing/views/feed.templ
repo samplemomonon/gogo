@@ -1,0 +1,47 @@
+package views
+
+import (
+	"strconv"
+
+	"gogo/internal/features/billing/activity"
+	"gogo.design/system/web/ui"
+)
+
+// Feed is the live catalog activity projection, swapped into #billing-region
+// by the /billing/fragment endpoint (hx-get). The same partial backs both the
+// lazy fragment and the CSR-friendly empty state.
+templ Feed(entries []activity.Entry) {
+	<section id="billing-fragment" class={ ui.CardClass + " mt-4" }>
+		@ui.CardBody("space-y-4 p-6") {
+			<div class="flex items-center justify-between">
+				<h2 class="card-title text-base font-bold">Event katalog terbaru</h2>
+				@ui.Badge("ghost", "sm", "font-mono text-xs") {
+					{ strconv.Itoa(len(entries)) } total
+				}
+			</div>
+			if len(entries) == 0 {
+				<div class="rounded-xl border border-dashed border-base-300/60 bg-base-200/50 py-6 text-center text-sm text-base-content/60">
+					Belum ada event katalog — buat produk di <a class={ ui.LinkClass } href="/seller/produk">/seller/produk</a> dan feed ini akan langsung terisi.
+				</div>
+			} else {
+				<ul class="divide-y divide-base-300/40">
+					for _, entry := range entries {
+						<li class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3 text-sm">
+							<div class="flex items-center gap-2.5">
+								@ui.Badge(badgeTone(entry.Action), "sm", "badge-soft font-medium") {
+									{ string(entry.Action) }
+								}
+								<span class="font-mono text-xs text-base-content/80 bg-base-200 px-2 py-0.5 rounded border border-base-300/50">
+									{ entry.ProductID }
+								</span>
+							</div>
+							<span class={ ui.MetaClass + " " + ui.NumClass }>
+								{ entry.When.Format("02 Jan 2006 15:04:05 MST") }
+							</span>
+						</li>
+					}
+				</ul>
+			}
+		}
+	</section>
+}

@@ -3,9 +3,9 @@
 //
 // Dependency contract:
 //
-//	apps/web/internal/pages/**       ─┐
-//	apps/web/internal/modules/**     ─┼─▶ gogo.design/system/web/ui
-//	apps/web/internal/shared/web/**  ─┘
+//	apps/web/internal/features/**   ─┐
+//	apps/web/internal/shell/**      ─┼─▶ gogo.design/system/web/ui
+//	apps/web/internal/shared/web/** ─┘
 //
 // This standalone module may import only the standard library and
 // github.com/a-h/templ. Its location outside apps/web/internal makes that

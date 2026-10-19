@@ -1,0 +1,53 @@
+package partials
+
+import (
+	"gogo/internal/features/home/ui/application/results"
+	"gogo.design/system/web/ui"
+)
+
+// ProductList is the storefront's product grid. term is the active search term,
+// which decides which empty state the grid shows: an empty catalog and an empty
+// search result are different situations and must not share one message.
+//
+// The region is a live status: pagination swaps this grid in place, and a
+// screen-reader user paging with the keyboard would otherwise get no
+// confirmation that anything happened.
+templ ProductList(products []*results.Product, term string) {
+	<div
+		id="product-list"
+		class={ ui.GridClass }
+		role="status"
+		aria-live="polite"
+		aria-busy="false"
+	>
+		if len(products) == 0 {
+			<div class="col-span-full">
+				@ui.Card("", nil) {
+					if term != "" {
+						@ui.EmptyState(
+							"Tidak ada produk yang cocok dengan “"+term+"”",
+							"Coba kata kunci lain, atau kosongkan pencarian untuk melihat seluruh katalog.",
+							ui.IconSearch("size-8"),
+						) {
+							@ui.ButtonLink("/", ui.TapActionClass(ui.IntentPrimary, "sm"), nil) {
+								@ui.IconClose("size-4")
+								Bersihkan pencarian
+							}
+						}
+					} else {
+						@ui.EmptyState("Belum ada produk", "Produk akan muncul di sini setelah ditambahkan.", ui.IconCart("size-8")) {
+							@ui.ButtonLink("/seller/produk", ui.TapActionClass(ui.IntentPrimary, "sm"), nil) {
+								@ui.IconPlus("size-4")
+								Tambah produk pertama
+							}
+						}
+					}
+				}
+			</div>
+		} else {
+			for _, product := range products {
+				@ProductCard(product)
+			}
+		}
+	</div>
+}

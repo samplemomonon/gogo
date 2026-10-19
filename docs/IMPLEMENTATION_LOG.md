@@ -7,6 +7,13 @@ This records what was actually done, and — more usefully — what the plan got
 wrong. Two of its claims did not survive contact with the code, and both are
 written up below rather than quietly dropped.
 
+**Note (2026-10-19):** this log is preserved as written. Paths in it reflect the
+layout at the time (`internal/modules`, `internal/pages`, `internal/bootstrap`);
+the [D-023](../ARCHITECTURE.md#d-023) re-home has since moved every unit under
+`internal/features/**` and renamed `internal/bootstrap` to `internal/shell`.
+For the current map see [`ARCHITECTURE.md`](../ARCHITECTURE.md) §1 and
+[`DECISION_TEAM_OWNED_VERTICALS.md`](./DECISION_TEAM_OWNED_VERTICALS.md).
+
 ---
 
 ## 1. Result

@@ -134,7 +134,7 @@ GET /readyz
 
 `ops` never names a specific upstream — the composition root contributes the
 *group*, and the classification travels with the root's `ReadinessPolicy`
-(optional: search; declared in `apps/web/internal/bootstrap/units.go`).
+(optional: search; declared in `apps/web/internal/shell/units.go`).
 Adding a platform service is therefore one contribution plus one
 `productconsumer` upstream constant and one readiness class in the table; the
 readiness message does not change. A search outage degrades search without
@@ -235,7 +235,7 @@ replaced one in-process module, and the blast radius question became real.
 ## Layers
 
 ```
-internal/bootstrap/product_connection.go   dial the four connections, create the
+internal/shell/product_connection.go    dial the four connections, create the
                                            breakers, contribute them to readiness
         │
         ▼

@@ -21,9 +21,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"gogo/internal/modules/auth/application"
-	"gogo/internal/modules/auth/domain"
-	authpostgres "gogo/internal/modules/auth/infrastructure/postgres"
+	"gogo/internal/features/auth/application"
+	"gogo/internal/features/auth/domain"
+	authpostgres "gogo/internal/features/auth/infrastructure/postgres"
 )
 
 func main() {

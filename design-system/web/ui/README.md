@@ -8,19 +8,19 @@ application's private `internal` tree. Native clients consume the neutral token
 contract and build platform-native components.
 
 The lowest visual layer of the web surface: reusable, presentational primitives
-that every page, module and shell partial composes. Nothing here knows about a
-page, a module, a domain, or a request.
+that every read-side, module and shell partial composes. Nothing here knows about
+a feature, a domain, or a request.
 
 ## Dependency contract (one-way)
 
 ```
-apps/web/internal/pages/**       ─┐
-apps/web/internal/modules/**     ─┼─▶  gogo.design/system/web/ui
-apps/web/internal/shared/web/**  ─┘
+apps/web/internal/features/**   ─┐
+apps/web/internal/shell/**      ─┼─▶  gogo.design/system/web/ui
+apps/web/internal/shared/web/** ─┘
 ```
 
 `ui` may import only the standard library and `github.com/a-h/templ`. It must
-never import pages, modules, `shell`,
+never import a vertical, `shell`,
 `pagekit`, `render`, or a domain package — otherwise a primitive would couple
 two surfaces together.
 

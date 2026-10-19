@@ -11,7 +11,7 @@
   ],
   "units": [
     {
-      "path": "apps/web/internal/modules/inventory",
+      "path": "apps/web/internal/features/inventory",
       "kind": "module",
       "team": "T2",
       "tier": "business",
@@ -20,7 +20,7 @@
       "rung": 2
     },
     {
-      "path": "apps/web/internal/modules/sales",
+      "path": "apps/web/internal/features/sales",
       "kind": "module",
       "team": "T2",
       "tier": "business",
@@ -29,7 +29,7 @@
       "rung": 2
     },
     {
-      "path": "apps/web/internal/pages/seller",
+      "path": "apps/web/internal/features/sales/ui",
       "kind": "page",
       "team": "T2",
       "tier": "business",
@@ -38,7 +38,7 @@
       "rung": 0
     },
     {
-      "path": "apps/web/internal/pages/home",
+      "path": "apps/web/internal/features/home/ui",
       "kind": "page",
       "team": "T3",
       "tier": "business",
@@ -47,7 +47,7 @@
       "rung": 0
     },
     {
-      "path": "apps/web/internal/modules/auth",
+      "path": "apps/web/internal/features/auth",
       "kind": "module",
       "team": "T4",
       "tier": "business",
@@ -56,7 +56,7 @@
       "rung": 2
     },
     {
-      "path": "apps/web/internal/pages/auth",
+      "path": "apps/web/internal/features/auth/ui",
       "kind": "page",
       "team": "T4",
       "tier": "business",
@@ -65,7 +65,7 @@
       "rung": 0
     },
     {
-      "path": "apps/web/internal/pages/profile",
+      "path": "apps/web/internal/features/profile/ui",
       "kind": "page",
       "team": "T4",
       "tier": "business",
@@ -74,7 +74,7 @@
       "rung": 0
     },
     {
-      "path": "apps/web/internal/modules/billing",
+      "path": "apps/web/internal/features/billing",
       "kind": "module",
       "team": "T5",
       "tier": "business",
@@ -83,7 +83,7 @@
       "rung": 1
     },
     {
-      "path": "apps/web/internal/modules/ops",
+      "path": "apps/web/internal/features/ops",
       "kind": "module",
       "team": "T5",
       "tier": "business",
@@ -92,7 +92,7 @@
       "rung": 1
     },
     {
-      "path": "apps/web/internal/pages/contentcms",
+      "path": "apps/web/internal/features/contentcms/ui",
       "kind": "page",
       "team": "T5",
       "tier": "business",
@@ -110,7 +110,7 @@
       "rung": 0
     },
     {
-      "path": "apps/web/internal/bootstrap",
+      "path": "apps/web/internal/shell",
       "kind": "composition",
       "team": "T5",
       "tier": "composition",
@@ -143,10 +143,10 @@
       "kind": "grpc",
       "proto": "contracts/proto/inventory/v1/inventory.proto",
       "service": "InventoryService",
-      "provider": "apps/web/internal/modules/inventory",
+      "provider": "apps/web/internal/features/inventory",
       "consumers": [
-        "apps/web/internal/modules/sales",
-        "apps/web/internal/pages/seller"
+        "apps/web/internal/features/sales",
+        "apps/web/internal/features/sales/ui"
       ],
       "breaking": "PACKAGE",
       "interaction": "x-as-a-service"
@@ -156,8 +156,8 @@
       "kind": "grpc",
       "proto": "contracts/proto/sales/v1/sales.proto",
       "service": "SalesService",
-      "provider": "apps/web/internal/modules/sales",
-      "consumers": ["apps/web/internal/pages/seller"],
+      "provider": "apps/web/internal/features/sales",
+      "consumers": ["apps/web/internal/features/sales/ui"],
       "breaking": "PACKAGE",
       "interaction": "x-as-a-service"
     },
@@ -166,7 +166,7 @@
       "kind": "grpc",
       "proto": "contracts/proto/auth/v1/auth.proto",
       "service": "AuthService",
-      "provider": "apps/web/internal/modules/auth",
+      "provider": "apps/web/internal/features/auth",
       "consumers": ["apps/web/internal/shared"],
       "breaking": "PACKAGE",
       "interaction": "x-as-a-service"

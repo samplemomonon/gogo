@@ -35,8 +35,8 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
                -X gogo/internal/shared/version.BuildDate=$(BUILD_DATE)
 
 .PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products seed docs-site-build docs-site-preview \
-	module buf buf-lint buf-generate buf-check buf-breaking arch-graph \
-	arch-team-catalog \
+	buf buf-lint buf-generate buf-check buf-breaking arch-graph \
+	feature arch-team-catalog \
 	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
 	up down restart logs ps reset smoke dev-pull
 
@@ -181,6 +181,24 @@ lint: vet buf-lint
 arch-graph:
 	$(GO) test ./internal/architecture/ -run ImportGraph -update
 
+# Scaffold a team-owned vertical (D-023): one team, one project, one image.
+# A vertical owns its backend AND its UI under apps/web/internal/features/<name>,
+# so a team has one directory instead of six scattered homes.
+#
+#	git config user.name/email	=> written into OWNERS.md + CODEOWNERS
+#	--team "Name" --owned-by email	=> override
+feature:
+	@scripts/feature-vertical.sh $(filter-out $@,$(MAKECMDGOALS))
+
+# `make feature <name>` passes the vertical's name as a goal — make has no
+# other positional channel. Swallow that goal, but only when `feature` is on
+# the command line, so a typo anywhere else still fails loudly instead of
+# silently doing nothing.
+ifneq (,$(filter feature,$(MAKECMDGOALS)))
+%:
+	@true
+endif
+
 # ---- Contract (buf/protobuf) ----------------------------------------------
 
 # Fail on an incompatible contract change against the base branch. A field may be
@@ -262,11 +280,6 @@ faker-products:
 # store the gateway uses. Requires DATABASE_URL (or AUTHZ_DATABASE_URL).
 seed:
 	$(GO) run ./cmd/authseed
-
-# Scaffold a new contract-compliant feature module:
-#   make module name=billing desc="Subscription billing and invoices"
-module:
-	$(GO) run ./cmd/modulegen $(name) "$(desc)"
 
 # ---- Container -----------------------------------------------------------
 

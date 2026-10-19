@@ -1,6 +1,9 @@
 package di
 
-import "reflect"
+import (
+	"reflect"
+	"strconv"
+)
 
 // Provide registers a typed singleton factory on the builder. It is the
 // type-safe complement to Builder.AddSingleton: the factory returns the
@@ -54,7 +57,40 @@ func MustResolveType[T any](c *Container) T {
 	return MustResolveAs[T](c, typeKey[T]())
 }
 
+// typeKey returns the key T is registered and resolved under.
+//
+// The key is the type's full import path plus its name — not
+// reflect.Type.String(), which prints only the package's *short* name and so
+// makes two types indistinguishable when two packages share it. That shape is
+// normal under the team-owned-vertical model (D-023): every vertical has its
+// own `ui` package and its own `ports` package, so `*ui.Page` and
+// `ports.Inventory` can exist more than once in one process. The key must be
+// their identity, not their spelling.
 func typeKey[T any]() string {
 	var zero T
-	return reflect.TypeOf(&zero).Elem().String()
+	return qualifiedName(reflect.TypeOf(&zero).Elem())
+}
+
+// qualifiedName renders t with its full package path where it has one, so two
+// same-named types from different packages yield different keys. Composite
+// shapes recurse, so a type nested under them is qualified too; unnamed types
+// fall back to their structural string, which is already unambiguous.
+func qualifiedName(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.Pointer:
+		return "*" + qualifiedName(t.Elem())
+	case reflect.Slice:
+		return "[]" + qualifiedName(t.Elem())
+	case reflect.Array:
+		return "[" + strconv.Itoa(t.Len()) + "]" + qualifiedName(t.Elem())
+	case reflect.Map:
+		return "map[" + qualifiedName(t.Key()) + "]" + qualifiedName(t.Elem())
+	}
+	if t.Name() == "" {
+		return t.String()
+	}
+	if pkg := t.PkgPath(); pkg != "" {
+		return pkg + "." + t.Name()
+	}
+	return t.Name()
 }

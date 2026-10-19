@@ -2,7 +2,7 @@
 
 **Companion to:** [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) (boundaries & topology) and [`ARCHITECTURE.md`](../ARCHITECTURE.md) (canonical rules).
 **Purpose:** distinguish architecture metadata from runtime product metadata and domain rules, audit the repository boundaries, and sequence the implementation work.
-**Status:** actionable. Every phase has an exit condition and a file list.
+**Status:** historical planning document (2026-10-19), kept for the reasoning; its executed phases are recorded in [`IMPLEMENTATION_LOG.md`](./IMPLEMENTATION_LOG.md). Every phase has an exit condition and a file list. It was written against the pre-D-023 layout — every unit now lives under `internal/features/**`, `internal/bootstrap` is `internal/shell`, and `cmd/modulegen` was retired in favour of `make feature`; [`ARCHITECTURE.md`](../ARCHITECTURE.md) §1 is the current map.
 
 ---
 

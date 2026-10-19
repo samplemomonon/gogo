@@ -1,6 +1,43 @@
 package di
 
-import "testing"
+import (
+	"testing"
+
+	typetestone "gogo/internal/shared/foundation/di/typetest/one"
+	typetesttwo "gogo/internal/shared/foundation/di/typetest/two"
+)
+
+// TestTypeKeysDistinguishSameNamedTypesFromDifferentPackages is the regression
+// test for the type key's identity requirement. The fixtures one.Page and
+// two.Page are distinct Go types that share both their package short name
+// (`typetest`) and their type name (`Page`) — the shape the team-owned-vertical
+// model makes routine, because every vertical has its own `ui` and `ports`
+// packages (D-023). If the container keys them by reflect.Type.String() they
+// collapse onto one key, the second registration overwrites the first, and the
+// failure surfaces far away as "service *ui.Page is not of type *ui.Page".
+func TestTypeKeysDistinguishSameNamedTypesFromDifferentPackages(t *testing.T) {
+	b := NewBuilder()
+	ProvideType(b, func(*Container) (*typetestone.Page, error) {
+		return &typetestone.Page{Tag: "one"}, nil
+	})
+	ProvideType(b, func(*Container) (*typetesttwo.Page, error) {
+		return &typetesttwo.Page{Tag: "two"}, nil
+	})
+	container := b.Build()
+
+	gotOne, err := ResolveType[*typetestone.Page](container)
+	if err != nil {
+		t.Fatalf("resolve one.Page: %v", err)
+	}
+	gotTwo, err := ResolveType[*typetesttwo.Page](container)
+	if err != nil {
+		t.Fatalf("resolve two.Page: %v", err)
+	}
+	if gotOne.Tag != "one" || gotTwo.Tag != "two" {
+		t.Errorf("resolved tags = %q, %q, want %q, %q — the container collapsed two same-named types from different packages onto one key",
+			gotOne.Tag, gotTwo.Tag, "one", "two")
+	}
+}
 
 // TestProvideRoundTripsTypedValue pins the typed registration contract: a
 // value registered through Provide resolves back as the same type with no

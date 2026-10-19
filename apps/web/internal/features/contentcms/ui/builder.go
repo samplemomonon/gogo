@@ -1,0 +1,189 @@
+package ui
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
+	"gogo/internal/shared/breaker"
+)
+
+const (
+	builderContentURL = "https://cdn.builder.io/api/v3/content/"
+	maxResponseBytes  = 1 << 20
+	cacheTTL          = 60 * time.Second
+	cacheCapacity     = 64
+)
+
+// BuilderReader consumes only published Builder.io content. The public API
+// key has read access; authoring and preview credentials never belong here.
+type BuilderReader struct {
+	model    string
+	apiKey   string
+	endpoint string
+	client   *http.Client
+	breaker  *breaker.Breaker
+	mu       sync.Mutex
+	cache    map[string]cacheEntry
+}
+
+type cacheEntry struct {
+	page      Page
+	expiresAt time.Time
+}
+
+func NewBuilderReader(model, publicAPIKey string) (*BuilderReader, error) {
+	model = strings.TrimSpace(model)
+	publicAPIKey = strings.TrimSpace(publicAPIKey)
+	if model == "" || publicAPIKey == "" {
+		return nil, ErrUnavailable
+	}
+	if !validSlug(model) {
+		return nil, errors.New("invalid Builder.io model name")
+	}
+	return &BuilderReader{
+		model:    model,
+		apiKey:   publicAPIKey,
+		endpoint: builderContentURL,
+		client: &http.Client{
+			Timeout:       3 * time.Second,
+			CheckRedirect: checkBuilderRedirect,
+		},
+		breaker: breaker.NewDefault(),
+		cache:   make(map[string]cacheEntry),
+	}, nil
+}
+
+func checkBuilderRedirect(request *http.Request, via []*http.Request) error {
+	if len(via) == 0 || request.URL.Scheme != "https" || request.URL.Host != via[0].URL.Host || len(via) > 3 {
+		return http.ErrUseLastResponse
+	}
+	return nil
+}
+
+// ReadPublished reads a single published page by its stable slug. It never
+// asks Builder for drafts or accepts client-selected model names.
+func (r *BuilderReader) ReadPublished(ctx context.Context, slug string) (Page, error) {
+	if !validSlug(slug) {
+		return Page{}, ErrNotFound
+	}
+	now := time.Now()
+	r.mu.Lock()
+	if entry, ok := r.cache[slug]; ok {
+		if now.Before(entry.expiresAt) {
+			r.mu.Unlock()
+			return clonePage(entry.page), nil
+		}
+		delete(r.cache, slug)
+	}
+	r.mu.Unlock()
+
+	page, err := r.fetch(ctx, slug)
+	if err != nil {
+		return Page{}, err
+	}
+	r.mu.Lock()
+	if len(r.cache) >= cacheCapacity {
+		// Expired entries are cleared before declining a new cache entry. The
+		// cache has a hard memory bound even if callers request many valid slugs.
+		for key, entry := range r.cache {
+			if !time.Now().Before(entry.expiresAt) {
+				delete(r.cache, key)
+			}
+		}
+	}
+	if len(r.cache) < cacheCapacity {
+		r.cache[slug] = cacheEntry{page: page, expiresAt: time.Now().Add(cacheTTL)}
+	}
+	r.mu.Unlock()
+	return clonePage(page), nil
+}
+
+func clonePage(page Page) Page {
+	page.Blocks = append([]Block(nil), page.Blocks...)
+	for index := range page.Blocks {
+		page.Blocks[index].Items = append([]FAQItem(nil), page.Blocks[index].Items...)
+	}
+	return page
+}
+
+func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
+	var page Page
+	var resultErr error
+	err := r.breaker.Execute(func() error {
+		endpoint, err := url.Parse(r.endpoint + url.PathEscape(r.model))
+		if err != nil {
+			return err
+		}
+		query := endpoint.Query()
+		query.Set("apiKey", r.apiKey)
+		query.Set("limit", "1")
+		query.Set("fields", "data")
+		query.Set("query", fmt.Sprintf(`{"data.slug":%q}`, slug))
+		endpoint.RawQuery = query.Encode()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+		if err != nil {
+			return err
+		}
+		resp, err := r.client.Do(req)
+		if err != nil {
+			// Do not wrap errors that may include the full request URL: Builder's
+			// public key is a query parameter and must not leak into logs.
+			resultErr = errors.New("Builder.io content transport failed")
+			return resultErr
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			resultErr = ErrNotFound
+			return nil // a clean miss is not an upstream availability failure
+		}
+		if resp.StatusCode != http.StatusOK {
+			resultErr = fmt.Errorf("Builder.io content request returned HTTP %d", resp.StatusCode)
+			return resultErr
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+		if err != nil {
+			resultErr = fmt.Errorf("read Builder.io content: %w", err)
+			return resultErr
+		}
+		if len(body) > maxResponseBytes {
+			resultErr = errors.New("Builder.io content exceeds response size limit")
+			return resultErr
+		}
+		var response []struct {
+			Data Page `json:"data"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			resultErr = fmt.Errorf("decode Builder.io content: %w", err)
+			return resultErr
+		}
+		if len(response) == 0 {
+			resultErr = ErrNotFound
+			return nil
+		}
+		page = response[0].Data
+		if page.Slug != slug {
+			resultErr = errors.New("Builder.io returned a mismatched editorial slug")
+			return resultErr
+		}
+		if err := page.Validate(); err != nil {
+			resultErr = fmt.Errorf("invalid Builder.io editorial content: %w", err)
+			return resultErr
+		}
+		return nil
+	})
+	if err != nil {
+		return Page{}, fmt.Errorf("%w: upstream read failed", ErrUnavailable)
+	}
+	if resultErr != nil {
+		return Page{}, resultErr
+	}
+	return page, nil
+}

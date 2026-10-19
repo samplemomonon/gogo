@@ -29,8 +29,8 @@ operator.
 | The call convention: tenant stamp, breaker, error classification | `internal/shared/grpcconsumer` |
 | Per-upstream error vocabulary + the wire→`Core` mapping | `internal/shared/productconsumer` |
 | Metrics exposition | `internal/shared/httpserver/metrics.go` |
-| Readiness aggregation over every breaker | `internal/modules/ops` |
-| Wiring (dial, create, contribute) | `internal/bootstrap/product_connection.go` |
+| Readiness aggregation over every breaker | `internal/features/ops` |
+| Wiring (dial, create, contribute) | `internal/shell/product_connection.go` |
 
 `productconsumer` exposes `Client.Breaker(Upstream)`; `ops` never reaches for a
 specific one — it asks for the **group of contributed breakers**, so adding an
@@ -111,7 +111,7 @@ go -C apps/web test -race ./internal/shared/breaker/...
 go -C apps/web test -race ./internal/shared/grpcconsumer/...
 go -C apps/web test -race ./internal/shared/productconsumer/...
 go -C apps/web test -race ./internal/shared/httpserver/...
-go -C apps/web test -race ./internal/bootstrap/...
+go -C apps/web test -race ./internal/shell/...
 ```
 
 The interesting ones:
@@ -124,7 +124,7 @@ The interesting ones:
   failures are classified per upstream.
 - `internal/shared/httpserver` — the exposition is always a *valid* Prometheus
   scrape, and every configured upstream appears.
-- `internal/bootstrap` — the four connections, and that readiness aggregates all
+- `internal/shell` — the four connections, and that readiness aggregates all
   four breakers (`fakestack_test.go`, `productplatform_integration_test.go`).
 
 ## Shipped monitoring

@@ -138,7 +138,7 @@ So the convention must come from elsewhere. Three transferable models, in descen
 
 The transferable lesson is the same in all three: **a string convention decays; a structural namespace does not, and an enforced pattern beats a documented one.** LaunchDarkly's published collision story is two teams each believing one flag was theirs — *"imagine having a room with two light switches that control the same light"* — and their fix was a *project-enforced prefix applied to API writes*, not a wiki page. [STRONG](https://launchdarkly.com/docs/home/flags/proj-flag-settings)
 
-**Verified current state.** `Composer` already holds its own cache and its keys are tenant-qualified via `islandKey`. Structurally the namespace already exists. What is missing is the **rule**: `internal/pages/home/islandkeys/islandkeys.go` hardcodes `HomeGrid = "home.product-grid"`, which is correct today because home owns the only island on the home page, and wrong the moment another team contributes one.
+**Verified current state.** `Composer` already holds its own cache and its keys are tenant-qualified via `islandKey`. Structurally the namespace already exists. What is missing is the **rule**: `internal/features/home/ui/islandkeys/islandkeys.go` hardcodes `HomeGrid = "home.product-grid"`, which is correct today because home owns the only island on the home page, and wrong the moment another team contributes one.
 
 **Trade-off accepted.** An island key becomes a cross-team contract string and cannot be renamed casually.
 
