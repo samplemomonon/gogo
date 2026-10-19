@@ -153,7 +153,10 @@ decided here because none of it has a consumer yet.
    offline (2026-10-19):** the gate is pinned by its own tests
    (`docs/site/scripts/check-publication.test.mjs`, run by `make check`) —
    approved documents pass while drafts, missing metadata, malformed dates, and
-   leftover draft instructions each block the build; the document content, its
+   leftover draft instructions each block the build — and the production
+   command (`npm run build`, gate included) was exercised end to end: it blocks
+   the checked-in drafts and completes against approved fixtures on a throwaway
+   copy, emitting the expected static pages. The document content, its
    approval, and the host remain owner-supplied.
 
 Step 4 (merchandising) exists only when §4's trigger fires.

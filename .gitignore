@@ -17,6 +17,8 @@ internal/shared/web/assets/css/output.css
 
 # ---- Node / Bun ----
 node_modules/
+# Rspress output for the customer legal site (docs/site)
+docs/site/doc_build/
 
 # ---- devenv (Nix dev environment) ----
 # .devenv/state is a Go module cache plus a built store closure. It is
