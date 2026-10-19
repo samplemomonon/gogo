@@ -1,6 +1,6 @@
 # Headless editorial CMS contract
 
-The gateway reads published public content from Builder.io through `contentcms.Reader`. The first adapter is for platform-wide pages such as FAQ; it does not invent a tenant-specific content model. It does not contain an authoring API, preview path, or write credential. Platform editorial administrators manage the CMS project and editor roles in Builder.io. Seller/merchant roles in the gateway do not grant CMS access.
+The gateway reads published public content from Builder.io through `contentcms.Reader`. The first adapter is for platform-wide pages such as FAQ; it does not invent a tenant-specific content model. It does not contain an authoring API, preview path, or write credential. Platform editorial administrators manage the CMS project and editor roles in Builder.io. Seller/merchant roles in the gateway do not grant CMS access. Ownership, the business rules per content surface, and the build order are recorded in [`DECISION_CONTENT_SURFACES.md`](./DECISION_CONTENT_SURFACES.md).
 
 ## Runtime configuration
 
