@@ -288,8 +288,9 @@ faker-products:
 
 # Seed the two dummy identities the role model demo needs (a pembeli and a
 # pembeli+penjual who owns a merchant). Idempotent; targets the shared Postgres
-# store the gateway uses. Requires DATABASE_URL (or AUTHZ_DATABASE_URL); like
-# `dev`, it runs from the repository root so a `.env` there is read.
+# store the gateway uses. Like `dev`, it runs from the repository root so the
+# `.env` there is the one read; an exported DATABASE_URL (or AUTHZ_DATABASE_URL)
+# wins over it.
 seed:
 	go run ./apps/web/cmd/authseed
 

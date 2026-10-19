@@ -6,7 +6,8 @@
 //
 // It is idempotent: re-running it only creates what is missing. It targets the
 // same Postgres the gateway uses (DATABASE_URL, falling back to
-// AUTHZ_DATABASE_URL) and applies the auth migrations first.
+// AUTHZ_DATABASE_URL — or the `.env` in the working directory when neither is
+// exported) and applies the auth migrations first.
 package main
 
 import (
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 
 	"gogo/internal/features/auth/application"
@@ -30,6 +32,15 @@ func main() {
 	tenant := flag.String("tenant", "default", "tenant identifier to seed")
 	merchantName := flag.String("merchant", "Toko Bunda", "merchant the penjual user owns")
 	flag.Parse()
+
+	// The working directory's `.env` is a fallback for the bare dev flow
+	// (`make seed` with no target exported). It is deliberately not loaded
+	// when a target is already exported: godotenv only fills unset
+	// variables, so the file's DATABASE_URL would shadow an exported
+	// AUTHZ_DATABASE_URL, which authseed prefers.
+	if os.Getenv("DATABASE_URL") == "" && os.Getenv("AUTHZ_DATABASE_URL") == "" {
+		_ = godotenv.Load()
+	}
 
 	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if dsn == "" {
