@@ -1,8 +1,8 @@
 # Content surfaces: ownership, business rules, and the build order
 
-**Status:** decided (2026-10-19); §5 step 2 is implemented and verified and
-§5 step 1 is verified offline — its live check awaits the Builder.io owner;
-step 3 awaits its legal content owners.
+**Status:** decided (2026-10-19); §5 step 2 is implemented and verified, and
+§5 steps 1 and 3 are verified offline — their external halves (the Builder.io
+project; legal content and the publication host) await their owners.
 **Scope:** editorial CMS pages, banners, engineering documentation, and the
 customer legal pages (terms & conditions, privacy policy).
 **Companions:** [`CMS_CONTENT_MODEL.md`](./CMS_CONTENT_MODEL.md) (the read
@@ -149,7 +149,15 @@ decided here because none of it has a consumer yet.
 3. **Customer legal publication.** Content owners complete the two documents
    and their metadata; the deployment path and host are supplied and wired.
    *Exit:* `npm run build` in `docs/site` passes the gate only with approved
-   documents, and the built site is served at the agreed path.
+   documents, and the built site is served at the agreed path. **Verified
+   offline (2026-10-19):** the gate is pinned by its own tests
+   (`docs/site/scripts/check-publication.test.mjs`, run by `make check`) —
+   approved documents pass while drafts, missing metadata, malformed dates, and
+   leftover draft instructions each block the build — and the production
+   command (`npm run build`, gate included) was exercised end to end: it blocks
+   the checked-in drafts and completes against approved fixtures on a throwaway
+   copy, emitting the expected static pages. The document content, its
+   approval, and the host remain owner-supplied.
 
 Step 4 (merchandising) exists only when §4's trigger fires.
 

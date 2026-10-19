@@ -20,6 +20,10 @@
   # languages.rust.enable = true;
   languages.javascript = {
     enable = true;
+    # The customer legal site (docs/site) builds with npm; the default
+    # nodejs-slim package ships without it, and `make docs-site-build`
+    # must be runnable from this environment.
+    npm.enable = true;
     bun = {
       enable = true;
     };
