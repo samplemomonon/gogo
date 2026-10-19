@@ -20,8 +20,9 @@ item 6), [`FOUNDATION_SUMMARY.md`](../FOUNDATION_SUMMARY.md).
 *Closed by [D-018](ARCHITECTURE.md#d-018).* The module and its scaffold were
 deleted — it duplicated the external `media-service` (the same
 two-authorities-for-one-row problem D-018 cured for product), was never
-mounted, and no contract or consumer depended on it. The `internal/modules/media`
-path can never return: the architecture test refuses the package name outright
+mounted, and no contract or consumer depended on it. The path can never return —
+not under `internal/modules` (retired) nor as an `internal/features/media*`
+successor: the architecture test refuses the aggregate name outright
 (`TestNoPlatformAggregateIsOwnedInProcess`, extended from product to media,
 category and search).
 
@@ -99,7 +100,7 @@ forever (`productevents/kafka.go`, `dispatch`).
 ## 6. ~~`MIGRATION_GUIDE.md` is stale~~ — **Resolved**
 
 *Closed by the follow-up pass.* The guide now describes the tree: the DI excerpt
-is copied from `apps/web/internal/bootstrap/di.go` (`ProvideInstance` for
+is copied from `apps/web/internal/shell/di.go` (`ProvideInstance` for
 process primitives, `ProvideType` for ports), the subscription step shows
 billing's real `kernel.EventBus.SubscribeTypes` pattern, the island step shows
 `render.ValidateIslandName`'s owner-namespaced rule, and every path is
@@ -151,6 +152,23 @@ per-service, and the split is verified file by file:
   (`productevents.decodePayload`) — the producer sends none today.
 - **Interim:** document it in any deployment that serves more than one tenant.
   A single-tenant deployment (the default `TENANT_DEFAULT`) is unaffected.
+
+## 9. Ownership re-home: team-owned verticals ([D-023](../ARCHITECTURE.md#d-023))
+
+Every feature is to own *one* directory — its backend **and** its UI — so a team
+has one home instead of six ([`DECISION_TEAM_OWNED_VERTICALS.md`](./DECISION_TEAM_OWNED_VERTICALS.md)).
+The program is phased (ops → sales/seller → auth → home/profile/contentcms →
+inventory/billing), stays green at every step, and must regenerate
+`import_graph.txt` (`make arch-graph`) after each move. **Phase 2 (`ops`) and
+Phase 3 (`sales`/`seller`) are done and verified** with the Go toolchain
+(`devenv.nix`): `ops` re-homed to `internal/features/ops`; `sales` + the seller
+console merged into `internal/features/sales` (backend hexagon at the feature
+root, read-side under `ui/`) with `OWNERS.md` each. Both import only their own
+subtree, `internal/shared`, and `gogo/contracts/*`, and are clamped by
+`internal/architecture/vertical_boundary_test.go`. The remaining phases (auth,
+home/profile/contentcms, inventory/billing) re-home the same way, one step at a
+time. The scaffolder (`make feature` / `scripts/feature-vertical.sh`) lands the
+target shape and the single ownership file (`OWNERS.md` + `CODEOWNERS`).
 
 ---
 

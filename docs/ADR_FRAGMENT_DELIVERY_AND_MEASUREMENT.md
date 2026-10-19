@@ -38,8 +38,8 @@ The owner ratified the scope for this iteration as: (1) streaming + fault tolera
 | The HTTP status and `Content-Type` are written **before** any component renders | `render/render.go:23-25` (`HTMLStatus`) |
 | `Vary` is set only by `render.Respond`; pages composed through the composer (pagekit) never set it | `render/strategy.go:61-66`; pagekit calls `RenderNavigation` directly |
 | A cache-hit fragment fast path writes raw bytes with no response headers of its own | `render/composer.go:631` (`CachedIsland`) |
-| PDP bypasses the composition layer: it renders its own template around a hand-rolled buffer | `internal/pages/home/handlers/products/detail/handler.go` |
-| The composer's only consumer today is the home listing (pagekit). Billing and generated modules use `render.Respond` + `shell.Page`; seller renders a whole page via `render.HTML` | source search across `internal/pages/**` |
+| PDP bypasses the composition layer: it renders its own template around a hand-rolled buffer | `internal/features/home/ui/handlers/products/detail/handler.go` |
+| The composer's only consumer today is the home listing (pagekit). Billing and generated modules use `render.Respond` + `shell.Page`; seller renders a whole page via `render.HTML` | source search across `internal/features/**` |
 
 ### 2.2 templ mechanics relevant to streaming (v0.3.1020 runtime)
 
@@ -186,16 +186,21 @@ Basis: [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) §6.4/§7 and [`ADR_
 
 | Unit | Kind | Team | Tier | Basis |
 |---|---|---|---|---|
-| `internal/pages/home` | page | T3 | business | PRD §6.4 (storefront surface) |
-| `internal/pages/seller` | page | T2 | business | PRD line 209 (merchant console) |
-| `internal/pages/auth`, `internal/pages/profile` | page | T4 | business | PRD §6.4 (identity surfaces) |
-| `internal/modules/auth` | module | T4 | business | PRD §6.4 |
+| `internal/features/home/ui` | page | T3 | business | PRD §6.4 (storefront surface) |
+| `internal/features/sales/ui` | page | T2 | business | PRD line 209 (merchant console) |
+| `internal/features/auth/ui`, `internal/features/profile/ui` | page | T4 | business | PRD §6.4 (identity surfaces) |
+| `internal/features/auth` | module | T4 | business | PRD §6.4 |
 | `internal/shared` (incl. `internal/shared/authconsumer`) | module | T5 | foundation | PRD §6.4; authconsumer carve-out decision recorded here: it remains under the shared module and is **not** a contract of T4 |
-| `internal/modules/billing` | module | T5 | business | PRD line 316 (rung 1) |
-| `internal/modules/ops` | module | T5 | business | **derived**: readiness aggregation + circuit-breaker surface are platform-operational capabilities, not merchant surface (basis: `internal/modules/ops` purpose docs, `CIRCUIT_BREAKER_IMPLEMENTATION.md`) |
-| `internal/pages/contentcms` | page | T5 | business | **derived**: a platform-wide content surface; no PRD unit claims it (basis: `CMS_CONTENT_MODEL.md` framing as a shared editorial surface) |
+| `internal/features/billing` | module | T5 | business | PRD line 316 (rung 1) |
+| `internal/features/ops` | module | T5 | business | **derived**: readiness aggregation + circuit-breaker surface are platform-operational capabilities, not merchant surface (basis: `internal/features/ops` purpose docs, `CIRCUIT_BREAKER_IMPLEMENTATION.md`) |
+| `internal/features/contentcms/ui` | page | T5 | business | **derived**: a platform-wide content surface; no PRD unit claims it (basis: `CMS_CONTENT_MODEL.md` framing as a shared editorial surface) |
 | `cmd/**` | composition | T5 | foundation | PRD §6.4 (bootstrap/entrypoints) |
 | `design-system/web/ui` | module | T5 | foundation | ADR_CROSS_TEAM §4.3 (platform owns primitives) |
+
+**Moved by [D-023](../ARCHITECTURE.md#d-023):** every unit above was re-homed
+under `internal/features/**` (and `internal/bootstrap` became `internal/shell`);
+the enforced source of truth is the updated
+`apps/web/internal/architecture/team_catalog.json`.
 
 Also decided:
 
@@ -215,7 +220,7 @@ Renames are behaviour-preserving and each is justified by a collision or an anti
 | `Composer.CachedFragment` | `Composer.CachedIsland` | The codebase now uses “island” for the unit; “fragment” stays reserved for HTMX response fragments. The method returns an island’s bytes |
 | `renderClient` | `renderClientPlaceholder` | Says what it renders (the placeholder), not just the mode |
 | `Component.FetchURL` (doc) vs new `Load` | unchanged names, documented contrast | `FetchURL` is fetched by the browser; `Load` runs server-side. The doc comment states the pairing so “fetch” alone is never ambiguous |
-| `internal/pages/home/handlers/products/{list,detail}` | unchanged | Same package name across page trees, disambiguated at import sites by aliases (`homelist`, `homedetail`); renaming would churn imports with no reader benefit at today's size. Trigger: a third `detail` package |
+| `internal/features/home/ui/handlers/products/{list,detail}` | unchanged | Same package name across read-side trees, disambiguated at import sites by aliases (`homelist`, `homedetail`); renaming would churn imports with no reader benefit at today's size. Trigger: a third `detail` package |
 | `handlers/products/*/views/pages` etc. | unchanged | Names are load-bearing in generated-code paths (`templ generate` output location); renaming them is a non-trivial churn with no ambiguity payoff |
 
 ---

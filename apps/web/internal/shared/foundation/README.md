@@ -116,7 +116,7 @@ contribution alone is enough.
 
 A unit that owns its own graph declares it and is wired by being listed, rather
 than hand-wired by the composition root. This is what keeps
-`internal/bootstrap/di.go` a list instead of a second copy of every unit's
+`internal/shell/di.go` a list instead of a second copy of every unit's
 dependencies:
 
 ```go

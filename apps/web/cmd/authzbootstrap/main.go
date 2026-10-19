@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	authpostgres "gogo/internal/modules/auth/infrastructure/postgres"
+	authpostgres "gogo/internal/features/auth/infrastructure/postgres"
 )
 
 func main() {

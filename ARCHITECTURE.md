@@ -23,14 +23,13 @@ that discovers feature modules through their manifests (`/module-registry`) and
 mounts them. Modules federate HTML fragments the way JavaScript remotes
 federate components, and communicate through a shared in-process event bus.
 
-Four kinds of units live under `gogo/internal`:
+Three kinds of units live under `gogo/internal`:
 
 | Unit | Path | Role |
 | ---- | ---- | ---- |
-| Modules | `internal/modules/<module>/**` | Self-contained features, hexagonal per module (`domain`, `application`, `infrastructure`, `presentation`). They own their routes and their remote contracts (e.g. `inventory.v1` gRPC). |
-| Pages | `internal/pages/<page>/**` | Gateway-side read-side consumers. They render their own pages from their own read models and consume modules **only over their remote contracts** (gRPC clients in `<page>/infrastructure/`), never over in-process imports. |
+| Team-owned vertical | `internal/features/<feature>/**` | One team's whole unit ([D-023](#d-023)): the backend hexagon at the feature root (`domain`, `application`, `infrastructure`, `presentation`, `compose`), its UI under `ui/`, its `routes.go`, its `OWNERS.md`, and — when a real cross-team consumer exists — its `public/` surface ([D-021](#d-021)). A vertical owns its remote contracts (e.g. `inventory.v1` gRPC) and never imports another vertical. |
 | Shared | `internal/shared/**` | Cross-cutting infrastructure: the event envelope (`events`), the kernel contract layer (`kernel` + `foundation`), module lifecycle (`module`), web helpers (`web`), the remote-client kits (`grpcconsumer`, `productconsumer`). |
-| Composition root | `internal/bootstrap` | The only place that mounts modules **and** pages. It owns the DI container, the wiring of the shared event bus, and the gRPC connections to the product platform. |
+| Composition root | `internal/shell` | The only place that mounts verticals. It owns the DI container, the wiring of the shared event bus, the in-process connections, and the gRPC connections to the product platform. |
 
 Remote contracts that must never drift live in their own Go modules under
 `contracts/` — not in `internal/`. Two families live there, and the distinction
@@ -38,7 +37,7 @@ matters:
 
 | Family | Contracts | Who serves them |
 | ------ | --------- | --------------- |
-| In-process modules | `inventory/v1`, `sales/v1`, `auth/v1` | gogo itself. The module mounts in this process; the contract is the seam that keeps pages from importing it. |
+| In-process modules | `inventory/v1`, `sales/v1`, `auth/v1` | gogo itself. The vertical mounts in this process; the contract is the seam that keeps its own `ui/` — and everyone else — from importing the backend. |
 | Product platform | `product/v1`, `productlisting/v1`, `productsearch/v1`, `category/v1` | Standalone services in another repository/deployment. gogo is a **client** of these and stores no product data ([D-018](#d-018)). |
 
 The product platform's contracts are vendored from the services that own them,
@@ -54,6 +53,17 @@ Two remote-client kits sit between callers and contracts:
 - **`internal/shared/productconsumer`** — the only package allowed to import a
   product-platform contract. It maps each wire shape into one neutral `Core`
   ([D-018](#d-018)).
+
+> **Ownership re-home complete ([D-023](#d-023)).** Each route's team owns its
+> backend and its UI in one directory,
+> [`internal/features/<feature>`](docs/DECISION_TEAM_OWNED_VERTICALS.md) — the
+> "team-owned vertical" (one team, one project, one image, the Keycloak model).
+> `internal/modules/` and `internal/pages/` are retired; `internal/bootstrap` is
+> `internal/shell`. The rules below are unchanged in responsibility — they are
+> re-expressed on the vertical: a vertical is a closed module (only its own
+> subtree, `internal/shared`, or `gogo/contracts`), and the layer matrix applies
+> per vertical. `TestRetiredRootsStayRetired` fails the build if either retired
+> root comes back, and `make feature` scaffolds a new vertical.
 
 ## 2. Import Rules (enforced)
 
@@ -76,33 +86,33 @@ and commit the result. A boundary change then shows up in review as a diff.
 
 | # | Rule |
 | - | ---- |
-| 1 | Runtime code under `internal/pages/**` may import a module **only through that module's `public` package** — the surface the owning team declares and maintains ([D-021](#d-021), [`ADR_CROSS_TEAM_UI_CONTRACT.md`](docs/ADR_CROSS_TEAM_UI_CONTRACT.md) §4.1) — and **never** any other runtime code under `internal/modules/**`. Everything else is reached through remote contracts. A page never imports another page. |
-| 2 | Runtime code under `internal/modules/**` **never** imports `internal/pages/**`. Modules do not know the gateway's read side exists. |
-| 3 | Runtime code under `internal/modules/**` **never** imports another module. Modules communicate through events on the bus, and the shared event vocabulary — type constants and payload structs — lives in the versioned `contracts/<name>/v1` module that both sides import. Today no module imports another. |
-| 4 | Only `internal/bootstrap` imports both `internal/pages/**` and `internal/modules/**`. It is the composition root. |
+| 1 | Runtime code under `internal/features/<f>/**` may import only its own subtree, `internal/shared/**`, and `gogo/contracts/**` — never another vertical, and never a retired root. A vertical's `ui/` consumes its own backend and every other vertical over the wire contracts (gRPC clients in `<f>/ui/infrastructure/`), never by importing them. The one deliberate cross-team exception is `public/` (below). Enforced by `TestFeatureVerticalIsAClosedModule`. |
+| 2 | A vertical's `ui/**` reaches no backend internals — not its own, not another vertical's — and the shell reaches a vertical only through that vertical's `compose/` package, its root package, or its `ui/`: never into `domain`, `application`, `presentation` or `infrastructure`. Enforced by `TestCompositionLayerReachesNoVerticalInternals`. |
+| 3 | A vertical never imports another vertical's backend: cross-vertical contact is events on the bus — the shared event vocabulary (type constants and payload structs) lives in the versioned `contracts/<name>/v1` module that both sides import — and, for UI only, the declared `public/` surface ([D-021](#d-021)). Today no vertical imports another. |
+| 4 | Only `internal/shell` imports verticals. It is the composition root. |
 | 5 | The platform-owned `design-system/web/ui` Go module **never** imports application or domain packages. Its standalone module can depend only on the standard library and Templ; web pages, modules and shell compose it through `gogo.design/system/web/ui`. Cross-platform tokens and governance live at repository-root `design-system/`. |
-| 6 | The product platform's contracts (`contracts/product/v1`, `productlisting/v1`, `productsearch/v1`, `category/v1`) are imported by exactly one package: `internal/shared/productconsumer`. `internal/bootstrap` is the sole exception — it dials the four connections and hands them to the kit. No page, module or other shared package may import them. |
-| 7 | No package under `internal/modules/catalog/`, `internal/modules/product*` or `internal/modules/listing/` may exist. The platform owns the product aggregate ([D-018](#d-018)); nothing here holds product state or writes a product. |
+| 6 | The product platform's contracts (`contracts/product/v1`, `productlisting/v1`, `productsearch/v1`, `category/v1`) are imported by exactly one package: `internal/shared/productconsumer`. `internal/shell` is the sole exception — it dials the four connections and hands them to the kit. No vertical's `ui/` or backend, and no other shared package, may import them. |
+| 7 | No package under `internal/features/catalog/`, `internal/features/product*` or `internal/features/listing/` may exist, and the retired roots `internal/modules/` and `internal/pages/` stay retired (`TestRetiredRootsStayRetired`). The platform owns the product aggregate ([D-018](#d-018)); nothing here holds product state or writes a product. |
 
 Rules 6 and 7 are what stop the product domain from quietly creeping back in.
 They are structural rather than conventional: rule 7 fails the build the moment a
-`catalog` or `product` module reappears under `internal/modules/`, whether or not
-anyone remembered this paragraph.
+`catalog` or `product` vertical reappears under `internal/features/` — or either
+retired root comes back — whether or not anyone remembered this paragraph.
 
 Rule 1's `public` exception is the one deliberate cross-team UI contract
-([D-021](#d-021)): a module's `public` package is its page-facing surface, owned
-and compatibility-managed by the module's team, while the page still decides
-what appears on a page and in what order. The exception is granted to pages
-only — a module importing another module's `public` is still a rule 3 violation,
-because module-to-module communication stays event-based. No module ships a
-`public` package today; none is added speculatively, and the first one is
-extracted with its first real consumer — the rules that will govern it are
-already enforced —
-`TestImportBoundaries` (`pages import modules only through a module's public
-surface`, `pages must not import other pages`), `TestCompositionLayerReachesNoModuleInternals`,
-and the synthetic-graph fixtures in `internal/architecture/ui_contract_test.go`.
+([D-021](#d-021)): a vertical's `public` package is its declared page-facing
+surface, owned and compatibility-managed by the vertical's team, consumed by
+other verticals' `ui/`. No vertical ships a `public` package today; none is
+added speculatively, and the first one is extracted with its first real
+consumer — when it appears, the closed-module rule
+(`TestFeatureVerticalIsAClosedModule`, [D-023](#d-023)) is extended with the
+grant. The module-shaped machinery that enforced the grant through D-023 (the
+`public` grant predicates, `TestModuleToModulePublicIsNotGranted` and the
+synthetic fixtures in `ui_contract_test.go`) was deleted in D-023 Phase 7
+together with the retired roots: it had no subject, and the closed-module rule
+currently admits no cross-vertical edge at all.
 
-The classic hexagon rules short of the above still apply per module:
+The classic hexagon rules short of the above still apply per vertical:
 `presentation` and `infrastructure` both depend on `application` ports, never
 the reverse; `domain` depends on nothing internal.
 
@@ -205,16 +215,17 @@ concern.
 
 ### D-005 · Pages consume modules over remote contracts only
 **Date:** original · **Status:** accepted
-Home and seller render their own read models from gRPC clients in
-`<page>/infrastructure/`, which delegate wire/transport to the shared
-`productconsumer` / `grpcconsumer` kits and map into page-local read models.
-Enforced by import rules [1](#2-import-rules-enforced) and
-[6](#2-import-rules-enforced), incl. keeping page-specific read-model mapping in
-each page rather than merging the clients.
+Every read-side renders its own read models from gRPC clients in its
+`ui/infrastructure/` — [D-023](#d-023) re-homed the pages, so `home` and the
+seller console live in `features/home/ui` and `features/sales/ui` — which
+delegate wire/transport to the shared `productconsumer` / `grpcconsumer` kits
+and map into vertical-local read models. Enforced by import rules
+[1](#2-import-rules-enforced) and [6](#2-import-rules-enforced), incl. keeping
+read-model mapping in each vertical rather than merging the clients.
 
 ### D-006 · Name-keyed DI container as composition root
 **Date:** 2026-09 · **Status:** accepted
-`internal/bootstrap/di.go` wires config, buses (shared + kernel view), logger
+`internal/shell/di.go` wires config, buses (shared + kernel view), logger
 and the module registry through `foundation/di` (`NewBuilder().AddSingleton(...)`).
 `BuildGateway` resolves from the container so wiring is explicit, auditable and
 tested (`di_test.go`).
@@ -232,9 +243,10 @@ the modules.)
 
 ### D-008 · Bootstrap is the only composition root
 **Date:** original · **Status:** accepted
-Modules and pages never wire each other. `internal/bootstrap` owns the full
-object graph and its lifecycle; modules volunteer their manifests and health
-and are drained in reverse order on shutdown.
+Verticals never wire each other. `internal/shell` (renamed from
+`internal/bootstrap` by [D-023](#d-023)) owns the full object graph and its
+lifecycle; verticals volunteer their manifests and health and are drained in
+reverse order on shutdown.
 
 ### D-009 · Reliable publication via a transactional outbox
 **Date:** 2026-09-25 · **Status:** accepted · **Superseded in part by [D-018](#d-018)**
@@ -392,9 +404,10 @@ admin CRUD page did not provide. Two questions had decade-scale consequences:
 where the console lives, and which unit owns stock.
 
 **Decision:** Replace the `admin` page with a `seller` page
-(`internal/pages/seller`) that consumes remote contracts over the same
-bufconn/network transport a split deployment uses, and add an **inventory
-module** (`internal/modules/inventory`) that owns the sellable stock quantity and
+(`internal/features/sales/ui`, re-homed by [D-023](#d-023)) that consumes
+remote contracts over the same bufconn/network transport a split deployment
+uses, and add an **inventory module** (`internal/features/inventory`) that owns
+the sellable stock quantity and
 an append-only `inventory_movements` ledger. `AdjustStock` is atomic
 (conditional `UPDATE … WHERE stock + delta >= 0`), idempotent on a non-empty
 `reference`, and rejects oversell with `FailedPrecondition`.
@@ -429,9 +442,16 @@ rather than an oversight — see [D-018](#d-018).
 
 **Problem:** A seller needs a point-of-sale (checkout → reserved stock → recorded transaction, void → stock restored). The POS must not re-implement stock logic or duplicate the ledger.
 
-**Decision:** The sales module (`internal/modules/sales`) owns the completed transaction and its lines. It **composes `inventory.v1.AdjustStock`** for the stock effect: on checkout it calls `AdjustStock(-qty, "sale", reference)` per line (atomic, idempotent on the transaction number); on store failure it compensates the lines already applied; on void it calls `AdjustStock(+qty, "void", reference)` and then marks the transaction voided. The inventory module remains the sole stock owner — sales never writes `products.stock` directly.
+**Decision:** The sales module (`internal/features/sales`, re-homed by
+[D-023](#d-023)) owns the completed transaction and its lines. It **composes
+`inventory.v1.AdjustStock`** for the stock effect: on checkout it calls
+`AdjustStock(-qty, "sale", reference)` per line (atomic, idempotent on the
+transaction number); on store failure it compensates the lines already applied;
+on void it calls `AdjustStock(+qty, "void", reference)` and then marks the
+transaction voided. The inventory module remains the sole stock owner — sales
+never writes `products.stock` directly.
 
-**Contract surface:** `sales.v1` gRPC contract (`Checkout`, `Get`, `List`, `Void`). The seller console (`internal/pages/seller`) consumes it as a remote peer over bufconn, alongside `inventory.v1` and the product platform.
+**Contract surface:** `sales.v1` gRPC contract (`Checkout`, `Get`, `List`, `Void`). The seller console (`internal/features/sales/ui`) consumes it as a remote peer over bufconn, alongside `inventory.v1` and the product platform.
 
 **Why not `inventory.v1` exposing a `Checkout` RPC:** stock adjustment is a primitive; a sale carries its own invariants (payment ≥ total, void rules, line-item audit trail) that belong in a dedicated sales aggregate. Composition keeps the inventory contract stable and reusable for future WMS consumers.
 
@@ -599,10 +619,11 @@ have made every page 503 for any single outage, which is strictly worse.
   ([D-009](#d-009), [D-012](#d-012)).
 
 **What survived, deliberately:** inventory, sales/POS, auth, billing and ops stay
-as in-process modules. They are gogo's own aggregates and no platform service
+as in-process verticals ([D-023](#d-023) re-homed them under
+`internal/features/`). They are gogo's own aggregates and no platform service
 duplicates them. Billing subscribes to `product.changed.*` for the activity
 feed; the storefront grid is TTL-bounded (30 s) and deliberately does not
-consume the event stream (`internal/pages/home/page.go`).
+consume the event stream (`internal/features/home/ui/page.go`).
 
 **What went, and why.** `media` and `reporting` were removed. Neither was gogo's
 to own:
@@ -623,8 +644,9 @@ media ([rule 7](#2-import-rules-enforced)).
 
 **Guardrails.** Import rules [6](#2-import-rules-enforced) and
 [7](#2-import-rules-enforced) are architecture tests, not conventions: rule 7
-fails the build the moment a `catalog`/`product`/`listing` module reappears
-under `internal/modules/`, so the domain cannot creep back in by accident.
+fails the build the moment a `catalog`/`product`/`listing` unit reappears
+under `internal/features/` (or a retired root comes back), so the domain cannot
+creep back in by accident.
 
 **Revisit when:** the platform adds tenant support, or suppliers become a
 platform concern. Until then gogo's product read path is defined entirely by
@@ -708,13 +730,21 @@ The grant is to **pages only**. Module-to-module imports stay event-based
 need for that is a separate ADR, not an edit to the import test.
 
 Nothing uses the grant today — no `public` package exists, and none is added
-speculatively. The change is enforcement-first: the page rule in
-`TestImportBoundaries` was narrowed, not deleted, its failure message names the
-ADR, `TestCompositionLayerReachesNoModuleInternals` extends the forbidden set to
-`compose`, and because a negative rule that has never seen a positive case
+speculatively. The change was enforcement-first: the page rule in
+`TestImportBoundaries` was narrowed, not deleted, its failure message named the
+ADR, `TestCompositionLayerReachesNoModuleInternals` extended the forbidden set
+to `compose`, and because a negative rule that has never seen a positive case
 cannot be distinguished from a broken parser, both predicates and the `public`
-grant are pinned on synthetic graphs in
+grant were pinned on synthetic graphs in
 `internal/architecture/ui_contract_test.go`.
+
+**Moved by [D-023](#d-023) (Phase 7).** The page tree is retired; the subject
+of this decision is a vertical's `ui/`. The enforcement machinery was deleted
+together with the retired roots — it had no subject, because the single
+boundary rule (`TestFeatureVerticalIsAClosedModule`) currently admits no
+cross-vertical edge at all — and the grant is re-extended into that rule when
+the first real `public/` consumer appears. The decision itself (the grant's
+shape and its limits) is unchanged.
 
 ### D-022 · The auth module owns the merchant relationship; only a merchant's members may change its products
 **Date:** 2026-10-17 · **Status:** accepted
@@ -730,7 +760,7 @@ seller console's `seller.catalog.manage` check answers the wrong question
 (tenant-wide) for a resource that is merchant-scoped.
 
 **Decision:** the auth module owns three aggregates
-(`internal/modules/auth/domain`), and their tables are the store relationship
+(`internal/features/auth/domain`), and their tables are the store relationship
 the ADR reserved:
 
 | Aggregate | Answers | Lifecycle |
@@ -763,7 +793,7 @@ relationships it summarizes.
 
 **Enforcement sits at the seller console's write boundary.** Product create,
 update and delete each resolve the target merchant and ask the PDP *before* the
-write reaches the platform (`internal/pages/seller/handlers`). A deny is 403; an
+write reaches the platform (`internal/features/sales/ui/handlers`). A deny is 403; an
 auth outage is 503, so a failure is never read as a permission decision. Create
 is additionally scoped to a merchant the employee may manage and stamps that
 `merchant_id` on the new product; update and delete read the product's existing
@@ -795,3 +825,139 @@ either, and a green suite was not evidence.
 owning `Toko Bunda`), both with PIN `123456`. It is idempotent, and it refuses
 to run with `APP_ENV=production` because it creates a known-credential account
 and a policy administrator.
+
+### D-023 · Team-owned verticals: one team, one project, one image
+**Date:** 2026-10-18 · **Status:** accepted — **implemented (Phases 0–7 complete, verified 2026-10-19)**
+
+**Problem.** The governance is correct but **scattered**. A single feature team's
+bounded context is spread across `internal/modules/<f>`, `internal/pages/<page>`,
+`design-system/`, `internal/bootstrap`, the cross-team UI contract docs, and the
+`internal/architecture` boundary tests plus its `import_graph.txt` snapshot. To
+understand or re-own a feature, you read six files across three trees and reason
+about five rules. That is a cognitive-load and ownership problem, not a
+scalability one (7 modules, 4 pages, one team — see
+[`DECISION_UI_OWNERSHIP.md`](docs/DECISION_UI_OWNERSHIP.md) §1.4).
+
+**Decision.** Re-home ownership so each team owns **one vertical**: a route's
+owning team owns its backend *and* its UI, together. The model is the
+self-contained vertical Keycloak exemplifies — one deployable that ships both the
+UI and the backend of a vertical. Under
+[`internal/features/<feature>`](docs/DECISION_TEAM_OWNED_VERTICALS.md): the
+existing hexagonal layers, plus `ui/` (the feature's pages/components, formerly
+`pages/<page>`), `routes.go` (route ownership), `public/` (the D-021 cross-team
+surface, declared in-vertical), `events.go`, `compose/` (its own graph), and
+`OWNERS.md`. The composition root is `internal/shell` (renamed from
+`internal/bootstrap`); it keeps only cross-cutting wiring. The old
+`internal/pages/` and `internal/modules/` trees are retired, so a "page" is
+either a vertical's own `ui/` or a shell entry that composes other verticals'
+`public` surfaces.
+
+**What is preserved, not changed.** UI ownership (a route has one owning team; the
+owner decides what appears; cross-team UI only via the declared `public` surface;
+slot/widget composition still not built), domain ownership (platform owns
+product; inventory owns stock; sales composes `inventory.v1`; auth owns the
+merchant relationship), and deployment ownership (one binary today; a vertical is
+the lift-out seam — its `compose` is its root and the existing `*_connection.go`
+in-process↔network dial swap makes promotion a config change).
+
+**The single boundary mechanism.** The answer to "boundaries are scattered" is a
+*containment* refactor, not more rules. A vertical is a **closed module to every
+other vertical by construction** (Go `internal/` visibility) except for its
+declared `public` package. Ownership is `OWNERS.md` at `features/<f>/` plus
+`CODEOWNERS` at the root. Cross-team rules collapse to one boundary test plus the
+`internal/` compiler rule and the in-vertical `public` contact surface.
+
+**The re-home is complete (Phases 2–7).** ops → `features/ops`; sales + the
+seller console → `features/sales` (backend hexagon at the feature root,
+read-side under `ui/`); auth → `features/auth`; home/profile/contentcms →
+`features/*/ui`; inventory/billing → `features/*`. `internal/modules/` and
+`internal/pages/` are deleted, `internal/bootstrap` is `internal/shell`, and the
+module scaffolder (`cmd/modulegen` + `make module`) is replaced by `make
+feature`. Each vertical owns its `OWNERS.md`; every vertical imports only its
+own subtree, `internal/shared`, and `gogo/contracts/*` — clamped by
+`internal/architecture/vertical_boundary_test.go`
+(`TestFeatureVerticalIsAClosedModule`,
+`TestFeatureVerticalHexagonDependencyDirection`,
+`TestCompositionLayerReachesNoVerticalInternals`) — and
+`TestRetiredRootsStayRetired` fails the build if either retired root comes back.
+The full program, its verification log and the execution findings live in
+[`docs/DECISION_TEAM_OWNED_VERTICALS.md`](docs/DECISION_TEAM_OWNED_VERTICALS.md)
+§4–§5. Every step was kept green: `go build ./...`, `go vet ./...`,
+`go test ./... -race`, the architecture tests, and `make arch-graph`.
+
+**Execution finding — the DI container keyed types by short name.** Merging
+`auth` (Phase 4) made two verticals' `ui.Page` types coexist, and
+`foundation/di` — which built its type keys from `reflect.Type.String()`, i.e.
+the *package name*, not the import path — resolved the second registration over
+the first: wrong wiring with no compile error and no DI error.
+`typeKey`/`qualifiedName` in `foundation/di/provide.go` now key by full import
+path, with a regression fixture (`foundation/di/typetest/{one,two}`) and test
+(`TestTypeKeysDistinguishSameNamedTypesFromDifferentPackages`). Recorded here
+because any future vertical adding a same-named type would have hit it too.
+
+**Revisit when:** a second authority for one row, an independent release cadence,
+or a hard resource-isolation requirement makes a vertical worth splitting into its
+own service/process. The consolidation does not create that split; it makes the
+eventual one a config change.
+
+### D-024 · Server-rendered UI by default; React only as owned islands
+**Date:** 2026-10-19 · **Status:** accepted
+
+**Problem.** The React-vs-server-render question is where UI ownership and
+operational weight go to die. The industry default after 2020 is a client-side
+app per feature; adopted here, it would (a) re-split the vertical — the team
+would no longer own its UI as one artifact shipped with its backend — and (b)
+make a Node toolchain and a real JavaScript bundle mandatory even where the UI
+is a navigation, a list and a form. Every client-side runtime is also something
+to ship, hydrate and observe, in a codebase whose server binary is already the
+unit of deployment ([D-001](#d-001), [D-023](#d-023)).
+
+**Decision.** The gateway renders HTML in Go, with Templ views and htmx
+fragments; the rendering contract (`render.Respond`: a document for a
+navigation, a fragment for an in-page swap) chooses the representation per
+request. **React is used only as an island**: a self-contained interactive
+region whose behaviour is genuinely complex — a rich editor, a drag-and-drop
+surface, a live map or graph — where hand-written DOM code would be the
+expensive part. The policy in full:
+
+- **Owned by the vertical that renders it.** Island code lives under
+  `<feature>/ui/`, obeys the same closed-module rule as the rest of the
+  vertical ([rule 1](#2-import-rules-enforced)), and ships in the same image as
+  its backend: one team, one project, one image — the [D-023](#d-023) property,
+  not a separate frontend deployment.
+- **Server-rendered first, island second.** The page renders and works without
+  JavaScript wherever the island's job allows it; the island is
+  progressive-enhancement, lazy-loaded, and never requires a client-side
+  router. No global SPA shell: navigation stays server-side, and static content
+  is not hydrated.
+- **A budget, reviewed like a dependency.** An island's bundle size is part of
+  the review that adds it and is measured: an island that grows until it is a
+  de-facto SPA is the failure mode, not the goal.
+- **No shared frontend build.** There is no cross-vertical JS pipeline that
+  would couple teams' release cadence; two verticals with islands are two
+  island bundles, each owned with its vertical.
+- **Extract with its consumer.** Today zero React islands exist in the gateway,
+  and none is added speculatively ([D-007](#d-007)'s rule applied to UI). The
+  first island arrives with its first real use case. The "islands" named by the
+  rendering contract (the revalidated storefront grid, the product-detail
+  region) are server-side cached regions — an island does not imply React.
+- **Docs and demos are build-time only.** A React-based site (e.g. Rspress) may
+  build documentation out of this repository; it is not part of the runtime
+  image and no application code imports it.
+
+**Why not "no JavaScript at all".** htmx covers the interaction win cheaply, but
+a rich editor or canvas re-implemented by hand is a worse maintenance bargain
+than a scoped React island. Banning React outright would push those cases into
+worse custom code; leaving the door open unbudgeted is how SPAs happen. The
+policy makes the exception expensive to declare and cheap to keep.
+
+**Why not "SPA per vertical".** For the team topology gogo decided (one team,
+one vertically-owned route, server-rendered HTML), a SPA per vertical buys
+client-side routing the server already does, duplicates state the server
+already holds, and adds a second deployment artifact per vertical — exactly the
+scattering [D-023](#d-023) removed.
+
+**Revisit when:** a second client runtime (mobile/desktop native) needs to share
+the UI, or an island's interaction is complex enough that React is the smaller
+total cost across several screens — the same "extract with the real consumer"
+rule applies.

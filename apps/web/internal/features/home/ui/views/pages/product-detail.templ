@@ -1,0 +1,68 @@
+package pages
+
+import (
+	"sort"
+	"gogo/internal/features/home/ui/application/results"
+	"gogo/internal/shared/money"
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo.design/system/web/ui"
+)
+
+func attributeLabel(key string) string {
+	if key == "material" { return "Material" }
+	if key == "weight" { return "Berat (g)" }
+	return key
+}
+
+func productAttributeKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values { keys = append(keys, key) }
+	sort.Strings(keys)
+	return keys
+}
+
+templ ProductDetail(product *results.Product, content templ.Component) {
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base(product.Name+" — Gogo", navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), "")}) {
+		@content
+	}
+}
+
+templ ProductDetailContent(product *results.Product) {
+	<div class="mb-5">
+		@ui.ButtonLink("/", ui.TapActionClass(ui.IntentPrimary, "sm"), nil) {
+			@ui.IconArrowLeft("size-4")
+			Kembali ke katalog
+		}
+	</div>
+	<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)]">
+		<section class="rounded-2xl border border-base-300 bg-base-100 p-6 sm:p-8">
+			<div class="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+				@ui.IconTag("size-8")
+			</div>
+			if product.Brand != "" {
+				<p class="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">{ product.Brand }</p>
+			}
+			<h1 class="text-3xl font-bold tracking-tight sm:text-4xl">{ product.Name }</h1>
+			if product.Description != "" {
+				<p class="mt-5 whitespace-pre-line leading-7 text-base-content/75">{ product.Description }</p>
+			} else {
+				<p class="mt-5 text-base-content/60">Belum ada deskripsi untuk produk ini.</p>
+			}
+			if len(product.Attributes) > 0 {
+				<dl class="mt-6 grid gap-3 border-t border-base-300 pt-5 sm:grid-cols-2">
+					for _, key := range productAttributeKeys(product.Attributes) {
+						<div><dt class="text-sm text-base-content/60">{ attributeLabel(key) }</dt><dd class="font-medium">{ product.Attributes[key] }</dd></div>
+					}
+				</dl>
+			}
+		</section>
+		<aside class="h-fit rounded-2xl border border-base-300 bg-base-100 p-6 sm:p-8">
+			<p class="text-sm text-base-content/60">Harga</p>
+			<div class="mt-2">@ui.PriceBlock("Rp", money.Rupiah(product.Price), ui.PriceLg)</div>
+			<div class="my-6 h-px bg-base-300"></div>
+			@ui.CountBadge(ui.CountBadgeOptions{Count: product.Stock, Suffix: "tersedia", ZeroLabel: "Stok habis", Class: ""})
+			<p class="mt-4 text-sm leading-6 text-base-content/60">Informasi katalog diperbarui oleh layanan produk. Ketersediaan dapat berubah.</p>
+		</aside>
+	</div>
+}

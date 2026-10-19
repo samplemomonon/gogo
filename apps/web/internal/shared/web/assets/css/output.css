@@ -4628,9 +4628,6 @@
   .w-24 {
     width: calc(var(--spacing) * 24);
   }
-  .w-fit {
-    width: fit-content;
-  }
   .w-full {
     width: 100%;
   }

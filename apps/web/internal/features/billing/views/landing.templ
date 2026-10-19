@@ -1,0 +1,46 @@
+package views
+
+import (
+	"gogo/internal/features/billing/activity"
+	"gogo.design/system/web/ui"
+)
+
+// Landing is the full-document region of the /billing page, rendered inside
+// the shared shell. The activity feed is lazy: the Load activity button
+// swaps the /billing/fragment endpoint into #billing-region.
+templ Landing(entries []activity.Entry) {
+	<div class={ ui.StackSpaceClass }>
+		@ui.HeroBanner(ui.HeroOptions{
+			Eyebrow:     "modul billing",
+			Tone:        "primary",
+			Title:       "Tagihan",
+			Description: "Penagihan langganan dan pengelolaan invoice",
+			FooterText:  statusText(len(entries)),
+		})
+		@ui.Card("gap-4 p-6", nil) {
+			<div class="space-y-1">
+				<h2 class="card-title text-lg font-bold">Aktivitas Katalog</h2>
+				<p class="text-sm text-base-content/70 leading-relaxed">
+					Modul ini berlangganan event <code class="px-2 py-0.5 rounded-md bg-base-200 border border-base-300/60 font-mono text-xs text-primary font-semibold">catalog.product.created / updated / deleted</code>
+					dari bus event bersama. Buat atau ubah produk di
+					<a class={ ui.LinkClass + " underline-offset-4" } href="/seller/produk">/seller/produk</a>, lalu muat ulang feed ini.
+				</p>
+			</div>
+			<div>
+				@ui.Button(ui.TapActionClass(ui.IntentPrimary, "sm"), templ.Attributes{
+					"hx-get":            "/billing/fragment",
+					"hx-target":         "#billing-region",
+					"hx-swap":           "innerHTML",
+					"hx-disabled-elt":   "this",
+				}) {
+					@ui.IconLayers("size-4")
+					Muat aktivitas
+					@ui.Spinner("xs", "htmx-indicator")
+				}
+			</div>
+			// A live region, so loading the feed is announced rather than
+			// swapping silently for a screen-reader user.
+			<div id="billing-region" class="animate-swap" role="status" aria-live="polite"></div>
+		}
+	</div>
+}

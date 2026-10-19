@@ -12,9 +12,9 @@ import (
 	"log/slog"
 	"os"
 
-	"gogo/internal/bootstrap"
 	"gogo/internal/shared/config"
 	"gogo/internal/shared/logging"
+	"gogo/internal/shell"
 )
 
 func main() {
@@ -26,13 +26,13 @@ func main() {
 
 	logger := logging.New(cfg)
 
-	ctx, cancel := bootstrap.SignalContext(context.Background())
+	ctx, cancel := shell.SignalContext(context.Background())
 	defer cancel()
 
 	// BuildGateway composes the whole gateway and returns one shutdown hook that
 	// releases everything the graph acquired: the product-platform connections, the
 	// in-process module persistence, and the product change feed.
-	app, closeAll, err := bootstrap.BuildGateway(ctx, cfg, logger)
+	app, closeAll, err := shell.BuildGateway(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("gateway startup failed", "error", err)
 		os.Exit(1)

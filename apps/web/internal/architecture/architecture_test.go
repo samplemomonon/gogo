@@ -24,9 +24,10 @@
 //   - Bazel is not installed in this checkout, and there is no MODULE.bazel or
 //     WORKSPACE file. Nothing runs `bazel test`.
 //   - Only 44 BUILD.bazel files remain, covering 43 packages — cmd, contracts,
-//     modules/auth, modules/reporting, and the home/profile/seller pages. Every
-//     other package, including all of internal/shared and internal/bootstrap,
-//     has none.
+//     the auth module, reporting, and the home/profile/seller pages (paths as
+//     they stood before the team-owned-verticals migration, D-023). Every
+//     other package, including all of internal/shared and the composition
+//     root, has none.
 //   - So the derived graph covered roughly a third of the repo while the
 //     committed snapshot held 119 packages. The staleness gate had been failing,
 //     which means the snapshot had been drifting with nothing to notice.
@@ -53,6 +54,9 @@ import (
 )
 
 const (
+	// modulesPrefix and pagesPrefix are the pre-D-023 roots. They are retired:
+	// every unit is a team-owned vertical under featuresPrefix, and
+	// TestRetiredRootsStayRetired fails if either old root comes back.
 	modulesPrefix = "gogo/internal/modules/"
 	pagesPrefix   = "gogo/internal/pages/"
 	cmdPrefix     = "gogo/cmd/"
@@ -69,9 +73,13 @@ const mainRepoPrefix = "gogo/"
 // relative path resolves either way.
 const graphFile = "import_graph.txt"
 
-// findGogoRoot locates the directory that contains internal/modules. It is only
+// findGogoRoot locates the directory that contains internal/features. It is only
 // needed by the test that re-derives the graph from the toolchain, which runs
 // under `go test` where the working directory is inside the real checkout.
+//
+// The marker is internal/features (not internal/modules) because D-023 retires
+// internal/modules entirely: every unit re-homes under internal/features, and
+// this locator must keep working once the old roots are gone.
 func findGogoRoot(t *testing.T) string {
 	t.Helper()
 
@@ -81,7 +89,7 @@ func findGogoRoot(t *testing.T) string {
 	}
 
 	for {
-		if info, err := os.Stat(filepath.Join(dir, "internal", "modules")); err == nil && info.IsDir() {
+		if info, err := os.Stat(filepath.Join(dir, "internal", "features")); err == nil && info.IsDir() {
 			return dir
 		}
 		parent := filepath.Dir(dir)
@@ -314,107 +322,6 @@ func withPrefix(pkgs []string, prefix string) map[string]bool {
 	return set
 }
 
-func moduleName(pkg string) string {
-	parts := strings.SplitN(strings.TrimPrefix(pkg, modulesPrefix), "/", 2)
-	return parts[0]
-}
-
-// pageName returns the page a package lives in, or "" for packages outside
-// internal/pages/.
-func pageName(pkg string) string {
-	rest, ok := strings.CutPrefix(pkg, pagesPrefix)
-	if !ok {
-		return ""
-	}
-	name, _, _ := strings.Cut(rest, "/")
-	return name
-}
-
-// isModulePublic reports whether pkg is a module's public surface — the
-// `<module>/public` package or something under it.
-//
-// This is the only kind of module package a page may import, per
-// docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1. The match is deliberately exact:
-// `public` or `public/…`, so a package named `publicity` is not mistaken for the
-// contract.
-func isModulePublic(pkg string) bool {
-	rest, ok := strings.CutPrefix(pkg, modulesPrefix)
-	if !ok {
-		return false
-	}
-	_, sub, nested := strings.Cut(rest, "/")
-	if !nested {
-		return false // the module's root package is not a contract
-	}
-	return sub == "public" || strings.HasPrefix(sub, "public/")
-}
-
-// moduleReachOffenses returns the module packages reachable from roots that are
-// not a module's public surface: every closure member under internal/modules/
-// that fails isModulePublic.
-//
-// It is the predicate behind ARCHITECTURE.md rule 1 as narrowed by
-// docs/ADR_CROSS_TEAM_UI_CONTRACT.md: a page may depend on `<module>/public`,
-// the surface the owning team declares and maintains, and on nothing else inside
-// a module. It is a plain function over a graph rather than a closure inside the
-// test so that the rule itself can be asserted on synthetic graphs — the real
-// graph contains no `public` package yet, and a rule that has never fired is a
-// rule nobody has tested.
-func moduleReachOffenses(g graph, roots ...string) []string {
-	var out []string
-	for _, dep := range closure(g, roots...) {
-		if strings.HasPrefix(dep, modulesPrefix) && !isModulePublic(dep) {
-			out = append(out, dep)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-// pageCompositionOffenses returns page -> other-page edges: a package under
-// internal/pages/ reaching a package that lives in a different page's subtree.
-//
-// A page importing its own subtree is one owner and is not an offense. A page
-// importing another page makes one page's layout another page's build
-// dependency — the shared-authority failure the four-zone model splits apart
-// (docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1: pages do not compose pages).
-func pageCompositionOffenses(g graph, pagePkgs []string) []string {
-	var out []string
-	for _, pagePkg := range pagePkgs {
-		me := pageName(pagePkg)
-		for _, dep := range closure(g, pagePkg) {
-			if !strings.HasPrefix(dep, pagesPrefix) || pageName(dep) == me {
-				continue
-			}
-			out = append(out, pagePkg+" -> "+dep)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
-// crossModuleOffenses returns importer -> dep edges that cross from one module
-// into another, the predicate behind import rule 3.
-//
-// That includes the other module's `public` package: ADR_CROSS_TEAM_UI_CONTRACT.md
-// §8 item 3 grants the public surface to pages only. Module-to-module
-// communication stays event-based, so a future need for module-to-module imports
-// is a separate ADR, not a quiet edit to this predicate.
-func crossModuleOffenses(g graph, modulePkgs []string) []string {
-	var out []string
-	for _, importer := range modulePkgs {
-		me := moduleName(importer)
-		for _, dep := range closure(g, importer) {
-			if !strings.HasPrefix(dep, modulesPrefix) || moduleName(dep) == me {
-				continue
-			}
-			out = append(out, importer+" -> "+dep)
-		}
-	}
-	sort.Strings(out)
-	return out
-}
-
 func sortedKeys(set map[string]bool) []string {
 	keys := make([]string, 0, len(set))
 	for k := range set {
@@ -431,74 +338,36 @@ func TestImportBoundaries(t *testing.T) {
 
 	g := readGraph(t)
 
-	modulePkgs := packagesUnder(g, modulesPrefix)
-	pagesPkgs := packagesUnder(g, pagesPrefix)
-	// Rule 4 asks whether bootstrap *reaches* pages and modules, so this is its
-	// closure, not just the packages that live under the bootstrap directory.
-	// No trailing slash: internal/bootstrap is a single package and its import
-	// path is `gogo/internal/bootstrap`.
-	bootstrapPkgs := closure(g, "gogo/internal/bootstrap")
+	// Rule 4 asks whether the shell *reaches* feature units, so this is its
+	// closure, not just the packages that live under the shell directory.
+	// No trailing slash: internal/shell is a single package and its import
+	// path is `gogo/internal/shell`.
+	shellPkgs := closure(g, "gogo/internal/shell")
 
-	t.Run("modules must not import pages", func(t *testing.T) {
-		if offending := withPrefix(closure(g, modulePkgs...), pagesPrefix); len(offending) > 0 {
-			t.Errorf("modules import pages (violates ARCHITECTURE.md rule 2):\n  %s",
-				strings.Join(sortedKeys(offending), "\n  "))
-		}
-	})
+	// Rules 1 and 3 as the old tree stated them — pages reach modules only
+	// through `public`, pages do not compose pages, modules do not import
+	// modules — have one subject now: the team-owned vertical. All three are
+	// asserted by TestFeatureVerticalIsAClosedModule in
+	// vertical_boundary_test.go (a vertical may import only its own subtree,
+	// internal/shared, or gogo/contracts), the single boundary mechanism D-023
+	// §5 prescribes. The module-shaped predicates that used to live here were
+	// deleted together with the retired internal/modules and internal/pages
+	// roots.
 
-	// Rule 1 as narrowed by docs/ADR_CROSS_TEAM_UI_CONTRACT.md: a page may reach
-	// a module only through the module's `public` package — the surface the
-	// owning team declares and maintains — and everything else is reached over
-	// remote contracts. The test must be narrowed, never deleted: the invariant
-	// it removes ("no module import at all") is replaced by a narrower one
-	// ("no module import except `public`"), and the failure message names the
-	// ADR so the rule's authority is findable from the build output.
-	t.Run("pages import modules only through a module's public surface", func(t *testing.T) {
-		if offending := moduleReachOffenses(g, pagesPkgs...); len(offending) > 0 {
-			t.Errorf("pages import module internals (violates ARCHITECTURE.md rule 1 and docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1):\n  %s\n"+
-				"  a page may import only <module>/public, the surface the owning team declares and maintains; "+
-				"everything else inside a module is reached over remote contracts",
-				strings.Join(offending, "\n  "))
-		}
-	})
-
-	// The other half of the ADR's zone table: pages do not compose pages. A page
-	// importing another page makes one page's layout another page's build
-	// dependency, which is exactly the shared-authority failure the four-zone
-	// model splits apart. A page importing its own subtree is fine — that is
-	// one owner.
-	t.Run("pages must not import other pages", func(t *testing.T) {
-		if offending := pageCompositionOffenses(g, pagesPkgs); len(offending) > 0 {
-			t.Errorf("pages import pages (violates ARCHITECTURE.md rule 1 and docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1); "+
-				"pages do not compose pages — move the shared piece into internal/shared:\n  %s",
-				strings.Join(offending, "\n  "))
-		}
-	})
-
-	t.Run("modules must not import other modules", func(t *testing.T) {
-		if offending := crossModuleOffenses(g, modulePkgs); len(offending) > 0 {
-			t.Errorf("cross-module runtime imports (violates ARCHITECTURE.md rule 3); share the contract module instead — "+
-				"a module's `public` surface is granted to pages only (docs/ADR_CROSS_TEAM_UI_CONTRACT.md §8 item 3):\n  %s",
-				strings.Join(offending, "\n  "))
-		}
-	})
-
-	t.Run("bootstrap is the composition root", func(t *testing.T) {
-		if len(withPrefix(bootstrapPkgs, pagesPrefix)) == 0 {
-			t.Error("bootstrap does not import any page (violates ARCHITECTURE.md rule 4)")
-		}
-		if len(withPrefix(bootstrapPkgs, modulesPrefix)) == 0 {
-			t.Error("bootstrap does not import any module (violates ARCHITECTURE.md rule 4)")
+	t.Run("the shell is the composition root", func(t *testing.T) {
+		if len(withPrefix(shellPkgs, featuresPrefix)) == 0 {
+			t.Error("the shell does not import any vertical (violates ARCHITECTURE.md rule 4)")
 		}
 	})
 
 	// The platform layer (internal/shared) must stay self-contained so it can be
 	// published as a module and consumed from a new service repo. If it ever
-	// imports modules/pages/cmd, extraction stops being a copy.
+	// imports a vertical, a retired root, or cmd, extraction stops being a copy.
 	t.Run("platform must not import app code", func(t *testing.T) {
 		var offending []string
 		for _, p := range closure(g, packagesUnder(g, "gogo/internal/shared/")...) {
-			if strings.HasPrefix(p, modulesPrefix) || strings.HasPrefix(p, pagesPrefix) || strings.HasPrefix(p, cmdPrefix) {
+			if strings.HasPrefix(p, featuresPrefix) || strings.HasPrefix(p, modulesPrefix) ||
+				strings.HasPrefix(p, pagesPrefix) || strings.HasPrefix(p, cmdPrefix) {
 				offending = append(offending, p)
 			}
 		}
@@ -515,8 +384,8 @@ func TestImportBoundaries(t *testing.T) {
 	// that kit and nothing else, so the wire↔core mapping, the error vocabulary and the
 	// breaker conventions cannot be re-implemented per page.
 	//
-	// The single permitted exception is bootstrap, which dials the four connections and
-	// hands them to the kit.
+	// The single permitted exception is the shell (internal/shell), which dials the four
+	// connections and hands them to the kit.
 	t.Run("platform contracts are reached only through the consumer kit", func(t *testing.T) {
 		const kit = "gogo/internal/shared/productconsumer"
 		platformContracts := []string{
@@ -528,7 +397,7 @@ func TestImportBoundaries(t *testing.T) {
 
 		var offending []string
 		for importer, deps := range g {
-			if importer == kit || importer == "gogo/internal/bootstrap" {
+			if importer == kit || importer == "gogo/internal/shell" {
 				continue
 			}
 			for _, dep := range deps {
@@ -548,13 +417,13 @@ func TestImportBoundaries(t *testing.T) {
 
 	// The product platform owns the product domain outright, so no package in this repo
 	// may hold product state or write a product. The guard is structural rather than a
-	// search for a SQL string: a reintroduced write path has to live in a module or page
-	// under these prefixes, and there are none for products.
+	// search for a SQL string: a reintroduced write path has to live in a vertical under
+	// these prefixes, and there are none for products.
 	t.Run("no product aggregate is owned in-process", func(t *testing.T) {
 		for _, prefix := range []string{
-			modulesPrefix + "catalog/",
-			modulesPrefix + "product",
-			modulesPrefix + "listing/",
+			featuresPrefix + "catalog/",
+			featuresPrefix + "product",
+			featuresPrefix + "listing/",
 		} {
 			if found := packagesUnder(g, prefix); len(found) > 0 {
 				t.Errorf("packages under %q exist (%v); the product platform owns the product domain "+
@@ -566,19 +435,40 @@ func TestImportBoundaries(t *testing.T) {
 
 }
 
+// TestRetiredRootsStayRetired pins the destination of the D-023 migration: every
+// unit is a team-owned vertical under internal/features, and the pre-migration
+// roots are gone. The compiler cannot express this — recreating
+// internal/modules or internal/pages compiles fine and would quietly re-open
+// the scattering the migration closed — so it is a graph-existence check, the
+// same shape as TestNoPlatformAggregateIsOwnedInProcess.
+func TestRetiredRootsStayRetired(t *testing.T) {
+	skipIfDisabled(t)
+
+	g := readGraph(t)
+
+	for _, root := range []string{modulesPrefix, pagesPrefix} {
+		if found := packagesUnder(g, root); len(found) > 0 {
+			t.Errorf("packages under %q exist (%v); D-023 retires this root — every unit is a "+
+				"team-owned vertical under %s (one team, one project, one image); use `make feature` "+
+				"to scaffold one", root, found, featuresPrefix)
+		}
+	}
+}
+
 // TestParserIsHonest is a guard on the guard. Every rule above is phrased as
 // "this edge must not exist", so a parser that silently returned an empty or
 // truncated graph would turn the whole file into a test that always passes.
 //
 // This asserts the graph is the shape we expect from gogo's real layout: the
 // top-level layers are all populated, and the known-good structure is present
-// (bootstrap reaches pages and modules).
+// (the shell reaches the verticals' ui).
 // If Gazelle's output format ever changes shape, this fails before the rule
 // checks get a chance to pass on nothing.
 //
-// The cmd/ floor is 2 rather than 3: the catalog and listing binaries went with
-// the product domain (see ARCHITECTURE.md D-018), leaving the server and the
-// module scaffolder. The contracts/ floor is 7 rather than 8: the reporting
+// The cmd/ floor is 3: the catalog and listing binaries went with the product
+// domain (see ARCHITECTURE.md D-018), and the module scaffolder was retired
+// with the D-023 re-home, leaving the server, the two auth maintenance
+// binaries and the team-catalog gate. The contracts/ floor is 6: the reporting
 // contract went with internal/modules/reporting, whose only consumer was a
 // stubbed adapter returning confident zeros.
 //
@@ -598,11 +488,16 @@ func TestParserIsHonest(t *testing.T) {
 		prefix      string
 		wantAtLeast int
 	}{
-		{modulesPrefix, 20},
-		{pagesPrefix, 20},
+		// The D-023 re-home is complete: every unit is a team-owned vertical
+		// under internal/features, and the floors below track the tree that
+		// remains. The features floor counts ops (1) + sales (20) + auth (14) +
+		// inventory (8) + billing (4) + home (9) + profile (6) + contentcms (1).
+		// Lower a floor when a unit deliberately moves — do not leave slack
+		// that absorbs any change.
+		{featuresPrefix, 60},
 		{"gogo/internal/shared/", 30},
-		{"gogo/internal/bootstrap", 1},
-		{"gogo/cmd/", 2},
+		{"gogo/internal/shell", 1},
+		{"gogo/cmd/", 3},
 		{"gogo/contracts/", 6},
 	} {
 		if got := len(packagesUnder(g, tc.prefix)); got < tc.wantAtLeast {
@@ -610,11 +505,11 @@ func TestParserIsHonest(t *testing.T) {
 		}
 	}
 
-	// Spot-check three real edges so a silently-empty graph cannot pass. The third is
-	// the product-platform boundary: the shared consumer kit must reach the four
+	// Spot-check real edges so a silently-empty graph cannot pass. The product-platform
+	// edges are the boundary: the shared consumer kit must reach the four
 	// contracts it speaks, and a graph that lost them would still pass the older checks.
 	for _, edge := range [][2]string{
-		{"gogo/internal/bootstrap", "gogo/internal/pages/home"},
+		{"gogo/internal/shell", "gogo/internal/features/home/ui"},
 		{"gogo/internal/shared/productconsumer", "gogo/contracts/product/v1"},
 		{"gogo/internal/shared/productconsumer", "gogo/contracts/productlisting/v1"},
 		{"gogo/internal/shared/productconsumer", "gogo/contracts/productsearch/v1"},

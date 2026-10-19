@@ -1,7 +1,6 @@
 # ---- Go ----
 # Compiled binaries and build output
 /bin/
-/modulegen
 # Stray binaries built at the repo root instead of bin/ (never commit these)
 /catalog
 /server
@@ -55,3 +54,13 @@ Thumbs.db
 
 # Local debug binaries built at the repo root while inspecting renders
 /renderdump
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml

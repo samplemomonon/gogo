@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// # Per-module dependency direction
+// # Per-vertical dependency direction
 //
 // ARCHITECTURE.md states the hexagon rules in prose and says outright that no
 // test enforces them:
@@ -21,6 +21,10 @@ import (
 //	 the reverse; domain depends on nothing internal."
 //
 // So the architecture was right and unverified. These tests make it checked.
+// The matrix below is data — layers, allowed callees — applied to whatever
+// verticals build the hexagon; TestFeatureVerticalHexagonDependencyDirection in
+// vertical_boundary_test.go is its one runner since D-023 Phase 7 retired
+// internal/modules (the module-era runner is tombstoned below).
 //
 // The rules below are data rather than hand-written subtests, because they are a
 // matrix: the same predicate over a list of (layer, allowed callee) pairs. That
@@ -45,9 +49,9 @@ type layerRule struct {
 	to []string
 }
 
-// The layers a module may be built from. A module that does not use one of them
-// is simply not constrained by that row, so a flat module — billing, ops, and
-// every module the scaffolder generates — passes without special-casing.
+// The layers a vertical may be built from. A vertical that does not use one of
+// them is simply not constrained by that row, so a flat vertical — billing,
+// ops — passes without special-casing.
 var knownLayers = []string{
 	"domain",
 	"application",
@@ -102,68 +106,11 @@ func rulesFor(module, layer string) []layerRule {
 	return out
 }
 
-// TestHexagonDependencyDirection enforces ARCHITECTURE.md's per-module rules.
-//
-// It only inspects modules that actually build the hexagon. A flat module has
-// no layer directories, so there is nothing to constrain and the rule is not
-// applied — which is correct, not a gap: the rule is about how layers may
-// relate to each other, and a module with one layer cannot violate it.
-func TestHexagonDependencyDirection(t *testing.T) {
-	skipIfDisabled(t)
-
-	checked := 0
-	for _, module := range modulesInGraph() {
-		for _, layer := range knownLayers {
-			pkg := modulesPrefix + module + "/" + layer
-			deps, ok := graphEdges()[pkg]
-			if !ok {
-				continue
-			}
-			rules := rulesFor(module, layer)
-			if len(rules) == 0 {
-				continue
-			}
-			checked++
-
-			allowed := map[string]bool{}
-			for _, r := range rules {
-				for _, to := range r.to {
-					allowed[to] = true
-				}
-			}
-
-			for _, dep := range deps {
-				if !strings.HasPrefix(dep, modulesPrefix+module+"/") {
-					continue // crosses a module boundary; rule 3 decides that
-				}
-				// Layers nest — infrastructure/postgres is inside
-				// infrastructure — so a rule naming infrastructure covers
-				// everything under it.
-				depLayer := strings.TrimPrefix(dep, modulesPrefix+module+"/")
-				permitted := false
-				for layer := range allowed {
-					if depLayer == layer || strings.HasPrefix(depLayer, layer+"/") {
-						permitted = true
-						break
-					}
-				}
-				if permitted {
-					continue
-				}
-				t.Errorf("%s imports %s\n"+
-					"  violated: layer %q may only import %s inside its module (ARCHITECTURE.md: "+
-					"\"presentation and infrastructure both depend on application ports, never the reverse; "+
-					"domain depends on nothing internal\")",
-					pkg, dep, layer, allowedList(layer))
-			}
-		}
-	}
-
-	if checked == 0 {
-		t.Fatal("no hexagon layers found; the matrix would assert nothing")
-	}
-	t.Logf("checked %d layer packages across %d modules", checked, len(modulesInGraph()))
-}
+// TestHexagonDependencyDirection (the module-era runner of the matrix below
+// over internal/modules) was deleted in D-023 Phase 7. Every vertical now lives
+// under internal/features, and TestFeatureVerticalHexagonDependencyDirection in
+// vertical_boundary_test.go applies the same matrix to them; keeping a second
+// runner for a retired root would be a rule with no subject.
 
 func allowedList(layer string) string {
 	for _, r := range layerRules {
@@ -178,107 +125,106 @@ func allowedList(layer string) string {
 	return "nothing"
 }
 
-// TestCompositionLayerReachesNoModuleInternals is the machine form of the
-// four-zone model in ARCHITECTURE.md §1: the application composition layer owns
-// the object graph and the response shape, and owns no business vocabulary.
+// TestCompositionLayerReachesNoVerticalInternals is the machine form of the
+// two-face ownership rule: the shell (the composition root) and each vertical's
+// ui are the two faces that sit outside a vertical's backend, and neither owns
+// the backend's vocabulary.
 //
-// The rule: bootstrap may reach a module only through the module's own
-// composition root — its `compose` package, or its root package when it
-// contributes itself to the container. It may not reach into a module's
-// domain, application, presentation or infrastructure.
+// The rule has two halves:
 //
-// Reaching into a module is not a Dependency Rule inversion — bootstrap is the
-// outermost layer, so pointing outward from it is fine. What it costs is
-// coupling: the composition root ends up knowing a module's internal wiring,
-// which is precisely the knowledge the module's `compose` package exists to
-// keep to itself. A module that declares what it needs as a parameter, and gets
-// the implementation from its own compose, needs no help from bootstrap.
+//  1. The shell may reach a vertical only through that vertical's own
+//     composition root — its `compose` package, or its root package when it
+//     contributes itself to the container — or through its `ui/`. It may not
+//     reach into a vertical's domain, application, presentation or
+//     infrastructure. Reaching in is not a Dependency Rule inversion (the shell
+//     is outermost), but it costs coupling: the root ends up knowing a
+//     vertical's internal wiring, which is exactly the knowledge that
+//     vertical's `compose` package exists to keep to itself.
 //
-// Pages are checked by the same shape: a page reaches no module internals, which
-// is import rule 1 restated at layer granularity rather than package
-// granularity. The one module package a page may reach is `public` — the
-// cross-team surface granted by docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1 — and it
-// is therefore the one layer this test does not forbid.
-func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
+//  2. A vertical's `ui` reaches no backend internals — not its own, and not
+//     another vertical's (the closed-module test forbids the latter outright).
+//     The read-side consumes its backend over the wire contract exactly as it
+//     consumes other verticals, so the two halves of one vertical still meet
+//     over gRPC; lifting one out stays a config change rather than a rewrite.
+//     The one cross-team surface a ui may name, `public`, does not exist yet
+//     (D-021: it is extracted with its first real consumer).
+//
+// The pre-D-023 form of this test checked the module/pages split; the vertical
+// model has one subject, so both halves are phrased on it and a retired root
+// cannot pass by having nothing to check.
+func TestCompositionLayerReachesNoVerticalInternals(t *testing.T) {
 	skipIfDisabled(t)
 
 	g := graphEdges()
 
-	// compositionExceptions are the edges the rule is known to be wrong about,
-	// recorded rather than forgotten.
-	//
-	// The list is a shrink-only ledger: an entry may be removed but never
-	// added silently, and each one says why it exists and what would retire it.
-	// A rule with a quiet exception is worse than no rule, because the next
-	// person cannot tell which edges were checked.
-	//
-	// It is empty. The last entry — bootstrap importing the sales module's
-	// inventoryclient adapter — was retired by moving inventoryclient.New into
-	// sales/compose as compose.NewInventoryAdjuster, so bootstrap now reaches
-	// sales only through its composition root, exactly as it reaches auth and
-	// inventory. The ledger stays so the next exception is written down where
-	// its rule is enforced, not so it can be filled again.
-	compositionExceptions := map[string]string{}
+	// matchesLayer reports which of the layers rest names, honoring the fact
+	// that layers nest (infrastructure/postgres lives inside infrastructure).
+	matchesLayer := func(rest string, layers []string) string {
+		for _, layer := range layers {
+			if rest == layer || strings.HasPrefix(rest, layer+"/") {
+				return layer
+			}
+		}
+		return ""
+	}
 
-	// These are the layers that carry a module's business: rules in domain, use
-	// cases in application, rules again in the adapters that implement them.
-	internalModuleLayers := []string{"domain", "application", "presentation", "infrastructure"}
+	// These are the layers that carry a vertical's business: rules in domain,
+	// use cases in application, rules again in the adapters that implement
+	// them.
+	backendLayers := []string{"domain", "application", "presentation", "infrastructure"}
 
-	// A page must not reach any of those layers, and not the module's compose
-	// root either. A page reaching compose would drag the module's whole object
-	// graph — adapters, connections, wiring — into the page's build, which is
-	// the dependency the four-zone model exists to cut. Only `public` is open to
-	// pages, per docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1.
-	pageForbiddenModuleLayers := append([]string{"compose"}, internalModuleLayers...)
-
-	t.Run("bootstrap reaches modules only through their composition roots", func(t *testing.T) {
-		for _, dep := range g["gogo/internal/bootstrap"] {
-			rest, ok := strings.CutPrefix(dep, modulesPrefix)
+	t.Run("the shell reaches a vertical only through its compose root or ui", func(t *testing.T) {
+		for _, dep := range g["gogo/internal/shell"] {
+			rest, ok := strings.CutPrefix(dep, featuresPrefix)
 			if !ok {
 				continue
 			}
-			_, layer, _ := strings.Cut(rest, "/")
-			if layer == "" {
-				continue // the module's root package
+			_, sub, _ := strings.Cut(rest, "/")
+			switch {
+			case sub == "", sub == "ui", strings.HasPrefix(sub, "ui/"),
+				sub == "compose", strings.HasPrefix(sub, "compose/"):
+				continue // the vertical's entry points; wiring these is the shell's job
 			}
-			if why, ok := compositionExceptions[dep]; ok {
-				t.Logf("known composition exception: %s\n  %s", dep, why)
-				continue
-			}
-			for _, forbidden := range internalModuleLayers {
-				if layer == forbidden || strings.HasPrefix(layer, forbidden+"/") {
-					t.Errorf("gogo/internal/bootstrap imports %s\n"+
-						"  violated: the composition root may reach a module only through its own "+
-						"compose package or its root package. Reaching into %q makes the root know "+
-						"the module's internal wiring, which is what that module's compose package "+
-						"exists to keep to itself", dep, forbidden)
-				}
+			if layer := matchesLayer(sub, backendLayers); layer != "" {
+				t.Errorf("gogo/internal/shell imports %s\n"+
+					"  violated: the composition root may reach a vertical only through its own "+
+					"compose package, its root package, or its ui. Reaching into %q makes the root "+
+					"know the vertical's internal wiring, which is what that vertical's compose "+
+					"package exists to keep to itself", dep, layer)
 			}
 		}
 	})
 
-	t.Run("a page reaches no module internals", func(t *testing.T) {
-		for pagePkg := range g {
-			if !strings.HasPrefix(pagePkg, pagesPrefix) {
-				continue
-			}
-			for _, dep := range closure(g, pagePkg) {
-				rest, ok := strings.CutPrefix(dep, modulesPrefix)
-				if !ok {
-					continue
-				}
-				_, layer, _ := strings.Cut(rest, "/")
-				for _, forbidden := range pageForbiddenModuleLayers {
-					if layer == forbidden || strings.HasPrefix(layer, forbidden+"/") {
-						t.Errorf("page %s reaches module internals %s; pages consume modules over "+
-							"their remote contracts, never by importing them. A module's only "+
-							"page-importable package is its `public` surface "+
-							"(ARCHITECTURE.md rule 1; docs/ADR_CROSS_TEAM_UI_CONTRACT.md §4.1)",
-							pagePkg, dep)
+	t.Run("a vertical's ui reaches no backend internals", func(t *testing.T) {
+		checked := 0
+		for _, feature := range featuresInGraph(g) {
+			base := featuresPrefix + feature
+			for _, pkg := range packagesUnder(g, base+"/ui") {
+				checked++
+				for _, dep := range closure(g, pkg) {
+					rest, ok := strings.CutPrefix(dep, base+"/")
+					if !ok {
+						continue // another vertical or the platform; other rules decide
+					}
+					if rest == "" {
+						t.Errorf("ui package %s imports its vertical's backend root %s; the read-side "+
+							"consumes the backend over its gRPC contract, exactly as it consumes other "+
+							"verticals (ARCHITECTURE.md rule 1; D-023)", pkg, dep)
+						continue
+					}
+					if layer := matchesLayer(rest, append([]string{"compose"}, backendLayers...)); layer != "" {
+						t.Errorf("ui package %s reaches backend internals %s\n"+
+							"  violated: a vertical's ui may not import its own backend's %q — the two "+
+							"halves meet over the wire contract, so a later lift-out is a config "+
+							"change rather than a rewrite (D-023)", pkg, dep, layer)
 					}
 				}
 			}
 		}
+		if checked == 0 {
+			t.Fatal("no vertical ui packages found; the rule would assert nothing")
+		}
+		t.Logf("checked %d ui packages across %d verticals", checked, len(featuresInGraph(g)))
 	})
 }
 
@@ -295,26 +241,32 @@ func TestCompositionLayerReachesNoModuleInternals(t *testing.T) {
 // alongside the platform's media-service — and the rule did not mention it, so
 // nothing stopped it. It was removed rather than ruled on, and this test is what
 // keeps it removed.
+//
+// The check moved with the units (D-023): the tree that can hold an aggregate
+// today is internal/features, and the retired roots cannot come back
+// (TestRetiredRootsStayRetired), so a match here is a directory a person
+// deliberately created.
 func TestNoPlatformAggregateIsOwnedInProcess(t *testing.T) {
 	skipIfDisabled(t)
 
 	// Every aggregate the external platform owns. gogo may hold a client for
-	// any of them and must hold state for none of them.
-	forbidden := []string{
-		modulesPrefix + "catalog/",
-		modulesPrefix + "product",
-		modulesPrefix + "listing",
-		modulesPrefix + "media",
-		modulesPrefix + "category",
-		modulesPrefix + "search",
-	}
+	// any of them and must hold state for none of them. Prefix match, so
+	// `product`, `products` and `product-anything` are all refused.
+	forbidden := []string{"catalog", "product", "listing", "media", "category", "search"}
 
 	root := findGogoRoot(t)
-	for _, prefix := range forbidden {
-		base := filepath.Join(root, strings.TrimPrefix(prefix, "gogo/"))
-		if _, err := os.Stat(base); err == nil {
-			t.Errorf("%s exists: the platform owns this aggregate, and gogo holding a second "+
-				"authority for one row is what D-011 and D-018 were written to prevent", prefix)
+	featuresDir := filepath.Join(root, "internal", "features")
+	entries, err := os.ReadDir(featuresDir)
+	if err != nil {
+		t.Fatalf("reading %s: %v", featuresDir, err)
+	}
+
+	for _, e := range entries {
+		for _, bad := range forbidden {
+			if e.Name() == bad || strings.HasPrefix(e.Name(), bad) {
+				t.Errorf("internal/features/%s exists: the platform owns this aggregate, and gogo holding a second "+
+					"authority for one row is what D-011 and D-018 were written to prevent", e.Name())
+			}
 		}
 	}
 }
@@ -482,25 +434,6 @@ func skipIfDisabled(t *testing.T) {
 	if os.Getenv("GOGO_SKIP_ARCHITECTURE") != "" {
 		t.Skip("GOGO_SKIP_ARCHITECTURE is set")
 	}
-}
-
-// modulesInGraph lists the distinct module names present in the committed graph.
-func modulesInGraph() []string {
-	g := graphEdges()
-	seen := make(map[string]bool)
-	for _, pkg := range packagesUnder(g, modulesPrefix) {
-		rest := strings.TrimPrefix(pkg, modulesPrefix)
-		name, _, _ := strings.Cut(rest, "/")
-		if name != "" {
-			seen[name] = true
-		}
-	}
-	out := make([]string, 0, len(seen))
-	for name := range seen {
-		out = append(out, name)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // # Render strategies must be complete

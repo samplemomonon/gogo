@@ -9,12 +9,12 @@
 // service performed the write.
 //
 // Why the gateway consumes the stream at all, given it no longer owns the write side:
-// the billing module's activity feed reports product activity, which is by
+// the billing vertical's activity feed reports product activity, which is by
 // definition about writes made elsewhere. Island-cache invalidation is the other
 // intended consumer — the pagekit InvalidateOnEvents/InvalidatePrefixOnEvents
 // helpers are the seam — but no island subscribes in this build: the storefront
 // grid is TTL-bounded instead, and the reason is recorded in
-// internal/pages/home/page.go.
+// internal/features/home/ui/page.go.
 //
 // What this is not: a source of truth. The payload is a notification (id and what
 // happened), following Fowler's Event Notification. A consumer that needs product state

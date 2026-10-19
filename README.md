@@ -58,21 +58,23 @@ that service directory first.
 - ✅ Startup configuration validation (`config.Validate()`) fails fast on invalid ports, timeouts or identity
 - ✅ In-memory, concurrency-safe repository + bounded LRU TTL cache behind swappable ports
 - ✅ Paged product listing end to end, threaded from the platform's browse contract through `productconsumer` into the home page's read model; short queries (< 3 chars) fall through to browse rather than a pointless search round trip
-- ✅ Crawlable paginated storefront (`/?page=N`) with server-rendered prev/next + numbered nav — one ISR cache entry per page, TTL-bounded (30s); the storefront does not consume the product event stream (the write side is another process — see `internal/pages/home/page.go`)
+- ✅ Crawlable paginated storefront (`/?page=N`) with server-rendered prev/next + numbered nav — one ISR cache entry per page, TTL-bounded (30s); the storefront does not consume the product event stream (the write side is another process — see `internal/features/home/ui/page.go`)
 - ✅ Storefront search (`/?q=term`, 3+ characters) served by `product-search-service`, with the term preserved across pages. One breaker per upstream, so search failing does not take the browse grid down with it
-- ✅ `cmd/modulegen` scaffolds a new contract-compliant module in seconds (`make module name=billing desc="…"`)
+- ✅ `make feature` scaffolds a team-owned vertical (backend + `ui/` + `OWNERS.md`) from `scripts/feature-vertical.sh` — one team, one directory (D-023)
 - ✅ Unit, package and end-to-end tests (run with `-race`)
 
 ## Routes
 
-Modules own their routes; pages own theirs. The gateway serves the storefront,
-the seller console and the account surfaces, and mounts the modules it discovers
-at `/module-registry`. Product data is **not** in this process: the **home** page
+Verticals own their routes. Each route's team owns its backend and its `ui/`
+together (D-023): the gateway serves the storefront, the seller console and the
+account surfaces, and federates the modules it discovers at `/module-registry`.
+Product data is **not** in this process: **home**'s read-side (`features/home/ui`)
 reads it from the platform's browse and search read models, and the **seller**
-console writes products and categories through `product.v1` / `category.v1`.
-Each surface renders its own pages from its own read model.
+console (`features/sales/ui`) writes products and categories through
+`product.v1` / `category.v1`. Each surface renders its own pages from its own
+read model.
 
-| Method   | Path                          | Module   | Area   | Description                                        |
+| Method   | Path                          | Vertical | Area   | Description                                        |
 | -------- | ----------------------------- | -------- | ------ | -------------------------------------------------- |
 | `GET`    | `/`                           | home     | public | Storefront product grid (ISR island; paginated via `/?page=N`, searchable via `/?q=term` with 3+ characters). Browse and search have **separate breakers**: a browse outage returns 503, a search outage returns a working storefront with search off |
 | `GET`    | `/catalog/{id}`               | home     | public | Product detail page (SSR from `productlisting.v1`; 404 for missing products, 503 when the catalog is unavailable) |
@@ -137,7 +139,7 @@ Gogo follows the **"Go + HTMX Micro Frontends"** pattern. Each feature module is
                                           (every in-process module,
                                            federated by manifest)
 
-  pages (no manifest, no lifecycle, wired by the composition root):
+  read-sides (a vertical's `ui/`, wired by the composition root):
    home   ──▶ productlisting.v1 List / productsearch.v1 Search  (browse + search)
    seller ──▶ product.v1 CRUD · category.v1 read · inventory.v1 AdjustStock · sales.v1 Checkout
 
@@ -146,18 +148,20 @@ Gogo follows the **"Go + HTMX Micro Frontends"** pattern. Each feature module is
                                        productsearch/v1 · category/v1
    (import rule 6 — an architecture test, not a convention)
 
-  product changes arrive out of band, not from a page:
+  product changes arrive out of band, not from a read-side:
    Kafka product.events.v1 ──▶ productevents ──product.changed.*──▶ shared bus
                                                             ◀── home + billing
    (cache invalidation + the billing activity feed)
 ```
 
-There is no product module in that diagram, and that is the point: the platform
+There is no product vertical in that diagram, and that is the point: the platform
 owns products, so gogo holds no product rows and publishes no product events.
 The store read by the storefront lives in the platform's Postgres; the stock
-ledger lives here, in the inventory module.
+ledger lives here, in the inventory vertical.
 
-The shell never reaches into a module: it knows modules through their **manifests** only.
+The shell never reaches into a vertical's internals: it mounts a vertical
+through its declared entry points (`compose/`, its root package, or its `ui/`)
+and knows federated modules through their **manifests** only.
 
 ### The module contract
 
@@ -203,11 +207,19 @@ type HealthReporter interface {
 }
 ```
 
-Not every surface is a module. The home storefront (root route) and the
-seller console are top-level **pages** (`internal/pages/home`, `internal/pages/seller`) — plain HTTP surfaces with no manifest, no lifecycle and no entry in the `/module-registry`. They consume the product platform the way any external service would: over its gRPC contracts, through the shared `productconsumer` kit, with their own client adapters in `infrastructure/` mapping the kit's neutral `Core` into page-local read models. They observe `product.changed.*` on the shared bus only to keep their island caches coherent. Pages are wired by the composition root and handed straight to the gateway:
+Not every surface is a federated module. A vertical's `ui/` (the storefront at
+`internal/features/home/ui`, the seller console at `internal/features/sales/ui`)
+is a plain HTTP surface with no manifest, no lifecycle and no entry in the
+`/module-registry`. Read-sides consume the product platform the way any external
+service would: over its gRPC contracts, through the shared `productconsumer`
+kit, with their own client adapters in `ui/infrastructure/` mapping the kit's
+neutral `Core` into vertical-local read models. Read-sides observe
+`product.changed.*` on the shared bus only to keep their island caches coherent.
+The composition root (`internal/shell/di.go`) declares the whole graph, and each
+vertical's `Register` receives exactly the capability it declares:
 
 ```go
-// internal/bootstrap/di.go — the composition root declares the whole graph
+// internal/shell/di.go — the composition root declares the whole graph
 fdi.ProvideType[homeports.Listing](b, func(c *fdi.Container) (homeports.Listing, error) {
     return fdi.ResolveAs[*homelistingclient.Client](c, serviceListingClient)
 })
@@ -221,47 +233,46 @@ fdi.ProvideType[sellerports.Sales](b, func(c *fdi.Container) (sellerports.Sales,
     return fdi.ResolveAs[*sellersalesclient.Client](c, serviceSellerSalesClient)
 })
 
-// Each page owns its own graph, keyed by type, and receives exactly the
-// capability it declares — so no caller has to name a page or its port.
-home.Register(b)
-seller.Register(b)
+// Each vertical owns its own graph, keyed by type, and receives exactly the
+// capability it declares — so no caller has to name a vertical or its port.
+homeui.Register(b)
+ui.Register(b) // the seller console
 ```
 
-Because pages carry no manifest, their nav items don't live in the
-registry — the gateway compiles the shell menu from **page nav first, then
-module nav** (`Registry.Nav()`), so a page's entry points always lead the top
-bar ahead of the module-federated items.
+Because read-sides carry no manifest, their nav items don't live in the
+registry — the gateway compiles the shell menu from **read-side nav first, then
+module nav** (`Registry.Nav()`), so a read-side's entry points always lead the
+top bar ahead of the module-federated items.
 
 The gateway (`internal/shared/httpserver`) collects the modules into a `module.Registry`, mounts each module's routes and exposes the registry at `/module-registry` (JSON by default, an HTML page for browsers). Registering a new module is one line in the composition root — its **navigation appears in the shell top bar automatically**, because the gateway compiles the nav from the manifests and injects it into every request:
 
 ```go
 // apps/web/cmd/server/main.go
 // BuildGateway composes the whole gateway — the four platform connections,
-// registry, pages, feature modules — and returns one shutdown hook, so the
-// product connections and the pages that use them cannot drift.
-app, closeAll, err := bootstrap.BuildGateway(ctx, cfg, logger)
+// registry, read-sides, feature modules — and returns one shutdown hook, so the
+// product connections and the read-sides that use them cannot drift.
+app, closeAll, err := shell.BuildGateway(ctx, cfg, logger)
 defer closeAll()
 ```
 
-That one line is a `Register` call, because each page and feature module
-declares its own graph rather than being hand-wired
-(`internal/bootstrap/di.go`):
+That one line is a `Register` call, because each vertical declares its own graph
+rather than being hand-wired (`internal/shell/di.go`):
 
 ```go
-home.Register(b)
-seller.Register(b)
+homeui.Register(b)
+ui.Register(b)      // the seller console
 billing.Register(b) // subscribes to product.changed.* on the shared bus
 ops.Register(b)     // /healthz + /readyz, aggregating every other module
 ```
 
 `ops.Register` is the interesting one. Readiness needs the state of every
 upstream the gateway renders from, but the clients that own those circuit
-breakers belong to pages — so rather than reach for them, `ops` asks for the
+breakers belong to read-sides — so rather than reach for them, `ops` asks for the
 **group of contributed breakers**. Adding an upstream is then one contribution
 in the composition root, and neither `ops` nor its readiness message needs to
 change.
 
-The gateway (`NewWithRegistry`) mounts the registry's routes and the pages,
+The gateway (`NewWithRegistry`) mounts the registry's routes and the read-sides,
 starts every `Lifer` in registration order before listening, drains them in
 reverse order during graceful shutdown, and serves the aggregated registry
 at `/module-registry`. `reg.Ready()` errs while any module reports `down`,
@@ -271,13 +282,14 @@ reporting the process is alive.
 The composition root owns one `events.Bus` and hands it to whichever
 surface needs it. gogo publishes no product events — the platform owns the
 product aggregate — so `productevents` *produces* onto this bus from the
-platform's Kafka feed, and billing and the home page *subscribe* as observers,
-to keep the activity feed and island caches coherent. The gateway never knows
-(or cares) which surfaces talk to each other. Surfaces also talk over gRPC:
-the platform exposes four versioned contracts as its remote interface, reached
-only through `productconsumer`, and the home page and seller console map the
-kit's `Core` into their own read models with their own client adapters — no
-surface imports another, and no surface imports a generated contract.
+platform's Kafka feed, and billing and the storefront read-side *subscribe* as
+observers, to keep the activity feed and island caches coherent. The gateway
+never knows (or cares) which surfaces talk to each other. Surfaces also talk
+over gRPC: the platform exposes four versioned contracts as its remote
+interface, reached only through `productconsumer`, and the storefront read-side
+and seller console map the kit's `Core` into their own read models with their
+own client adapters — no surface imports another, and no surface imports a
+generated contract.
 
 ### Where the shell ends and modules begin
 
@@ -333,32 +345,32 @@ consequences worth knowing:
   configured away; the four gRPC addresses are not, because those degrade into
   a silently empty storefront.
 
-The `billing` module is the working subscriber example: it subscribes to
+The `billing` vertical is the working subscriber example: it subscribes to
 `product.changed.*` on the shared bus and renders them as a live
 HTMX fragment at `/billing` — change a product in `/seller`, open `/billing`,
 and the activity feed shows it without billing importing any product-platform
 code (its test pins this behaviour).
 
-The `home` page and the `seller` console are the **remote-consumer**
-examples: neither imports module runtime code — and neither imports a
-generated contract, which import rule 6 enforces. Home declares
-`application/ports.Listing` (a read-only port over the platform's browse and
-search contracts) and implements it over `shared/productconsumer`; the seller
-console declares `application/ports.ProductCatalog`, `ports.Inventory` and
-`ports.Sales` and implements the first over the same kit and the other two over
-its own inventory/sales clients. Each page's `infrastructure/*client` is only
-the final hop — mapping the kit's neutral `Core` into the page's own read model.
-Home additionally subscribes to `product.changed.*` on the shared bus only to
-invalidate its own grid island cache, never to publish.
+The storefront read-side (`features/home/ui`) and the seller console
+(`features/sales/ui`) are the **remote-consumer** examples: neither imports
+module runtime code — and neither imports a generated contract, which import
+rule 6 enforces. The storefront declares `application/ports.Listing` (a
+read-only port over the platform's browse and search contracts) and implements
+it over `shared/productconsumer`; the seller console declares
+`application/ports.ProductCatalog`, `ports.Inventory` and `ports.Sales` and
+implements the first over the same kit and the other two over its own
+inventory/sales clients. Each read-side's `infrastructure/*client` is only
+the final hop — mapping the kit's neutral `Core` into the vertical's own read
+model. Home additionally subscribes to `product.changed.*` on the shared bus
+only to invalidate its own grid island cache, never to publish.
 
-### Scaffolding a new module
+### Scaffolding a new vertical
 
 ```sh
-make module name=billing desc="Subscription billing, invoices and payments"
-# or: make module name=billing desc="Subscription billing, invoices and payments"
+make feature billing
 ```
 
-This creates `internal/modules/billing/` with a manifest, a shell-rendered landing page, an HTMX fragment endpoint and a passing smoke test — no templ CLI required. Then register it with the gateway (one line in `cmd/server/main.go`); its nav item federates into the shell top bar and its manifest appears in `/module-registry` the moment the gateway boots.
+This creates `internal/features/billing/` — the vertical's backend (a contract-compliant module with a manifest, a shell-rendered landing page and an HTMX fragment endpoint), its `ui/`, its tests and its `OWNERS.md` — from `scripts/feature-vertical.sh`, no templ CLI required. Then register it with the gateway (one line in the composition root); its nav item federates into the shell top bar and its manifest appears in `/module-registry` the moment the gateway boots.
 
 ### The product platform is a separate deployment
 
@@ -384,9 +396,9 @@ convention:
 1. **Contracts, not imports.** The four `.proto` files are vendored into
    `contracts/` with `go_package` rewritten to gogo's module path, so the wire
    types are the seam. Import rule 6 restricts them to `productconsumer`, so a
-   page cannot grow a private gRPC client that bypasses the mapping.
+   read-side cannot grow a private gRPC client that bypasses the mapping.
 2. **A neutral `Core`.** The kit maps every wire shape into one `Core` —
-   `int64` IDs to decimal strings, money kept in minor units — so pages keep
+   `int64` IDs to decimal strings, money kept in minor units — so read-sides keep
    their own read models and gogo's own ID representation. See
    [D-018](ARCHITECTURE.md#d-018) for why each conversion is lossy in one
    direction only, and why a caller must not read an absent field as a real
@@ -396,7 +408,7 @@ convention:
    off. One shared breaker would have made every page 503 for any single
    outage.
 
-**Testing it without the platform.** `internal/bootstrap/fakestack_test.go` and
+**Testing it without the platform.** `internal/shell/fakestack_test.go` and
 `productplatform_integration_test.go` run the real gRPC servers over a
 bufconn, so the gateway's platform wiring — tenant stamping, breaker
 classification, mapping, cache invalidation across the event feed — is covered
@@ -502,15 +514,15 @@ The mechanics live in `internal/shared/web/render/component.go` and
 `cache.go`. The `TTLCache` is bounded and uses **least-recently-used**
 eviction (dropping an expired entry first), so a hot island is never evicted
 in favour of a cold one that merely arrived later. Each surface declares its
-own island keys — the home page in its own `presentation/http/islandkeys`
+own island keys — the storefront in `features/home/ui/islandkeys`
 (`home.product-grid`), the seller console in its own. Handlers
 build their islands, the composer decides, and cache invalidation listens
 for product events. Mapping to what this repo still serves:
 
-| Island                          | Page          | Strategy | Invalidation                                  |
+| Island                          | Surface       | Strategy | Invalidation                                  |
 | ------------------------------- | ------------- | -------- | --------------------------------------------- |
-| `home.product-grid`             | `/` (`/?page=N`) | ISR 30s | TTL expiry only — the page does not consume the product event stream; the write side is another process (`internal/pages/home/page.go`) |
-| `home.product-detail`           | `/catalog/{id}` | ISR 30s | TTL expiry only (same page-owned TTL bound, one entry per product id) |
+| `home.product-grid`             | `/` (`/?page=N`) | ISR 30s | TTL expiry only — the read-side does not consume the product event stream; the write side is another process (`internal/features/home/ui/page.go`) |
+| `home.product-detail`           | `/catalog/{id}` | ISR 30s | TTL expiry only (same vertical-owned TTL bound, one entry per product id) |
 | `billing.activity`              | `/billing`    | SSR     | — (always fresh; fed by the same `product.changed.*` events) |
 
 The product-detail islands (`detail.{id}.product-info`, `.price`, `.stock`)
@@ -556,6 +568,10 @@ swaps 4xx/5xx responses (`htmx.org/quirks`). Fragments are the **same Templ
 partials** the GET endpoints render, so swapped markup always reflects
 server truth.
 
+This server-rendered default is a policy, not a preference: React enters the
+codebase only as an island owned by the vertical that renders it, budgeted and
+shipped in the same image — see [D-024](ARCHITECTURE.md#d-024).
+
 References: [htmx — Requests & Responses](https://htmx.org/docs/#requests--responses),
 [htmx — Template Fragments](https://htmx.org/essays/template-fragments),
 [htmx — Quirks](https://htmx.org/quirks),
@@ -569,15 +585,18 @@ its paths are relative to `apps/web/`:
 
 ```
 cmd/
-├── server/                # composition root: config, logger, gateway lifecycle (pages + modules)
-└── modulegen/             # scaffolds a new contract-compliant feature module
-    └── templates/         # module.go / handler.go / module_test.go templates
+├── server/                # entry point: config, logger, gateway lifecycle (shell.BuildGateway)
+├── teamcatalog/           # gate: validates the unit table against the team catalog
+├── authseed/              # dev maintenance: seeds tenant RBAC + the two demo identities
+└── authzbootstrap/        # maintenance: provisions the first tenant policy administrator
 
 internal/
-├── bootstrap/             # gateway-only startup: SignalContext, the four product-platform
-│                          # connections, BuildGateway (modules + pages + registry)
-├── modules/               # feature modules — manifest + routes, join the /module-registry
-│   ├── inventory/         # owns stock: the inventory_stock table + the movement ledger,
+├── shell/                 # the composition root: shell.go (SignalContext, BuildGateway),
+│                          # di.go (the whole object graph), units.go (the unit table),
+│                          # module_gateway.go, and the *_connection.go files — the product
+│                          # dials plus the in-process mounts of inventory/sales/auth
+├── features/              # team-owned verticals — one directory per team: backend + ui + OWNERS.md
+│   ├── inventory/         # owns stock: the inventory_stock table + the movement ledger
 │   │   ├── compose/       # Build (Postgres ↔ in-memory)
 │   │   ├── domain/        # pure business rules — knows nothing about HTTP/templ/HTMX
 │   │   ├── application/   # use cases + ports; returns result DTOs (results/), never HTML
@@ -587,58 +606,51 @@ internal/
 │   │   │   └── use-cases/ # one package per use case
 │   │   ├── infrastructure/# technical implementations
 │   │   │   └── postgres/  # inventory_stock + inventory_movements; its own migration filenames
-│   │   └── presentation/grpcservice/ # inventory.v1 gRPC service (AdjustStock: atomic, idempotent)
-│   ├── sales/             # point-of-sale: composes inventory.v1 AdjustStock per checkout line
+│   │   ├── presentation/grpcservice/ # inventory.v1 gRPC service (AdjustStock: atomic, idempotent)
+│   │   └── module.go      # manifest; mounted in-process by shell/inventory_connection.go
+│   ├── sales/             # point-of-sale backend: composes inventory.v1 AdjustStock per checkout line
+│   │   └── ui/            # the seller console: a REMOTE consumer of the platform (products,
+│   │       ├── application/   # read-only categories), inventory (stock) and sales (POS)
+│   │       │                  # ports.ProductCatalog + ports.Inventory + ports.Sales + its own read models
+│   │       ├── handlers/      # one package per surface, split by file: handler (render/fail), catalog, stock, pos, form
+│   │       ├── httperr/       # peer error → HTTP status + cashier-facing message; outages collapse to one 503
+│   │       ├── infrastructure/authclient/      # merchant resolution over auth.v1
+│   │       ├── infrastructure/catalogclient/   # adapter over productconsumer: Core + status → port errors
+│   │       ├── infrastructure/inventoryclient/ # gRPC adapter over inventoryv1
+│   │       ├── infrastructure/salesclient/     # gRPC adapter over salesv1
+│   │       ├── views/         # presentation model: results → Templ components
+│   │       │   ├── pages/        # full documents (seller)
+│   │       │   └── partials/     # dashboard, product-table, category-list, stock-ledger, kasir-form, transactions
+│   │       ├── islandkeys/    # seller.product-table, seller.kasir, seller.transactions — owned here
+│   │       └── page.go        # read-side wiring: composer, cache coherency subscription, nav
 │   ├── auth/              # identity: auth.v1, the session cookie, tenant resolution
+│   │   └── ui/            # sign-in page: a REMOTE consumer of auth (login.v1)
+│   │       ├── application/   # ports + results the read-side owns; no authv1 wire types
+│   │       ├── handlers/      # login + logout; writes the cookie via shared/web/session
+│   │       ├── infrastructure/authclient/  # thin adapter over the shared authconsumer client
+│   │       ├── views/         # pages/ (login)
+│   │       └── page.go        # read-side wiring
+│   ├── home/              # storefront read-side: a REMOTE consumer of the platform (browse + search)
+│   │   └── ui/            # the storefront (root route)
+│   │       ├── application/   # ports.Listing (its read contract) + results.Product read model
+│   │       ├── handlers/products/{list,detail}/  # listing + product-detail handlers
+│   │       ├── infrastructure/listingclient/  # adapter over productconsumer: Core → home's read model
+│   │       ├── views/         # pages/ (full documents) + partials/ (product-list, product-card)
+│   │       ├── islandkeys/    # home.product-grid — owned here
+│   │       └── page.go        # read-side wiring: composer, cache coherency subscription, nav
+│   ├── profile/           # account read-side: a REMOTE consumer of auth (login.v1)
+│   │   └── ui/            # ports + results.Account, authclient, handlers, views (pages/profile)
+│   ├── contentcms/        # editorial read-side: /pages/{slug} — Builder.io published content only
+│   │   └── ui/            # Reader contract + PageHandler; no Register — the shell wires it directly
 │   ├── billing/           # billing module: subscribes to product.changed.* events
 │   │   ├── activity/      # in-memory read model kept coherent by contract-keyed On* handlers
 │   │   ├── handlers/      # landing page + activity-feed fragment (hx-get)
 │   │   ├── views/         # Templ components for the landing page and feed
 │   │   └── module.go      # manifest, routes, contract-keyed bus subscriptions
 │   └── ops/               # operational module: /healthz + /readyz (no views)
-├── pages/                 # top-level pages — NO manifest, NO lifecycle, wired by the root
-│   ├── home/              # storefront: a REMOTE consumer of the platform (browse + search)
-│   │   ├── application/   # ports.Listing (home's own read contract) + results.Product read model
-│   │   ├── handlers/products/list/  # listing handler — mirrors seller's per-handler layout
-│   │   ├── infrastructure/listingclient/  # adapter over productconsumer: Core → home's read model
-│   │   ├── views/         # presentation model: results → Templ components
-│   │   │   ├── pages/        # full document (home)
-│   │   │   └── partials/     # product-list, product-card (the grid the root page composes)
-│   │   ├── islandkeys/    # home.product-grid — owned here
-│   │   ├── page.go        # page wiring: composer, cache coherency subscription, nav
-│   │   └── page_test.go
-│   ├── seller/            # seller console: a REMOTE consumer of the platform (products,
-│   │                      # read-only categories), inventory (stock) and sales (POS)
-│   │   ├── application/   # ports.ProductCatalog + ports.Inventory + ports.Sales + seller's own read models
-│   │   ├── handlers/      # one package per surface, split by file: handler (render/fail), catalog, stock, pos, form
-│   │   ├── httperr/       # peer error → HTTP status + cashier-facing message; outages collapse to one 503
-│   │   ├── infrastructure/catalogclient/  # adapter over productconsumer: Core + status → port errors
-│   │   ├── infrastructure/inventoryclient/ # gRPC adapter over inventoryv1
-│   │   ├── infrastructure/salesclient/    # gRPC adapter over salesv1
-│   │   ├── views/         # presentation model: results → Templ components
-│   │   │   ├── pages/        # full documents (seller)
-│   │   │   └── partials/     # dashboard, product-table, category-list, stock-ledger, kasir-form, transactions
-│   │   ├── islandkeys/    # seller.product-table, seller.kasir, seller.transactions — owned here
-│   │   ├── page.go        # page wiring: composer, cache coherency subscription, nav
-│   │   └── page_test.go
-│   ├── auth/              # sign-in page: a REMOTE consumer of auth (login.v1)
-│   │   ├── application/   # ports + results the page owns; no authv1 wire types
-│   │   ├── handlers/      # login + logout; writes the cookie via shared/web/session
-│   │   ├── infrastructure/authclient/  # thin adapter over the shared authconsumer client
-│   │   ├── views/         # pages/ (login)
-│   │   ├── page.go        # page wiring
-│   │   └── page_test.go
-│   ├── profile/           # account page: a REMOTE consumer of auth (login.v1)
-│   │   ├── application/   # ports + results.Account read model
-│   │   ├── handlers/      # account section; reads the cookie via shared/web/session
-│   │   ├── infrastructure/authclient/  # thin adapter over the shared authconsumer client
-│   │   ├── views/         # pages/ (profile)
-│   │   ├── page.go        # page wiring
-│   │   └── page_test.go
-│   └── README.md          # pages vs modules, placement rules
 └── shared/                # generic, reusable infrastructure (the federation substrate)
     ├── authconsumer/      # shared remote-client kit for identity: wraps auth.v1, one error vocabulary
-    │                      # shared by the auth and profile pages (one client, one breaker)
+    │                      # shared by the auth and profile read-sides (one client, one breaker)
     ├── breaker/           # circuit breaker shared by the consumer kits (one per upstream)
     ├── config/            # environment-driven configuration (validated at startup);
     │                      # the four product-platform addresses are REQUIRED
@@ -676,12 +688,14 @@ internal/
                            # and the templ-rendered /module-registry page
 ```
 
-Wiring happens in each module's `module.go` (the module composition root):
-infrastructure → application ports → use cases → HTTP handlers. A thin
-`application.Service` facade wires the use cases, owns the event
-contract, and exposes only narrow reader/writer ports to presentation — each use
-case receives exactly the single-method repository port it needs. Modules are
-registered with the gateway by their manifests only.
+Wiring happens in each vertical: `compose/` (or the flat `module.go`) builds the
+backend graph — infrastructure → application ports → use cases → HTTP handlers —
+and the `ui/` package owns the read-side graph, contributing it to the shell by
+declaring its ports. A thin `application.Service` facade wires the use cases,
+owns the event contract, and exposes only narrow reader/writer ports to
+presentation — each use case receives exactly the single-method repository port
+it needs. A federating vertical advertises its manifest; non-federating
+read-sides are mounted by the shell directly.
 
 ### Boundary rules
 
@@ -706,31 +720,32 @@ infrastructure ──────────┘   (implements application ports
   decision: `handlers/` parses input, runs the use case and declares the
   response intent; `views/` (the presentation model) renders result DTOs
   into Templ + htmx and never runs use cases; `httperr/` maps domain errors
-  to HTTP status/messages; `islandkeys/` names this module's islands.
+  to HTTP status/messages; `islandkeys/` names this vertical's islands.
 - **`shared/module` + `shared/events`** are federation substrate: modules
   declare manifests and publish/subscribe events without importing each
   other. **`shared/web/render`** owns the rendering mechanics — HTMX
   detection, full page vs fragment, redirect, cache, island strategy — and
   knows nothing about products: no `Product`, no use cases, no repository.
-- **Modules never import each other** (enforced). Cross-module needs go
+- **Verticals never import each other** (enforced by
+  `TestFeatureVerticalIsAClosedModule`). Cross-vertical needs go
   through exactly two channels, both owned at the boundaries: (1) the
   **shared event bus** — observe `product.changed.*` without importing the
-  producer (billing renders the feed from it, the home page invalidates its
-  island cache on it); (2) a **remote gRPC contract** — the contract lives in
-  the `contracts/` Go module, the client's transport mechanics live once in
-  `shared/grpcx` + `shared/grpcconsumer` + `shared/productconsumer`, and each
-  consumer owns its *client adapter* and its own read model.
+  producer (billing renders the feed from it, the storefront read-side
+  invalidates its island cache on it); (2) a **remote gRPC contract** — the
+  contract lives in the `contracts/` Go module, the client's transport mechanics
+  live once in `shared/grpcx` + `shared/grpcconsumer` + `shared/productconsumer`,
+  and each consumer owns its *client adapter* and its own read model.
 - **The product platform is reached through exactly one package.**
   `shared/productconsumer` is the sole importer of `product/v1`,
-  `productlisting/v1`, `productsearch/v1` and `category/v1` (`internal/bootstrap`
+  `productlisting/v1`, `productsearch/v1` and `category/v1` (`internal/shell`
   is the one exception: it dials the four connections). It maps every wire
   shape into one neutral `Core` and owns the error vocabulary (not-found /
-  invalid / conflict / unavailable); each page aliases that into its own
-  `ports.Err*`. So a page cannot grow a private gRPC client that re-implements
-  the tenant stamp, the breaker, or the ID conversion — and the boundary is an
-  architecture test, not a review convention.
-- **Remote consumption is swappable by construction.** The home page only
-  knows `ports.Listing` (a read-only List/Search port); the seller console only
+  invalid / conflict / unavailable); each read-side aliases that into its own
+  `ports.Err*`. So no read-side can grow a private gRPC client that
+  re-implements the tenant stamp, the breaker, or the ID conversion — and the
+  boundary is an architecture test, not a review convention.
+- **Remote consumption is swappable by construction.** The storefront read-side
+  only knows `ports.Listing` (a read-only List/Search port); the seller console only
   knows `ports.ProductCatalog`, `ports.Inventory` and `ports.Sales`. Tests
   reach the platform over a bufconn channel (`grpcx.InProcess`); production
   points the same client at a network address (`grpcx.Dial(ProductAddress)`) —
@@ -738,7 +753,7 @@ infrastructure ──────────┘   (implements application ports
 - Use case says what happens; handler decides HTTP; view decides HTML;
   render decides how the HTML is delivered (full page vs HTMX fragment);
   events keep cross-cutting effects (cache invalidation) decoupled.
-- **One error table per module.** `domain.Classify(err)` maps an error to a
+- **One error table per vertical.** `domain.Classify(err)` maps an error to a
   transport-neutral `domain.Kind` (NotFound/Invalid/Conflict/Internal), and
   `domain.Message(err)` returns the stable client message. Each adapter is a
   thin projection of that table — `grpcservice.toStatus` picks a gRPC code,
@@ -748,13 +763,13 @@ infrastructure ──────────┘   (implements application ports
 
 Placement rule of thumb:
 
-> If code is still useful when the module that uses it is deleted, it does not
-> belong in that module. So each module keeps its own `httperr` and `islandkeys`
-> at its own `presentation/http/` — and the home page and seller console have
-> their own, consumer-side copies (home maps the platform's `Core` into its own
-> product read model and names its own grid island; the seller console maps its
-> peers' errors into a cashier-facing error table). `shared` is
-> only for what has proven reusable across modules, not for what two modules
+> If code is still useful when the vertical that uses it is deleted, it does not
+> belong in that vertical. So each vertical keeps its own `httperr` and
+> `islandkeys` alongside its read-side — the storefront and seller console keep
+> their own, consumer-side copies (the storefront maps the platform's `Core`
+> into its own product read model and names its own grid island; the seller
+> console maps its peers' errors into a cashier-facing error table). `shared` is
+> only for what has proven reusable across verticals, not for what two verticals
 > happen to both use today — `productconsumer` earns its place by being the
 > *only* legal path to four contracts, not by being the most convenient one.
 
@@ -787,7 +802,7 @@ Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (
 | `make templ`   | Regenerate `*_templ.go` from `.templ` sources      |
 | `make css`     | Compile the Tailwind stylesheet                    |
 | `make faker-products` | Seed development categories and products through the platform APIs |
-| `make module`  | Scaffold a module: `make module name=billing desc="…"` |
+| `make feature` | Scaffold a vertical: `make feature billing` (backend + `ui/` + `OWNERS.md`) |
 | `make tidy`    | `go mod tidy`                                      |
 | `make docker-build` | Build the production image (multi-stage, non-root) |
 | `make docker-push`  | Build and push `$(IMAGE):$(IMAGE_TAG)`         |

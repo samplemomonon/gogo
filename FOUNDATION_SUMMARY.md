@@ -22,9 +22,9 @@ shared `events.Event`; consumers subscribe through `kernel.EventBus` (D-004).
 
 | Package | Contract | Wired by |
 | --- | --- | --- |
-| `di` | Name-/type-/group-keyed DI container + builder (`ProvideType`, `ProvideNamed`, `Contribute`) with lifecycle | `internal/bootstrap` and every unit's `Register(b)` |
-| `eventbus` | `MemoryBus` / `AsyncBus` implementing `kernel.EventBus` | `internal/bootstrap/di.go` |
-| `adapter` | `EventBusAdapter` (shared bus → `kernel.EventBus`), `LoggerAdapter` (slog → `kernel.Logger`) | `internal/bootstrap/di.go` |
+| `di` | Name-/type-/group-keyed DI container + builder (`ProvideType`, `ProvideNamed`, `Contribute`) with lifecycle | `internal/shell` and every unit's `Register(b)` |
+| `eventbus` | `MemoryBus` / `AsyncBus` implementing `kernel.EventBus` | `internal/shell/di.go` |
+| `adapter` | `EventBusAdapter` (shared bus → `kernel.EventBus`), `LoggerAdapter` (slog → `kernel.Logger`) | `internal/shell/di.go` |
 
 ## Awaiting adoption
 

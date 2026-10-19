@@ -113,11 +113,11 @@ If a later fact changes this — a second runtime, independent deployment, or a 
 For the web runtime, the platform unit is `templ.Component`. The public entry point should therefore be **an ordinary Go package that exposes components**, not a new interface type. This contract does not require native apps to embed web components or adopt a web-oriented abstraction.
 
 ```go
-// internal/modules/recommendation/public/public.go
+// internal/features/recommendation/public/public.go
 
 // Package public is the cross-team surface of the recommendation feature.
 // The recommendation team owns everything here and its compatibility; other
-// units may import this package and nothing else under internal/modules/recommendation.
+// units may import this package and nothing else under internal/features/recommendation.
 package public
 
 // Component renders the recommendation section for a page.
@@ -190,7 +190,9 @@ The rule change and its enforcement landed together, in the shape this section s
 3. Module-to-module `public` was **not granted**: `modules must not import other modules` (`crossModuleOffenses`) is unchanged in scope, and its failure message now says so explicitly. Rule 3 and its event-based reasoning stand.
 4. `ARCHITECTURE.md` rule 1 states the narrowed rule and the `public` exception; the decision log carries [D-021](../ARCHITECTURE.md#d-021), which records the ownership split, the pages-only scope, and the implementation.
 
-Because no `public` package exists yet — none is added speculatively, and the first is extracted with its first real consumer — the real-graph tests exercise only the negative half. The predicates are therefore additionally pinned on synthetic graphs in `internal/architecture/ui_contract_test.go`: the `public` grant, each forbidden layer, the transitive-taint rule (a `public` package that reaches its own module's internals fails every page that imports it), the `publicity`-style prefix trap, and module-to-module `public` refusal in both directions.
+**Moved by [D-023](../ARCHITECTURE.md#d-023) (Phase 7).** The `pages/` and `modules/` trees are retired, and with them the page-shaped predicates and fixtures named above: `moduleReachOffenses`, `pageCompositionOffenses`, `crossModuleOffenses` and `ui_contract_test.go` were deleted, and `TestCompositionLayerReachesNoModuleInternals` became `TestCompositionLayerReachesNoVerticalInternals` (same rule, over `internal/features/<f>`). The closed-module rule that now carries this ADR's subject is `TestFeatureVerticalIsAClosedModule`; it currently admits no cross-vertical edge at all, and the `public` grant is re-extended into it when the first real consumer appears. The decision here — the grant's shape, its pages-only (now read-sides-only) scope, and its limits — is unchanged.
+
+Because no `public` package exists yet — none is added speculatively, and the first is extracted with its first real consumer — the real-graph tests exercise only the negative half. The predicates were therefore additionally pinned on synthetic graphs in `internal/architecture/ui_contract_test.go`: the `public` grant, each forbidden layer, the transitive-taint rule (a `public` package that reaches its own module's internals fails every page that imports it), the `publicity`-style prefix trap, and module-to-module `public` refusal in both directions. Those fixtures were retired with the roots in D-023 Phase 7; when the first `public` consumer arrives, the grant and its fixtures come back with it.
 
 **The trade, restated for the record:** item 2 replaced one enforced invariant ("no module import at all") with a narrower one ("no module import except `public`"). The reduction is real. It is the price of a cross-team UI contract that keeps feature ownership with the feature team, and the fixtures are what make the narrowed invariant as verifiable as the old one.
 

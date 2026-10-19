@@ -5,6 +5,7 @@
 **Supersedes:** Rev 1 of this document. *Complements* [`ARCHITECTURE.md`](../ARCHITECTURE.md), which remains the canonical statement of the seven import rules and the `D-0xx` decision log.
 **Decision IDs:** `TT-0xx` (single namespace). Rev 1 deliberately used a separate `TT-nnn` range to avoid colliding with `ARCHITECTURE.md`'s `D-0xx` log; Rev 2 consolidates, and §0.4 records the one migration hazard.
 **Author role:** Software Architect.
+**Status (2026-10-19):** kept as the requirements record; Rev 2 was the design input for [D-023](../ARCHITECTURE.md#d-023) (team-owned verticals) and the boundary work. It was written against the pre-D-023 layout — every unit now lives under `internal/features/**`, `internal/bootstrap` is `internal/shell`, and `cmd/modulegen` was retired in favour of `make feature`. Where this document and [`ARCHITECTURE.md`](../ARCHITECTURE.md) disagree on a current path, the latter wins.
 
 ---
 
