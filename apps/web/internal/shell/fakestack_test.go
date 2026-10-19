@@ -29,6 +29,8 @@ import (
 	authinfra "gogo/internal/features/auth/infrastructure"
 	"gogo/internal/features/billing"
 	homeui "gogo/internal/features/home/ui"
+	homeports "gogo/internal/features/home/ui/application/ports"
+	homeresults "gogo/internal/features/home/ui/application/results"
 	homelistingclient "gogo/internal/features/home/ui/infrastructure/listingclient"
 	"gogo/internal/features/inventory"
 	inventoryinfra "gogo/internal/features/inventory/infrastructure"
@@ -56,6 +58,18 @@ import (
 	"gogo/internal/shared/productconsumer"
 	"gogo/internal/shell"
 )
+
+// bannerSlotStub keeps the fakestack's home page composed without an editorial
+// source — the slot is empty, exactly as the production slot is when Builder.io
+// is unconfigured (the composition root's adapter over contentui.DisabledReader
+// would answer the same).
+type bannerSlotStub struct{}
+
+var _ homeports.BannerSlot = bannerSlotStub{}
+
+func (bannerSlotStub) ReadBanner(context.Context, string) (homeresults.Banner, error) {
+	return homeresults.Banner{}, homeports.ErrNoBanner
+}
 
 type integrationEmployeeSessions struct{}
 
@@ -759,7 +773,7 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 	registry.AddAll(ops.NewModuleWithProbe(ops.Readiness(registry, breakerGroup(upstreamBreakers), shell.ReadinessPolicy())))
 
 	app := httpserver.NewWithRegistry(cfg, logger, registry, upstreamBreakers,
-		homeui.New(homelistingclient.New(conns, breakers), logger),
+		homeui.New(homelistingclient.New(conns, breakers), bannerSlotStub{}, logger),
 		ui.New(
 			sellercatalogclient.New(conns, breakers),
 			sellerinventoryclient.New(inventoryConn, inventoryBreaker),

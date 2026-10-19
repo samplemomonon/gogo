@@ -333,6 +333,18 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		}
 		return contentui.NewBuilderReader(cfg.BuilderModel, cfg.BuilderPublicAPIKey)
 	})
+	// The home page's editorial banner slot: the page declares the port, the
+	// contentcms reader is the source, and this adapter is the only place that
+	// sees both — no vertical imports another (D-023). The reader being
+	// disabled when Builder.io is unconfigured keeps the route composition
+	// stable: the slot simply renders nothing.
+	fdi.ProvideType[homeports.BannerSlot](b, func(c *fdi.Container) (homeports.BannerSlot, error) {
+		reader, err := fdi.ResolveType[contentui.Reader](c)
+		if err != nil {
+			return nil, err
+		}
+		return newBannerSlot(reader), nil
+	})
 	fdi.ProvideType[*contentui.PageHandler](b, func(c *fdi.Container) (*contentui.PageHandler, error) {
 		reader, err := fdi.ResolveType[contentui.Reader](c)
 		if err != nil {
