@@ -22,6 +22,12 @@ const (
 	cacheCapacity     = 64
 )
 
+// errBuilderTransportFailed replaces transport errors, which may embed the full
+// request URL — and the public read key is a query parameter — so they must
+// never reach a log. Every other failure detail names only this package's own
+// finds (a status, a document shape) and is kept for enablement debugging.
+var errBuilderTransportFailed = errors.New("Builder.io content transport failed")
+
 // BuilderReader consumes only published Builder.io content. The public API
 // key has read access; authoring and preview credentials never belong here.
 type BuilderReader struct {
@@ -134,9 +140,10 @@ func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
 		}
 		resp, err := r.client.Do(req)
 		if err != nil {
-			// Do not wrap errors that may include the full request URL: Builder's
-			// public key is a query parameter and must not leak into logs.
-			resultErr = errors.New("Builder.io content transport failed")
+			// Do not surface errors that may include the full request URL:
+			// Builder's public key is a query parameter and must not leak into
+			// logs.
+			resultErr = errBuilderTransportFailed
 			return resultErr
 		}
 		defer resp.Body.Close()
@@ -180,6 +187,14 @@ func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
 		return nil
 	})
 	if err != nil {
+		// A failure this package constructed (a status, a document problem, a
+		// slug mismatch) keeps its detail: enablement must be able to tell bad
+		// content from a bad wire. Transport errors are already replaced by the
+		// sentinel above, and an opened circuit has no detail, so both stay
+		// generic.
+		if resultErr != nil && !errors.Is(resultErr, errBuilderTransportFailed) {
+			return Page{}, fmt.Errorf("%w: %w", ErrUnavailable, resultErr)
+		}
 		return Page{}, fmt.Errorf("%w: upstream read failed", ErrUnavailable)
 	}
 	if resultErr != nil {
