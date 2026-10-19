@@ -4241,6 +4241,9 @@
   .mb-2 {
     margin-bottom: var(--spacing-2);
   }
+  .mb-4 {
+    margin-bottom: var(--spacing-4);
+  }
   .mb-5 {
     margin-bottom: calc(var(--spacing) * 5);
   }
@@ -5709,6 +5712,9 @@
     }
     .sm\:gap-5 {
       gap: calc(var(--spacing) * 5);
+    }
+    .sm\:p-6 {
+      padding: var(--spacing-6);
     }
     .sm\:p-8 {
       padding: var(--spacing-8);

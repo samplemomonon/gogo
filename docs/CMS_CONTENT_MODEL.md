@@ -1,6 +1,6 @@
 # Headless editorial CMS contract
 
-The gateway reads published public content from Builder.io through `contentcms.Reader`. The first adapter is for platform-wide pages such as FAQ; it does not invent a tenant-specific content model. It does not contain an authoring API, preview path, or write credential. Platform editorial administrators manage the CMS project and editor roles in Builder.io. Seller/merchant roles in the gateway do not grant CMS access.
+The gateway reads published public content from Builder.io through `contentcms.Reader`. The first adapter is for platform-wide pages such as FAQ; it does not invent a tenant-specific content model. It does not contain an authoring API, preview path, or write credential. Platform editorial administrators manage the CMS project and editor roles in Builder.io. Seller/merchant roles in the gateway do not grant CMS access. The storefront home consumes one published page as its banner slot (`home-banner`) through a page-declared port the composition root adapts from this reader. Ownership, the business rules per content surface, and the build order are recorded in [`DECISION_CONTENT_SURFACES.md`](./DECISION_CONTENT_SURFACES.md).
 
 ## Runtime configuration
 
@@ -31,4 +31,4 @@ CMS content is presentation data. Product names, prices, stock, categories, and 
 
 ## Acceptance before enabling production
 
-Create the model in the target Builder.io project, verify the exact API response against a published fixture, assign platform-only editor roles, and capture the approved key scope and rotation owner. Establish the approved outbound network path and prove redirects remain on the Builder.io host. The source does not include project credentials or egress policy, so integration remains opt-in until deployment configuration is supplied.
+Create the model in the target Builder.io project, verify the exact API response against a published fixture, assign platform-only editor roles, and capture the approved key scope and rotation owner. Establish the approved outbound network path and prove redirects remain on the Builder.io host. On the repository side the read path is already pinned by tests in `internal/features/contentcms/ui` (documented request shape, documented-shape fixture parse, 404-vs-503 taxonomy, cache bounds, and the rule that the public read key never appears in an error); replace the fixture with a captured published response when the project exists. The source does not include project credentials or egress policy, so integration remains opt-in until deployment configuration is supplied.

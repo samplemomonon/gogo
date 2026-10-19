@@ -11,6 +11,7 @@ package homelist
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -28,14 +29,24 @@ import (
 	"gogo/internal/shared/web/render"
 )
 
+// BannerSlot is the editorial content slug the storefront's home banner reads
+// from the CMS. It is the page's own vocabulary: the slot is declared here, and
+// the composition root maps the name onto the editorial reader.
+const BannerSlot = "home-banner"
+
 // Handler serves the home page's public, paginated product listing.
 type Handler struct {
-	page *pagekit.PagedListPage[*results.Product]
+	page    *pagekit.PagedListPage[*results.Product]
+	banners ports.BannerSlot
+	logger  *slog.Logger
 }
 
-// NewHandler wires the home listing handler around the remote listing port.
-func NewHandler(listing ports.Listing, composer *render.Composer, logger *slog.Logger) *Handler {
+// NewHandler wires the home listing handler around the remote listing port and
+// the page's editorial banner slot.
+func NewHandler(listing ports.Listing, banners ports.BannerSlot, composer *render.Composer, logger *slog.Logger) *Handler {
 	return &Handler{
+		banners: banners,
+		logger:  logger,
 		page: pagekit.NewPagedListPage(
 			islandkeys.HomeGrid,
 			render.RenderingContract{
@@ -91,6 +102,31 @@ func classifyFetchError(err error) int {
 // the remote listing port. The renderer serves the full page for plain requests and
 // the bare listing fragment for HTMX requests, which htmx swaps into the listing's
 // swap target.
+//
+// The editorial banner is resolved first and rides the request context into the
+// document (pages.WithBanner). An empty slot or a failed editorial read renders
+// no banner — logged, never fatal — because the storefront must not stop
+// serving products just because its editorial slot is unavailable
+// (docs/DECISION_CONTENT_SURFACES.md §2).
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+	if banner, ok := h.readBanner(r.Context()); ok {
+		r = r.WithContext(pages.WithBanner(r.Context(), banner))
+	}
 	h.page.Handle(w, r)
+}
+
+// readBanner resolves the page's editorial banner slot; ok reports whether
+// there is a banner to render. ErrNoBanner is the expected empty state and is
+// not logged; any other failure is logged and degraded to no banner.
+func (h *Handler) readBanner(ctx context.Context) (results.Banner, bool) {
+	banner, err := h.banners.ReadBanner(ctx, BannerSlot)
+	switch {
+	case err == nil:
+		return banner, true
+	case errors.Is(err, ports.ErrNoBanner):
+		return results.Banner{}, false
+	default:
+		h.logger.Warn("home banner unavailable", "slot", BannerSlot, "error", err)
+		return results.Banner{}, false
+	}
 }

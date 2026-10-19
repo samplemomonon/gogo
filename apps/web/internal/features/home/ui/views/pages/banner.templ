@@ -1,0 +1,22 @@
+package pages
+
+import "gogo/internal/features/home/ui/application/results"
+
+// Banner renders the storefront's editorial banner section: the published
+// hero/banner content the editorial CMS serves for the home slot, adapted by
+// the composition root and attached to the request before the document renders
+// (docs/DECISION_CONTENT_SURFACES.md §5 step 2). The slot degrades to rendering
+// nothing — an empty or failed read means no section, no frame, no error copy —
+// so the storefront keeps serving whatever the editorial source is doing.
+templ Banner(banner results.Banner) {
+	if banner.Title != "" || banner.ImageURL != "" {
+		<section class="rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-6" data-slot="home-banner">
+			if banner.Title != "" {
+				<h2 class="mb-4 text-2xl font-semibold tracking-tight">{ banner.Title }</h2>
+			}
+			if banner.ImageURL != "" {
+				<img class="max-h-96 w-full rounded-xl object-cover" src={ banner.ImageURL } alt={ banner.ImageAlt }>
+			}
+		</section>
+	}
+}

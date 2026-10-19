@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "rspress dev",
     "build": "node scripts/check-publication.mjs && rspress build",
-    "preview": "rspress preview"
+    "preview": "rspress preview",
+    "test": "node --test scripts/check-publication.test.mjs"
   },
   "devDependencies": {
     "@rspress/core": "2.0.23"
