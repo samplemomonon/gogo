@@ -34,7 +34,7 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
                -X gogo/internal/shared/version.Commit=$(COMMIT) \
                -X gogo/internal/shared/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products seed docs-site-build docs-site-preview \
+.PHONY: all build run dev assets test vet check lint fmt tidy templ css css-watch faker-products seed docs-site-build docs-site-preview docs-site-gate-test \
 	buf buf-lint buf-generate buf-check buf-breaking arch-graph \
 	feature arch-team-catalog \
 	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
@@ -121,7 +121,14 @@ docs-site-build:
 docs-site-preview:
 	npm --prefix docs/site run preview
 
-check: vet test services-vet services-test gofmt-check arch-team-catalog
+# The publication gate itself must stay covered: approved documents pass while
+# drafts, missing metadata, malformed dates and leftover draft instructions
+# block the build. Pure Node with no dependencies — nothing to install first
+# (the devenv toolchain ships node without npm, so the runner is node direct).
+docs-site-gate-test:
+	node --test docs/site/scripts/check-publication.test.mjs
+
+check: vet test services-vet services-test gofmt-check arch-team-catalog docs-site-gate-test
 	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
 	@before="$$(git status --porcelain -- apps/web design-system/web/ui)"; \
 	go -C design-system/web/ui tool templ generate >/dev/null 2>&1; \
@@ -155,7 +162,7 @@ check: vet test services-vet services-test gofmt-check arch-team-catalog
 		(echo "check failed: the committed import graph is stale — run 'make arch-graph' and commit the result."; \
 		 $(GO) test ./internal/architecture/ -run ImportGraph 2>&1 | sed -n '2,20p'; exit 1); \
 	echo "import graph current"
-	@echo "check passed: gofmt clean, templates and contracts generated, import graph current, vet and tests green"
+	@echo "check passed: gofmt clean, templates and contracts generated, import graph current, vet and tests green, publication gate covered"
 
 # Static analysis beyond go vet (currently go vet; swap in staticcheck).
 lint: vet buf-lint
