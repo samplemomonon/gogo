@@ -419,7 +419,8 @@ without a network.
 **Local run.** `docker compose up` from the repository root brings up the
 platform; `docker compose up -d --build` from `gogo/` brings up Postgres and the
 gateway against it. The two stacks meet on the shared `ecommerce_default`
-network.
+network. When this repository runs the platform itself instead, the same split
+is `make up-platform` plus `make dev` on the host — see Quick start.
 
 A full cross-deployment demo: with the platform running, create a product at
 `http://localhost:8080/seller` and watch it appear in the `/billing` activity
@@ -783,9 +784,19 @@ Requirements: **Go 1.27+**, **Bun**, and the [templ CLI](https://templ.guide/qui
 # 1. Install dependencies
 bun install
 
-# 2. Build CSS and run the dev watchers + server
+# 2. Load the local configuration — the platform addresses of the stack below
+cp .env.example .env
+
+# 3. Start the product platform in Docker. `make up` runs the whole system,
+#    gateway included, when you would rather not run Go on the host.
+make up-platform
+
+# 4. Build CSS and run the dev watchers + server against the platform
 make dev
 ```
+
+With the stack fresh, `make faker-products` seeds categories and products
+through the platform APIs so there is a catalogue to browse.
 
 Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (management),
 <http://localhost:8080/healthz> (ops) and <http://localhost:8080/module-registry> (module manifests).
@@ -795,6 +806,10 @@ Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (
 | Target         | Description                                        |
 | -------------- | -------------------------------------------------- |
 | `make dev`     | Watch templ & CSS changes, run the server          |
+| `make up`      | Run the whole system in Docker (platform + gateway) |
+| `make up-platform` | Run the platform only, for `make dev` on the host |
+| `make down`    | Stop the Docker stack, keeping its data             |
+| `make smoke`   | Poll every service's health endpoint                |
 | `make build`   | Generate templ + CSS, build `bin/gogo`             |
 | `make run`     | Build and run the binary                           |
 | `make test`    | Run the gateway tests with the race detector        |
@@ -815,7 +830,7 @@ Then open <http://localhost:8080> (storefront), <http://localhost:8080/seller> (
 
 ## Configuration
 
-Configuration is read from environment variables; a `.env` file is loaded if present (see `.env.example`). Values are parsed strictly — a malformed duration or an unknown log level fails **startup**, never quietly falls back, so a typo cannot ship to production. Every variable maps 1:1 onto a Kubernetes ConfigMap/Secret entry.
+Configuration is read from environment variables; a `.env` file is loaded if present (see `.env.example`, which sits at the repository root and is read from the process's working directory). Values are parsed strictly — a malformed duration or an unknown log level fails **startup**, never quietly falls back, so a typo cannot ship to production. Every variable maps 1:1 onto a Kubernetes ConfigMap/Secret entry.
 
 | Variable          | Default | Description                          |
 | ----------------- | ------- | ------------------------------------ |

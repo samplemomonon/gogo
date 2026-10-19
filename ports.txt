@@ -91,6 +91,13 @@ postgres                postgres DB_PORT   5432 5432 POSTGRESQL
 # the clash by mapping 5434, 5436 and 5437 onto their own containers — that
 # offset exists for this reason.
 #
+# The dev stack publishes the broker twice: the services dial kafka:9092 over
+# the container network, and the host dials localhost:19092 (the second listener
+# in docker-compose.dev.yml). The host side is 19092 rather than 9092 because
+# 9092 on a developer machine belongs to product-service, above — the broker
+# steps aside so that row holds, and the change feed stays reachable from a
+# gateway running on the host.
+#
 # Publishing these ports in development is safe only because every platform
 # service refuses unauthenticated callers. Before that, an unauthenticated
 # POST /api/v1/products on 8082 wrote to the catalogue while the aggregator's
