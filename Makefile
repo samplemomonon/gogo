@@ -38,7 +38,7 @@ LDFLAGS     := -X gogo/internal/shared/version.Version=$(VERSION) \
 	buf buf-lint buf-generate buf-check buf-breaking arch-graph \
 	feature arch-team-catalog \
 	docker-build docker-push k8s-build k8s-apply k8s-secrets k8s-delete clean \
-	up down restart logs ps reset smoke dev-pull
+	up up-platform down restart logs ps reset smoke smoke-platform dev-pull
 
 all: build
 
@@ -54,12 +54,17 @@ run: build
 	$(BINARY)
 
 # Development: watch templ + CSS changes and run the server.
+#
+# The server runs from the repository root (plain `go run`, not `go -C
+# apps/web`): the config loader reads `.env` from the working directory, and the
+# root is where `.env` sits, next to `.env.example` — the same file `make run`
+# and the quick start use.
 dev: templ css
 	@bun --watch design-system/web/build.mjs & \
 	go -C design-system/web/ui tool templ generate --watch & \
 	cd $(APP_DIR) && templ generate --watch & \
 	bun run css:watch & \
-	$(GO) run $(PKG)
+	go run ./apps/web/cmd/server
 
 test: assets
 	$(GO) test ./... -race
@@ -283,9 +288,10 @@ faker-products:
 
 # Seed the two dummy identities the role model demo needs (a pembeli and a
 # pembeli+penjual who owns a merchant). Idempotent; targets the shared Postgres
-# store the gateway uses. Requires DATABASE_URL (or AUTHZ_DATABASE_URL).
+# store the gateway uses. Requires DATABASE_URL (or AUTHZ_DATABASE_URL); like
+# `dev`, it runs from the repository root so a `.env` there is read.
 seed:
-	$(GO) run ./cmd/authseed
+	go run ./apps/web/cmd/authseed
 
 # ---- Container -----------------------------------------------------------
 
@@ -321,9 +327,23 @@ k8s-build:
 # would be accepted by a platform service.
 DEV_COMPOSE := docker compose -f docker-compose.dev.yml
 
-# How long `smoke` waits for every endpoint before giving up, in seconds. The
-# default covers a cold start on a slow machine; a warm stack settles in seconds.
+# How long the smoke targets wait for every endpoint before giving up, in
+# seconds. The default covers a cold start on a slow machine; a warm stack
+# settles in seconds.
 SMOKE_TIMEOUT ?= 90
+
+# The endpoints the smoke targets poll. `smoke` checks the whole system;
+# `smoke-platform` checks everything `make up-platform` starts — the same list
+# without the gateway, which runs on the host in that flow (`make dev`) rather
+# than in a container.
+GATEWAY_HEALTH  := "gateway|http://localhost:8080/healthz"
+PLATFORM_HEALTH := \
+	"category-service|http://localhost:8086/healthz" \
+	"media-service|http://localhost:8081/healthz" \
+	"product-service|http://localhost:8082/healthz" \
+	"product-listing|http://localhost:8083/healthz" \
+	"product-search|http://localhost:8084/healthz" \
+	"aggregator|http://localhost:8085/healthz"
 
 # --wait holds the command until every container's healthcheck passes, so a
 # failure here names the unhealthy service instead of surfacing as seven
@@ -331,6 +351,14 @@ SMOKE_TIMEOUT ?= 90
 up:
 	$(DEV_COMPOSE) up -d --build --wait --wait-timeout 300
 	@$(MAKE) --no-print-directory smoke
+
+# The whole system except the gateway. `make dev` runs the gateway on the host
+# so the templ and CSS watchers see the source tree, and it cannot share port
+# 8080 with the gateway container. Scaling the gateway to zero is what keeps
+# "everything else" true as services are added to docker-compose.dev.yml.
+up-platform:
+	$(DEV_COMPOSE) up -d --build --wait --scale gateway=0 --wait-timeout 300
+	@$(MAKE) --no-print-directory smoke-platform
 
 down:
 	$(DEV_COMPOSE) down
@@ -366,18 +394,17 @@ ps:
 # their container starts, and the loser was whichever dependency chain was
 # longest that day. Output is printed once, at the end, so a slow start does
 # not look like a loop of failures.
-smoke:
+#
+# `smoke` checks the whole system; `smoke-platform` checks everything
+# `up-platform` starts. One recipe, two endpoint lists.
+smoke: HEALTH_TARGETS = $(GATEWAY_HEALTH) $(PLATFORM_HEALTH)
+smoke-platform: HEALTH_TARGETS = $(PLATFORM_HEALTH)
+
+smoke smoke-platform:
 	@deadline=$$(($$(date +%s) + $(SMOKE_TIMEOUT))); \
 	while :; do \
 		fail=0; report=""; \
-		for target in \
-			"gateway|http://localhost:8080/healthz" \
-			"category-service|http://localhost:8086/healthz" \
-			"media-service|http://localhost:8081/healthz" \
-			"product-service|http://localhost:8082/healthz" \
-			"product-listing|http://localhost:8083/healthz" \
-			"product-search|http://localhost:8084/healthz" \
-			"aggregator|http://localhost:8085/healthz"; do \
+		for target in $(HEALTH_TARGETS); do \
 			name=$${target%%|*}; url=$${target#*|}; \
 			code=$$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 $$url 2>/dev/null); \
 			if [ "$$code" = "200" ]; then \

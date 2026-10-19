@@ -1,11 +1,13 @@
 # The whole system, in one command.
 #
-#   make up        start everything
-#   make down      stop it, keep the data
-#   make reset     stop it and delete the data
-#   make ps        what is running
-#   make logs      follow everything
-#   make smoke     check that every health endpoint answers
+#   make up           start everything
+#   make up-platform  start the platform only, for running the gateway on the
+#                     host against it (`make dev`)
+#   make down         stop it, keep the data
+#   make reset        stop it and delete the data
+#   make ps           what is running
+#   make logs         follow everything
+#   make smoke        check that every health endpoint answers
 #
 # # Why this file exists
 #
@@ -97,12 +99,17 @@ services:
     environment:
       KAFKA_NODE_ID: "1"
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      # Two listeners so the same broker is reachable from inside the network and
-      # from the host, which need different advertised addresses.
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # PLAINTEXT is how the network reaches the broker (every service dials
+      # kafka:9092); EXTERNAL is the host listener, which needs its own
+      # advertised address. The host port is 19092 rather than 9092 because
+      # 9092 on a developer machine is product-service's, per ports.txt: the
+      # broker steps aside so that row holds, and a gateway running on the host
+      # can dial both the broker and the service at their assigned ports.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       # Single node, so every replication factor must be 1. Left at Kafka's
       # default of 3 the broker refuses to start.
@@ -113,7 +120,9 @@ services:
       KAFKA_NUM_PARTITIONS: "3"
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
     ports:
-      - "9092:9092"
+      # The broker's host-facing listener. Services reach it at kafka:9092 over
+      # the container network instead and never on this port.
+      - "19092:19092"
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
@@ -220,7 +229,10 @@ services:
       context: ./services/product-service
       dockerfile: Dockerfile
     container_name: gogo-dev-product
-    ports: ["8082:8082"]
+    # 9092 is published for the gateway running on the host (`make dev`): the
+    # registry assigns the port to product-service, and the broker above takes
+    # 19092 on the host so this mapping can exist.
+    ports: ["8082:8082", "9092:9092"]
     environment:
       <<: *app-env
       DB_USER: product_user
