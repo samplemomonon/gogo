@@ -153,22 +153,27 @@ per-service, and the split is verified file by file:
 - **Interim:** document it in any deployment that serves more than one tenant.
   A single-tenant deployment (the default `TENANT_DEFAULT`) is unaffected.
 
-## 9. Ownership re-home: team-owned verticals ([D-023](../ARCHITECTURE.md#d-023))
+## 9. ~~Ownership re-home: team-owned verticals~~ — **Resolved**
 
-Every feature is to own *one* directory — its backend **and** its UI — so a team
-has one home instead of six ([`DECISION_TEAM_OWNED_VERTICALS.md`](./DECISION_TEAM_OWNED_VERTICALS.md)).
-The program is phased (ops → sales/seller → auth → home/profile/contentcms →
-inventory/billing), stays green at every step, and must regenerate
-`import_graph.txt` (`make arch-graph`) after each move. **Phase 2 (`ops`) and
-Phase 3 (`sales`/`seller`) are done and verified** with the Go toolchain
-(`devenv.nix`): `ops` re-homed to `internal/features/ops`; `sales` + the seller
-console merged into `internal/features/sales` (backend hexagon at the feature
-root, read-side under `ui/`) with `OWNERS.md` each. Both import only their own
-subtree, `internal/shared`, and `gogo/contracts/*`, and are clamped by
-`internal/architecture/vertical_boundary_test.go`. The remaining phases (auth,
-home/profile/contentcms, inventory/billing) re-home the same way, one step at a
-time. The scaffolder (`make feature` / `scripts/feature-vertical.sh`) lands the
-target shape and the single ownership file (`OWNERS.md` + `CODEOWNERS`).
+*Closed by [D-023](../ARCHITECTURE.md#d-023) Phases 4–7.* The program ran phased
+(ops → sales/seller → auth → home/profile/contentcms → inventory/billing) and
+stayed green at every step. Every unit now lives under
+`apps/web/internal/features/<f>` — backend hexagon at the vertical root,
+read-side under `ui/`, `OWNERS.md` + `CODEOWNERS` per team — while
+`internal/modules/` and `internal/pages/` are deleted, `internal/bootstrap` is
+`internal/shell`, and the retired `cmd/modulegen` / `make module` scaffolder is
+replaced by `make feature` (`scripts/feature-vertical.sh`). The boundary is
+enforced by the architecture suite (`TestFeatureVerticalIsAClosedModule`,
+`TestFeatureVerticalHexagonDependencyDirection`,
+`TestCompositionLayerReachesNoVerticalInternals`, `TestRetiredRootsStayRetired`)
+and `import_graph.txt` is the regenerated baseline (`make arch-graph`).
+
+One thread stays deliberately open, recorded in the program's own document
+rather than here: the `public/` cross-vertical grant
+([D-021](../ARCHITECTURE.md#d-021)) is extended into the closed-module rule when
+its first genuine consumer appears — see
+[`DECISION_TEAM_OWNED_VERTICALS.md`](./DECISION_TEAM_OWNED_VERTICALS.md),
+"Remaining".
 
 ---
 
