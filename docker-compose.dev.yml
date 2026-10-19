@@ -119,6 +119,13 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_NUM_PARTITIONS: "3"
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      # The image's default log directory (/tmp/kafka-logs) lives in the
+      # container layer, so a recreated broker would come back with no topics
+      # and no consumer-group offsets; consumers then spin on UNKNOWN_TOPIC_ID
+      # fetches against the recreated topics' fresh ids (seen when this service
+      # was first recreated for the host listener). The named volume below only
+      # holds the broker's state when log.dirs points at it.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     ports:
       # The broker's host-facing listener. Services reach it at kafka:9092 over
       # the container network instead and never on this port.
