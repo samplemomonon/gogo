@@ -1,7 +1,8 @@
 # Content surfaces: ownership, business rules, and the build order
 
-**Status:** decided (2026-10-19); §5 step 2 is implemented and verified — steps 1
-and 3 await their owners (Builder.io credentials; legal content).
+**Status:** decided (2026-10-19); §5 step 2 is implemented and verified and
+§5 step 1 is verified offline — its live check awaits the Builder.io owner;
+step 3 awaits its legal content owners.
 **Scope:** editorial CMS pages, banners, engineering documentation, and the
 customer legal pages (terms & conditions, privacy policy).
 **Companions:** [`CMS_CONTENT_MODEL.md`](./CMS_CONTENT_MODEL.md) (the read
@@ -128,7 +129,10 @@ decided here because none of it has a consumer yet.
    `BUILDER_CONTENT_MODEL`; obtain the approved egress path; publish one real
    page. *Exit:* the published page renders at `/pages/{slug}`; unsetting the
    two variables returns 404; a forced CMS failure returns 503, not an empty
-   page.
+   page. **Verified offline (2026-10-19):** the 404 and 503 exits, the
+   documented request shape, the response parse, the error taxonomy, and the
+   cache bounds are pinned by tests in `internal/features/contentcms/ui`; the
+   live published page still requires the project and the approved egress path.
 2. **Banner slot in the storefront home.** `home` declares a content port for a
    named slot; the composition root adapts the `contentcms` reader into it (the
    same shape as the existing cross-vertical wiring in
