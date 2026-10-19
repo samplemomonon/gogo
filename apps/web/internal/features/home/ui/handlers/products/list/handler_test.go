@@ -59,9 +59,9 @@ func (s *stubListing) GetProduct(context.Context, string) (*results.Product, err
 	return s.result.Products[0], nil
 }
 
-func newTestHandler(t *testing.T, listing ports.Listing) *Handler {
+func newTestHandler(t *testing.T, listing ports.Listing, banners ports.BannerSlot) *Handler {
 	t.Helper()
-	return NewHandler(listing, pagekit.NewComposer(), discardLogger())
+	return NewHandler(listing, banners, pagekit.NewComposer(), discardLogger())
 }
 
 func get(t *testing.T, handler *Handler, target string) *httptest.ResponseRecorder {
@@ -143,7 +143,7 @@ func TestTheHandlerTranslatesPageAndTermIntoThePortQuery(t *testing.T) {
 				Products: []*results.Product{{ID: "1", Name: "Kopi", Price: 1000, Stock: 1}},
 				Total:    45,
 			}}
-			rec := get(t, newTestHandler(t, listing), tt.target)
+			rec := get(t, newTestHandler(t, listing, emptySlot()), tt.target)
 
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want 200", rec.Code)
@@ -171,7 +171,7 @@ func TestAnOutageAnswers503WithTheRetryMessage(t *testing.T) {
 	t.Parallel()
 
 	listing := &stubListing{err: fmt.Errorf("browse: %w", productconsumer.ErrProductPlatformUnavailable)}
-	rec := get(t, newTestHandler(t, listing), "/")
+	rec := get(t, newTestHandler(t, listing, emptySlot()), "/")
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("status = %d, want 503", rec.Code)
@@ -191,7 +191,7 @@ func TestAnUnclassifiedFailureAnswers500(t *testing.T) {
 	t.Parallel()
 
 	listing := &stubListing{err: errors.New("boom")}
-	rec := get(t, newTestHandler(t, listing), "/")
+	rec := get(t, newTestHandler(t, listing, emptySlot()), "/")
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500", rec.Code)

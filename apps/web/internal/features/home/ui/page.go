@@ -35,8 +35,11 @@ type Page struct {
 	detail  *homedetail.Handler
 }
 
-// New wires the home page around its remote listing. listing is the remote
-// consumer port (implemented by listingclient); logger receives the page's
+// New wires the home page around its remote listing and its editorial banner
+// slot. listing is the remote consumer port (implemented by listingclient);
+// banners is the page-declared editorial port the composition root adapts from
+// the contentcms read-side — the page imports no other vertical
+// (docs/DECISION_CONTENT_SURFACES.md §5 step 2); logger receives the page's
 // diagnostic output.
 //
 // The grid cache is *not* event-invalidated any more. It used to subscribe to the
@@ -48,23 +51,25 @@ type Page struct {
 // write side. An event-driven invalidation would need a Kafka change feed consumed
 // here, which is deliberately out of scope: a 30s lag on a storefront grid does not
 // justify a Kafka dependency in the gateway.
-func New(listing ports.Listing, logger *slog.Logger) *Page {
+func New(listing ports.Listing, banners ports.BannerSlot, logger *slog.Logger) *Page {
 	// One composer per page: every island of the page (the listing and each
 	// product's detail region) shares one page-scoped cache.
 	composer := pagekit.NewComposer()
 	return &Page{
-		handler: homelist.NewHandler(listing, composer, logger),
+		handler: homelist.NewHandler(listing, banners, composer, logger),
 		detail:  homedetail.NewHandler(listing, composer, logger),
 	}
 }
 
 // Register registers the home page's graph with the composition root, keyed by
-// its type. Its inputs — the listing port and the logger — must already be
-// registered by type, so the page owns its own wiring without any caller naming it.
+// its type. Its inputs — the listing port, the banner slot and the logger — must
+// already be registered by type, so the page owns its own wiring without any
+// caller naming it.
 func Register(b *fdi.Builder) {
 	fdi.ProvideType(b, func(c *fdi.Container) (*Page, error) {
 		return New(
 			fdi.MustResolveType[ports.Listing](c),
+			fdi.MustResolveType[ports.BannerSlot](c),
 			fdi.MustResolveType[*slog.Logger](c),
 		), nil
 	})

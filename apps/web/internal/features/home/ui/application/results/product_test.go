@@ -27,6 +27,7 @@ func TestReadModelIsPageLocal(t *testing.T) {
 
 	assertLocal(t, reflect.TypeOf(results.Product{}), "Product")
 	assertLocal(t, reflect.TypeOf(results.Listing{}), "Listing")
+	assertLocal(t, reflect.TypeOf(results.Banner{}), "Banner")
 }
 
 // TestReadModelShapeIsDeliberate pins the exported fields of the read model.
@@ -39,6 +40,8 @@ func TestReadModelShapeIsDeliberate(t *testing.T) {
 		[]string{"Attributes", "Barcode", "Brand", "Currency", "Description", "ID", "Name", "Price", "ProductTypeID", "SchemaVersion", "Slug", "Stock", "TenantID"})
 	assertFields(t, reflect.TypeOf(results.Listing{}), "Listing",
 		[]string{"NextCursor", "Products", "Total"})
+	assertFields(t, reflect.TypeOf(results.Banner{}), "Banner",
+		[]string{"ImageAlt", "ImageURL", "Title"})
 }
 
 // assertLocal walks a page-local struct's exported fields and rejects anything

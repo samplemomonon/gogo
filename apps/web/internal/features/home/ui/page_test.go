@@ -220,6 +220,7 @@ func newRouter(t *testing.T) *platform {
 				Search: breaker.NewDefault(),
 			},
 		),
+		emptyBannerSlot{},
 		discardLogger(),
 	)
 
@@ -325,7 +326,7 @@ func TestHomeGridIsPublicAndCacheable(t *testing.T) {
 func TestNav(t *testing.T) {
 	t.Parallel()
 
-	nav := ui.New(nil, discardLogger()).Nav()
+	nav := ui.New(nil, emptyBannerSlot{}, discardLogger()).Nav()
 	if len(nav) != 1 {
 		t.Fatalf("len(Nav) = %d, want 1: %+v", len(nav), nav)
 	}
@@ -505,7 +506,7 @@ func TestThePageDependsOnlyOnItsPort(t *testing.T) {
 		return results.Listing{}, nil
 	}}
 
-	homePage := ui.New(stub, discardLogger())
+	homePage := ui.New(stub, emptyBannerSlot{}, discardLogger())
 	router := chi.NewRouter()
 	homePage.RegisterRoutes(router)
 
@@ -519,6 +520,14 @@ func TestThePageDependsOnlyOnItsPort(t *testing.T) {
 	if !served {
 		t.Error("the page rendered without asking its port for data")
 	}
+}
+
+// emptyBannerSlot satisfies the home page's banner port with an empty slot, so
+// the page-level tests exercise the storefront without any editorial machinery.
+type emptyBannerSlot struct{}
+
+func (emptyBannerSlot) ReadBanner(context.Context, string) (results.Banner, error) {
+	return results.Banner{}, ports.ErrNoBanner
 }
 
 // portStub satisfies the home page's port without any gRPC machinery, which is the

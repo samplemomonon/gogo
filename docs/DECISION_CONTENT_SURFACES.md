@@ -1,7 +1,7 @@
 # Content surfaces: ownership, business rules, and the build order
 
-**Status:** decided (2026-10-19); implementation is sliced, not done — §5 is the
-program.
+**Status:** decided (2026-10-19); §5 step 2 is implemented and verified — steps 1
+and 3 await their owners (Builder.io credentials; legal content).
 **Scope:** editorial CMS pages, banners, engineering documentation, and the
 customer legal pages (terms & conditions, privacy policy).
 **Companions:** [`CMS_CONTENT_MODEL.md`](./CMS_CONTENT_MODEL.md) (the read
@@ -74,7 +74,8 @@ write credential exists in this repository or its deploy configuration.
 **Banners — today's scope: editorial only.** A banner is a published CMS block,
 placed by the page that owns the slot. There is no scheduling, ordering,
 audience or tenant targeting, or impression/click tracking. If any of that is
-needed, it is new work under §4 — not a quiet widening of this one.
+needed, it is new work under §4 — not a quiet widening of this one. The one live
+slot today is the storefront home's `home-banner` slug (§5 step 2).
 
 **Banner failure semantics.** The home page keeps serving when the CMS is down
 or a slot is absent: the slot degrades to rendering nothing (no empty frame, no
@@ -137,7 +138,10 @@ decided here because none of it has a consumer yet.
    the D-021 `public/` grant's trigger, decided then. *Exit:* a published banner
    renders on home; absence or CMS failure degrades to no banner while home
    still serves; tests pin all three paths; `import_graph.txt` regenerated
-   (`make arch-graph`) and `make check` green.
+   (`make arch-graph`) and `make check` green. **Done (2026-10-19):** the port is
+   `home/ui/application/ports.BannerSlot`, the slot is `home-banner`;
+   `internal/shell/content_connection.go` adapts `contentui.Reader`; handler
+   tests pin the published, empty and failed paths; `make check` is green.
 3. **Customer legal publication.** Content owners complete the two documents
    and their metadata; the deployment path and host are supplied and wired.
    *Exit:* `npm run build` in `docs/site` passes the gate only with approved
