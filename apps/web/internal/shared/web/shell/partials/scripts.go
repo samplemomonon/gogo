@@ -289,3 +289,59 @@ const WebVitalsJS = `
   });
 })();
 `
+
+// LiveSearchJS shows and hides the storefront's live-search sheet as the shopper
+// types in the header box. It is the keyboard/pointer half of the search drawer:
+// htmx fetches the result rows (via the input's hx-get to /search/suggest), and
+// this script only decides when the sheet is visible. It never navigates and
+// never reloads — a result row is a plain link, so choosing one closes the sheet
+// and lets the browser do the normal full-page navigation.
+//
+// The sheet opens on input focus (so a shopper who just tabbed in sees it) and
+// on any keystroke that leaves a non-empty term; it closes when the term is
+// emptied, on Escape, on a result click, on the close button, or on a click
+// outside the sheet. It guards every reference so a page that does not mount the
+// search surface (or that has not yet fetched the input) stays inert.
+const LiveSearchJS = `
+(function () {
+  var input = document.querySelector('form[role="search"] input[type="search"][hx-get="/search/suggest"]');
+  var drawer = document.getElementById("search-drawer");
+  var results = document.getElementById("live-search-results");
+  if (!input || !drawer || !results) {
+    return;
+  }
+
+  function sync() {
+    drawer.hidden = input.value.trim().length === 0;
+  }
+
+  input.addEventListener("input", sync);
+  input.addEventListener("focus", sync);
+  input.addEventListener("search", sync);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      drawer.hidden = true;
+    }
+  });
+
+  // A result row or the close button closes the sheet; a click inside a plain
+  // row (not a link) should not close it, so only those two close it here.
+  drawer.addEventListener("click", function (e) {
+    if (e.target.closest("[data-search-result]") || e.target.closest("[data-search-close]")) {
+      drawer.hidden = true;
+    }
+  });
+
+  // A click outside the input and the sheet closes it. The input is excluded so
+  // a shopper can click back into it without the sheet flickering.
+  document.addEventListener("click", function (e) {
+    if (drawer.hidden) {
+      return;
+    }
+    if (input.contains(e.target) || drawer.contains(e.target)) {
+      return;
+    }
+    drawer.hidden = true;
+  });
+})();
+`

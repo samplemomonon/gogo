@@ -45,7 +45,8 @@ Two rules from `DECISION_UI_OWNERSHIP.md` apply to every row below:
 
 | Surface | Owner | Where it lives | Runtime? |
 | --- | --- | --- | --- |
-| Editorial pages (`/pages/{slug}`) | `contentcms` vertical | `internal/features/contentcms/`; source: Builder.io; contract: `CMS_CONTENT_MODEL.md` | Yes — the gateway reads published content |
+| Editorial pages (`/pages/{slug}`, optional native homepage at `/`) | `contentcms` vertical | `internal/features/contentcms/`; source: native PostgreSQL (tenant-scoped) with a Builder.io published-read fallback; contract: `CMS_CONTENT_MODEL.md` | Yes — the gateway reads published content |
+| Public site shell (header menu, footer, brand, theme) | `contentcms` vertical | `content_site_settings`; rendered by the shared shell through a presentation-safe request context | Yes — published settings only |
 | Banners (editorial) | Content: `contentcms`. Placement: the page that renders the slot (`home`) | block type `hero`/`banner`; `design-system` `HeroBanner` | Yes |
 | Engineering documentation | The repository — reviewed in Git | `docs/**`, `README.md` | No — build-time |
 | Customer legal pages (terms, privacy) | Facts: the service owner + legal (outside the repository). Build: the repository | `docs/site/` (Rspress) + `check-publication.mjs` gate | No — build-time |
@@ -67,10 +68,14 @@ logged 503 and **never an empty success page**; with no CMS configured the route
 404s (kill switch). CMS content is presentation data — it can never write or
 override product data.
 
-**Authoring (who may edit).** Platform editorial administrators manage the CMS
-project and editor roles in Builder.io. Roles in the gateway — seller, merchant,
-buyer — do not grant CMS access. The gateway holds a public read key only; no
-write credential exists in this repository or its deploy configuration.
+**Native pages and site shell.** The gateway also owns tenant-scoped native pages and a tenant-wide shell. Native pages use the closed `schemaVersion: 2` component registry, validate every save and publish, and serve only the published snapshot at `/pages/{slug}`. The shell stores brand, same-origin menu/footer links, homepage slug, and validated colour tokens; it has a draft and published copy, and only the published copy reaches public requests. The published homepage slug can claim `/`; a missing or invalid page falls back to the manual storefront or fails closed, never leaking a draft.
+
+**Authoring (who may edit).** Builder.io project and editor roles remain
+separate from the gateway. Native pages and the site shell are authorized by the
+gateway's existing `authz.role.manage` capability; seller, merchant, and buyer
+roles grant no CMS access unless that capability is explicitly assigned. The
+gateway holds only a Builder.io public read key; no write credential exists in
+this repository or its deploy configuration.
 
 **Banners — today's scope: editorial only.** A banner is a published CMS block,
 placed by the page that owns the slot. There is no scheduling, ordering,
@@ -131,7 +136,7 @@ decided here because none of it has a consumer yet.
    two variables returns 404; a forced CMS failure returns 503, not an empty
    page. **Verified offline (2026-10-19):** the 404 and 503 exits, the
    documented request shape, the response parse, the error taxonomy, and the
-   cache bounds are pinned by tests in `internal/features/contentcms/ui`; the
+   cache bounds are pinned by tests in `internal/features/contentcms/presentation`; the
    live published page still requires the project and the approved egress path.
 2. **Banner slot in the storefront home.** `home` declares a content port for a
    named slot; the composition root adapts the `contentcms` reader into it (the

@@ -120,6 +120,7 @@ func Load() (*AppConfig, error) {
 		ProductListingAddress:       envString("PRODUCT_LISTING_ADDRESS", ""),
 		ProductSearchAddress:        envString("PRODUCT_SEARCH_ADDRESS", ""),
 		CategoryAddress:             envString("CATEGORY_ADDRESS", ""),
+		MediaAddress:                envString("MEDIA_ADDRESS", ""),
 		ProductPlatformServiceToken: envString("PRODUCT_PLATFORM_SERVICE_TOKEN", ""),
 		BuilderPublicAPIKey:         envString("BUILDER_PUBLIC_API_KEY", ""),
 		BuilderModel:                envString("BUILDER_CONTENT_MODEL", ""),

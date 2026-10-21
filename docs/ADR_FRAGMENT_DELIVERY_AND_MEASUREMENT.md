@@ -193,7 +193,7 @@ Basis: [`TEAM_TOPOLOGIES_PRD.md`](./TEAM_TOPOLOGIES_PRD.md) §6.4/§7 and [`ADR_
 | `internal/shared` (incl. `internal/shared/authconsumer`) | module | T5 | foundation | PRD §6.4; authconsumer carve-out decision recorded here: it remains under the shared module and is **not** a contract of T4 |
 | `internal/features/billing` | module | T5 | business | PRD line 316 (rung 1) |
 | `internal/features/ops` | module | T5 | business | **derived**: readiness aggregation + circuit-breaker surface are platform-operational capabilities, not merchant surface (basis: `internal/features/ops` purpose docs, `CIRCUIT_BREAKER_IMPLEMENTATION.md`) |
-| `internal/features/contentcms/ui` | page | T5 | business | **derived**: a platform-wide content surface; no PRD unit claims it (basis: `CMS_CONTENT_MODEL.md` framing as a shared editorial surface) |
+| `internal/features/contentcms/presentation` | page | T5 | business | **derived**: a platform-wide content surface; no PRD unit claims it (basis: `CMS_CONTENT_MODEL.md` framing as a shared editorial surface) |
 | `cmd/**` | composition | T5 | foundation | PRD §6.4 (bootstrap/entrypoints) |
 | `design-system/web/ui` | module | T5 | foundation | ADR_CROSS_TEAM §4.3 (platform owns primitives) |
 

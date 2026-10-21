@@ -7,6 +7,7 @@ package ui_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -40,6 +41,31 @@ func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// stubMediaResolver is an in-memory ports.MediaResolver: it maps a media id to a
+// presigned URL, optionally failing, so a test can assert the storefront renders
+// an image from media-service without standing one up. It stands in for the
+// media-service connection the composition root dials in production.
+type stubMediaResolver struct {
+	mu   sync.Mutex
+	urls map[string]string
+	err  error
+}
+
+func (s *stubMediaResolver) BatchDownloadURLs(_ context.Context, ids []string) (map[string]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make(map[string]string, len(ids))
+	for _, id := range ids {
+		if url, ok := s.urls[id]; ok {
+			out[id] = url
+		}
+	}
+	return out, nil
+}
+
 // The platform stubs below stand in for the two read services the storefront consumes.
 // They are contract-only: the page must depend on the wire contracts and never on a
 // product service's runtime code.
@@ -62,6 +88,17 @@ func (s *stubBrowse) add(id int64, name string, price int64) {
 		Id: id, Name: name, PriceCents: price, Currency: "IDR", Stock: 10,
 		Status:    productlistingv1.ProductStatus_PRODUCT_STATUS_ACTIVE,
 		CreatedAt: timestamppb.Now(), UpdatedAt: timestamppb.Now(),
+	})
+}
+
+func (s *stubBrowse) addWithMedia(id int64, name string, price int64, mediaID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.products = append(s.products, &productlistingv1.Product{
+		Id: id, Name: name, PriceCents: price, Currency: "IDR", Stock: 10,
+		Status:         productlistingv1.ProductStatus_PRODUCT_STATUS_ACTIVE,
+		PrimaryMediaId: mediaID,
+		CreatedAt:      timestamppb.Now(), UpdatedAt: timestamppb.Now(),
 	})
 }
 
@@ -199,11 +236,16 @@ type platform struct {
 // gRPC transport. It returns the stubs so a test can seed them directly — which is how a
 // test models a product created by another process, exactly the case the storefront has
 // to handle now that it does not own the write side.
-func newRouter(t *testing.T) *platform {
+func newRouter(t *testing.T, media ...ports.MediaResolver) *platform {
 	t.Helper()
 
 	browse := &stubBrowse{}
 	search := &stubSearch{}
+
+	var m ports.MediaResolver
+	if len(media) > 0 {
+		m = media[0]
+	}
 
 	homePage := ui.New(
 		listingclient.New(
@@ -219,6 +261,8 @@ func newRouter(t *testing.T) *platform {
 				Browse: breaker.NewDefault(),
 				Search: breaker.NewDefault(),
 			},
+			m,
+			discardLogger(),
 		),
 		emptyBannerSlot{},
 		discardLogger(),
@@ -252,6 +296,82 @@ func TestIndexPage(t *testing.T) {
 		if strings.Contains(rec.Body.String(), forbidden) {
 			t.Errorf("public home must not expose admin actions, found %q", forbidden)
 		}
+	}
+}
+
+// TestHeaderRendersTheLiveSearchDrawer pins the search-as-you-type feature's
+// shell half: the header's search input carries the htmx live-search attributes
+// and the drawer sheet that receives the results is present in the document.
+// htmx is what drives the typing → drawer flow; without these attributes the
+// storefront search would still work (Enter navigates to ?q=) but would not
+// preview results as the shopper types.
+func TestHeaderRendersTheLiveSearchDrawer(t *testing.T) {
+	t.Parallel()
+
+	p := newRouter(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	p.router.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	for _, want := range []string{
+		`hx-get="/search/suggest"`,
+		`hx-target="#live-search-results"`,
+		`hx-trigger="input changed delay:250ms, search"`,
+		`id="search-drawer"`,
+		`id="live-search-results"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("home page missing live-search marker %q", want)
+		}
+	}
+}
+
+// TestProductCardRendersThePrimaryImage pins the MinIO integration's storefront
+// half: a product whose primary_media_id resolves through media-service renders
+// an <img> with the presigned URL, so the storefront shows product images instead
+// of the icon placeholder.
+func TestProductCardRendersThePrimaryImage(t *testing.T) {
+	t.Parallel()
+
+	media := &stubMediaResolver{urls: map[string]string{
+		"9": "https://minio.local/gogo/9/hero.jpg?X-Amz-Signature=abc",
+	}}
+	p := newRouter(t, media)
+	p.browse.addWithMedia(1, "Aurora Phone", 1000000, 9)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	p.router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `<img src="https://minio.local/gogo/9/hero.jpg?X-Amz-Signature=abc"`) {
+		t.Errorf("product card missing the resolved media URL in an <img>; got:\n%s", body)
+	}
+}
+
+// A media-service outage must render placeholders, not a broken page: the grid
+// keeps serving products even when their images cannot be resolved.
+func TestProductCardDegradesWhenMediaIsUnavailable(t *testing.T) {
+	t.Parallel()
+
+	media := &stubMediaResolver{err: errors.New("media-service down"), urls: map[string]string{"9": "https://minio.local/x"}}
+	p := newRouter(t, media)
+	p.browse.addWithMedia(1, "Aurora Phone", 1000000, 9)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	p.router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: a media outage must not take the grid down", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Aurora Phone") {
+		t.Errorf("grid lost the product when media was down; got:\n%s", body)
 	}
 }
 

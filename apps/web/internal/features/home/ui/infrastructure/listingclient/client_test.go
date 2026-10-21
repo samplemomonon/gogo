@@ -117,6 +117,8 @@ func newTestClient(t *testing.T, browse *fakeBrowse, search *fakeSearch) (*Clien
 			Browse: breaker.NewDefault(),
 			Search: breaker.NewDefault(),
 		},
+		nil,
+		nil,
 	)
 	return client, browse, search
 }

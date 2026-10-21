@@ -37,9 +37,15 @@ templ ProductDetailContent(product *results.Product) {
 	</div>
 	<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)]">
 		<section class="rounded-2xl border border-base-300 bg-base-100 p-6 sm:p-8">
-			<div class="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-				@ui.IconTag("size-8")
-			</div>
+			if product.ImageURL != "" {
+				<div class="mb-6 overflow-hidden rounded-2xl border border-base-300/60">
+					<img src={ product.ImageURL } alt={ product.Name } class="h-full w-full object-cover" />
+				</div>
+			} else {
+				<div class="mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+					@ui.IconTag("size-8")
+				</div>
+			}
 			if product.Brand != "" {
 				<p class="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">{ product.Brand }</p>
 			}

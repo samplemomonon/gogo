@@ -15,6 +15,7 @@ gogo/cmd/teamcatalog
 gogo/contracts/auth/v1
 gogo/contracts/category/v1
 gogo/contracts/inventory/v1
+gogo/contracts/media/v1
 gogo/contracts/product/v1
 gogo/contracts/productlisting/v1
 gogo/contracts/productsearch/v1
@@ -37,12 +38,20 @@ gogo/internal/features/billing	gogo/internal/features/billing/activity,gogo/inte
 gogo/internal/features/billing/activity	gogo/internal/shared/events,gogo/internal/shared/productevents
 gogo/internal/features/billing/handlers	gogo/internal/features/billing/activity,gogo/internal/features/billing/views,gogo/internal/shared/web/render,gogo/internal/shared/web/shell
 gogo/internal/features/billing/views	gogo/internal/features/billing/activity
-gogo/internal/features/contentcms/ui	gogo/internal/shared/breaker,gogo/internal/shared/web/navigation
-gogo/internal/features/home/ui	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/handlers/products/detail,gogo/internal/features/home/ui/handlers/products/list,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation,gogo/internal/shared/web/pagekit
+gogo/internal/features/contentcms/application/ports	gogo/internal/features/contentcms/domain
+gogo/internal/features/contentcms/compose	gogo/internal/features/contentcms/application/ports,gogo/internal/features/contentcms/infrastructure/postgres,gogo/internal/features/contentcms/presentation,gogo/internal/features/contentcms/presentation/handler,gogo/internal/shared/authconsumer,gogo/internal/shared/config,gogo/internal/shared/foundation/di
+gogo/internal/features/contentcms/domain
+gogo/internal/features/contentcms/infrastructure/postgres	gogo/internal/features/contentcms/application/ports,gogo/internal/features/contentcms/domain,gogo/internal/shared/pgxkit
+gogo/internal/features/contentcms/presentation	gogo/internal/features/contentcms/application/ports,gogo/internal/shared/breaker
+gogo/internal/features/contentcms/presentation/components	gogo/internal/features/contentcms/domain
+gogo/internal/features/contentcms/presentation/handler	gogo/internal/features/contentcms/application/ports,gogo/internal/features/contentcms/domain,gogo/internal/features/contentcms/presentation/pages,gogo/internal/shared/tenant,gogo/internal/shared/web/navigation,gogo/internal/shared/web/render,gogo/internal/shared/web/session,gogo/internal/shared/web/site
+gogo/internal/features/contentcms/presentation/pages	gogo/internal/features/contentcms/application/ports,gogo/internal/features/contentcms/domain,gogo/internal/features/contentcms/presentation/components,gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/layouts,gogo/internal/shared/web/shell/partials,gogo/internal/shared/web/site
+gogo/internal/features/home/ui	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/handlers/products/detail,gogo/internal/features/home/ui/handlers/products/list,gogo/internal/features/home/ui/handlers/products/search,gogo/internal/shared/foundation/di,gogo/internal/shared/web/navigation,gogo/internal/shared/web/pagekit
 gogo/internal/features/home/ui/application/ports	gogo/internal/features/home/ui/application/results
 gogo/internal/features/home/ui/application/results
 gogo/internal/features/home/ui/handlers/products/detail	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/islandkeys,gogo/internal/features/home/ui/views/pages,gogo/internal/shared/productconsumer,gogo/internal/shared/tenant,gogo/internal/shared/web/render
 gogo/internal/features/home/ui/handlers/products/list	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/application/results,gogo/internal/features/home/ui/infrastructure/listingclient,gogo/internal/features/home/ui/islandkeys,gogo/internal/features/home/ui/views/pages,gogo/internal/features/home/ui/views/partials,gogo/internal/shared/tenant,gogo/internal/shared/web/pagekit,gogo/internal/shared/web/render
+gogo/internal/features/home/ui/handlers/products/search	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/views/partials
 gogo/internal/features/home/ui/infrastructure/listingclient	gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/application/results,gogo/internal/shared/breaker,gogo/internal/shared/productconsumer,gogo/internal/shared/tenant
 gogo/internal/features/home/ui/islandkeys
 gogo/internal/features/home/ui/views/pages	gogo/internal/features/home/ui/application/results,gogo/internal/shared/money,gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/layouts
@@ -97,10 +106,11 @@ gogo/internal/shared/foundation/specification
 gogo/internal/shared/foundation/validation	gogo/internal/shared/kernel
 gogo/internal/shared/grpcconsumer	gogo/internal/shared/breaker,gogo/internal/shared/tenant
 gogo/internal/shared/grpcx	gogo/internal/shared/authn,gogo/internal/shared/tenant
-gogo/internal/shared/httpserver	gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/module,gogo/internal/shared/netutil,gogo/internal/shared/tenant,gogo/internal/shared/web/assets,gogo/internal/shared/web/navigation,gogo/internal/shared/web/render,gogo/internal/shared/web/shell
+gogo/internal/shared/httpserver	gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/module,gogo/internal/shared/netutil,gogo/internal/shared/tenant,gogo/internal/shared/web/assets,gogo/internal/shared/web/navigation,gogo/internal/shared/web/render,gogo/internal/shared/web/shell,gogo/internal/shared/web/site
 gogo/internal/shared/kernel
 gogo/internal/shared/keyset
 gogo/internal/shared/logging	gogo/internal/shared/config
+gogo/internal/shared/mediaconsumer	gogo/contracts/media/v1,gogo/internal/shared/breaker,gogo/internal/shared/grpcconsumer
 gogo/internal/shared/module	gogo/internal/shared/web/navigation
 gogo/internal/shared/money
 gogo/internal/shared/netutil
@@ -115,6 +125,7 @@ gogo/internal/shared/web/pagekit	gogo/internal/shared/events,gogo/internal/share
 gogo/internal/shared/web/render	gogo/internal/shared/tenant
 gogo/internal/shared/web/session
 gogo/internal/shared/web/shell	gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/layouts
-gogo/internal/shared/web/shell/layouts	gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/partials
-gogo/internal/shared/web/shell/partials	gogo/internal/shared/web/navigation
-gogo/internal/shell	gogo/internal/features/auth/compose,gogo/internal/features/auth/ui,gogo/internal/features/auth/ui/application/ports,gogo/internal/features/auth/ui/infrastructure/authclient,gogo/internal/features/billing,gogo/internal/features/contentcms/ui,gogo/internal/features/home/ui,gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/application/results,gogo/internal/features/home/ui/infrastructure/listingclient,gogo/internal/features/inventory,gogo/internal/features/inventory/compose,gogo/internal/features/ops,gogo/internal/features/profile/ui,gogo/internal/features/profile/ui/application/ports,gogo/internal/features/profile/ui/infrastructure/authclient,gogo/internal/features/sales/compose,gogo/internal/features/sales/ui,gogo/internal/features/sales/ui/application/ports,gogo/internal/features/sales/ui/infrastructure/authclient,gogo/internal/features/sales/ui/infrastructure/catalogclient,gogo/internal/features/sales/ui/infrastructure/inventoryclient,gogo/internal/features/sales/ui/infrastructure/salesclient,gogo/internal/shared/authconsumer,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/events,gogo/internal/shared/foundation/adapter,gogo/internal/shared/foundation/di,gogo/internal/shared/grpcx,gogo/internal/shared/httpserver,gogo/internal/shared/kernel,gogo/internal/shared/module,gogo/internal/shared/productconsumer,gogo/internal/shared/productevents,gogo/internal/shared/web/session
+gogo/internal/shared/web/shell/layouts	gogo/internal/shared/web/navigation,gogo/internal/shared/web/shell/partials,gogo/internal/shared/web/site
+gogo/internal/shared/web/shell/partials	gogo/internal/shared/web/navigation,gogo/internal/shared/web/site
+gogo/internal/shared/web/site	gogo/internal/shared/web/navigation
+gogo/internal/shell	gogo/internal/features/auth/compose,gogo/internal/features/auth/ui,gogo/internal/features/auth/ui/application/ports,gogo/internal/features/auth/ui/infrastructure/authclient,gogo/internal/features/billing,gogo/internal/features/contentcms/compose,gogo/internal/features/home/ui,gogo/internal/features/home/ui/application/ports,gogo/internal/features/home/ui/application/results,gogo/internal/features/home/ui/infrastructure/listingclient,gogo/internal/features/inventory,gogo/internal/features/inventory/compose,gogo/internal/features/ops,gogo/internal/features/profile/ui,gogo/internal/features/profile/ui/application/ports,gogo/internal/features/profile/ui/infrastructure/authclient,gogo/internal/features/sales/compose,gogo/internal/features/sales/ui,gogo/internal/features/sales/ui/application/ports,gogo/internal/features/sales/ui/infrastructure/authclient,gogo/internal/features/sales/ui/infrastructure/catalogclient,gogo/internal/features/sales/ui/infrastructure/inventoryclient,gogo/internal/features/sales/ui/infrastructure/salesclient,gogo/internal/shared/authconsumer,gogo/internal/shared/authn,gogo/internal/shared/breaker,gogo/internal/shared/config,gogo/internal/shared/events,gogo/internal/shared/foundation/adapter,gogo/internal/shared/foundation/di,gogo/internal/shared/grpcx,gogo/internal/shared/httpserver,gogo/internal/shared/kernel,gogo/internal/shared/mediaconsumer,gogo/internal/shared/module,gogo/internal/shared/productconsumer,gogo/internal/shared/productevents,gogo/internal/shared/web/navigation,gogo/internal/shared/web/session,gogo/internal/shared/web/site

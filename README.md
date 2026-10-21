@@ -381,13 +381,14 @@ process" story now lives in the platform repository. What this repo owes that
 story is a **contract and an address**:
 
 ```sh
-# The four addresses are required configuration. There is no in-process
+# The five addresses are required configuration. There is no in-process
 # fallback: the gateway refuses to boot rather than serve a storefront that
 # can never have products in it.
 PRODUCT_ADDRESS=dns:///product-app:9092
 PRODUCT_LISTING_ADDRESS=dns:///product-listing-app:9093
 PRODUCT_SEARCH_ADDRESS=dns:///product-search-app:9094
 CATEGORY_ADDRESS=dns:///category-app:9090
+MEDIA_ADDRESS=dns:///media-app:9091
 PRODUCT_PLATFORM_SERVICE_TOKEN=change-this-to-a-shared-service-token
 KAFKA_BROKERS=kafka:19092   # optional — see below
 ```
@@ -864,10 +865,11 @@ Configuration is read from environment variables; a `.env` file is loaded if pre
 | `PRODUCT_LISTING_ADDRESS`  | **required** | gRPC target of `product-listing-service` (browse: `productlisting.v1`) |
 | `PRODUCT_SEARCH_ADDRESS`   | **required** | gRPC target of `product-search-service` (search: `productsearch.v1`) |
 | `CATEGORY_ADDRESS`         | **required** | gRPC target of `category-service` (`category.v1`) |
+| `MEDIA_ADDRESS`            | **required** | gRPC target of `media-service` (image metadata and presigned URLs, `media.v1`) |
 | `PRODUCT_PLATFORM_SERVICE_TOKEN` | **required** | Bearer credential the gateway presents to authenticated product-platform gRPC services (at least 16 characters) |
 | `KAFKA_BROKERS`    | —       | Comma-separated `host:port` of the product change feed. When set, `productevents` consumes `product.events.v1` and republishes it as `product.changed.*`, so a product changed elsewhere still drops this process's island caches. When empty, caches expire on their TTLs (30s for the storefront grid) |
 
-**The four product addresses are required and have no default.** That is a
+**The five platform addresses are required and have no default.** That is a
 deliberate asymmetry with `KAFKA_BROKERS`: a missing address would otherwise
 produce a permanently empty storefront that looks like a real answer — no
 error, no log line an operator would notice. Failing at boot is loud and

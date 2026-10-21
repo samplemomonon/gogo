@@ -25,9 +25,9 @@ func TestTheRemoteAdapterSatisfiesThePagesOwnedPort(t *testing.T) {
 
 	// Assigning the adapter to a ports.Listing variable makes the conformance
 	// above exercisable at run time as well as at compile time. New only wraps
-	// the connections and fills in default breakers, so empty connections are
-	// safe here.
-	var adapter ports.Listing = listingclient.New(productconsumer.Connections{}, productconsumer.Breakers{})
+	// the connections and fills in default breakers, so empty connections and no
+	// media step are safe here.
+	var adapter ports.Listing = listingclient.New(productconsumer.Connections{}, productconsumer.Breakers{}, nil, nil)
 	if adapter == nil {
 		t.Fatal("listingclient.New returned nil; the page's port has no adapter")
 	}

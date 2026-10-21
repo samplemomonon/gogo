@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">Image placeholder</title>
+  <desc id="desc">A neutral grey placeholder used by the page builder hero preset.</desc>
+  <rect width="1200" height="675" fill="#e5e7eb"/>
+  <g fill="none" stroke="#9ca3af" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="430" y="230" width="340" height="230" rx="18"/>
+    <circle cx="510" cy="300" r="28" fill="#9ca3af" stroke="none"/>
+    <path d="M470 430l105-105 80 80 60-60 85 85"/>
+  </g>
+  <text x="600" y="530" fill="#6b7280" font-family="system-ui, sans-serif" font-size="34" text-anchor="middle">Image placeholder</text>
+</svg>

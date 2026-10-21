@@ -5,7 +5,8 @@
   "scripts": {
     "design-system:tokens": "bun design-system/web/build.mjs",
     "css:build": "npm run design-system:tokens && tailwindcss -i ./apps/web/internal/shared/web/assets/css/app.css -o ./apps/web/internal/shared/web/assets/css/output.css",
-    "css:watch": "npm run design-system:tokens && tailwindcss -i ./apps/web/internal/shared/web/assets/css/app.css -o ./apps/web/internal/shared/web/assets/css/output.css --watch"
+    "css:watch": "npm run design-system:tokens && tailwindcss -i ./apps/web/internal/shared/web/assets/css/app.css -o ./apps/web/internal/shared/web/assets/css/output.css --watch",
+    "test:page-builder": "node --test apps/web/internal/shared/web/assets/js/page-builder-core.test.js"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3"

@@ -1,0 +1,18 @@
+package pages
+
+import (
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo.design/system/web/ui"
+)
+
+// LegacyPage wraps the older Builder.io editorial read path in the same public
+// shell as native pages. The body is produced by html/template, which has
+// already escaped every upstream value and sanitized Markdown; passing its
+// rendered buffer here is therefore the only trusted-HTML boundary on this
+// path.
+templ LegacyPage(title string, body templ.Component) {
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base(title, navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), ""), Narrow: true}) {
+		@body
+	}
+}

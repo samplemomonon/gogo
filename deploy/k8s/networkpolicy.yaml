@@ -2,7 +2,7 @@
 # the explicitly permitted paths below. Adjust the "ingress controller" and "prometheus"
 # pod selectors to your cluster.
 #
-# Note the egress rules: the gateway reaches the four product-platform services by
+# Note the egress rules: the gateway reaches the five product-platform services by
 # *namespace*, not by pod selector, because those services are deployed by the platform's
 # own manifests and may live outside this namespace. Selectors across a namespace boundary
 # are what a podSelector in a single-namespace policy cannot express, so the rule names the
@@ -81,9 +81,9 @@ spec:
         - protocol: TCP
           port: 5432
     # The product platform's gRPC contracts: product (writes), product-listing
-    # (browse), product-search (search), category (the hierarchy). One rule, four
-    # ports, because they are four views of one dependency rather than four unrelated
-    # ones.
+    # (browse), product-search (search), category (the hierarchy), media (images).
+    # One rule, five ports, because they are five views of one dependency rather
+    # than five unrelated ones.
     - to:
         - namespaceSelector:
             matchLabels:
@@ -97,6 +97,8 @@ spec:
           port: 9094
         - protocol: TCP
           port: 9090
+        - protocol: TCP
+          port: 9091
     # The product change feed, so island caches are dropped when a product changes
     # outside this process. Drop this rule along with KAFKA_BROKERS if the gateway runs
     # on its cache TTLs alone.

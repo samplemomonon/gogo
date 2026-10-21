@@ -7,35 +7,34 @@ import (
 )
 
 templ ProductCard(product *results.Product) {
-	<article class={ ui.CardHoverClass + " overflow-hidden flex flex-col justify-between" }>
-		@ui.MediaTile("") {
-			<div class="size-11 rounded-xl bg-base-100/80 border border-base-300/60 shadow-xs flex items-center justify-center text-primary/80 group-hover:scale-110 group-hover:text-primary transition-[transform,color] duration-200">
-				@ui.IconTag("size-5")
-			</div>
-			@ui.Badge("ghost", "xs", "absolute top-2.5 end-2.5 font-mono text-[10px] text-base-content/50 uppercase tracking-wider") {
-				Katalog
+	<article class={ ui.CardHoverClass + " overflow-hidden flex flex-col" }>
+		<div class="group relative aspect-square overflow-hidden bg-gradient-to-br from-primary/10 via-base-200 to-secondary/10">
+			if product.ImageURL != "" {
+				<img src={ product.ImageURL } alt={ product.Name } loading="lazy" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+			} else {
+				<div class="flex h-full w-full items-center justify-center text-primary/70">
+					@ui.IconTag("size-12")
+				</div>
 			}
-		}
+			<span class="absolute right-3 top-3 rounded-full border border-base-300/50 bg-base-100/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-base-content/60 shadow-sm">Katalog</span>
+		</div>
 
-		@ui.CardBody("gap-3 p-4 flex-1 flex flex-col justify-between") {
-			<div class="space-y-2">
-				<h2 class="card-title text-base font-semibold leading-snug group-hover:text-primary transition-colors line-clamp-2">
+		@ui.CardBody("gap-3 p-3 sm:p-4 flex-1") {
+			<div class="flex flex-1 flex-col gap-2">
+				<h2 class="line-clamp-2 min-h-10 text-sm font-medium leading-snug text-base-content group-hover:text-primary transition-colors sm:text-[15px]">
 					{ product.Name }
 				</h2>
-				<div class="flex items-center justify-between gap-2 pt-0.5">
-					@ui.CountBadge(ui.CountBadgeOptions{
-						Count:     product.Stock,
-						Suffix:    "tersedia",
-						ZeroLabel: "Stok habis",
-						Class:     "shrink-0",
-					})
-				</div>
+				@ui.CountBadge(ui.CountBadgeOptions{
+					Count:     product.Stock,
+					Suffix:    "tersedia",
+					ZeroLabel: "Stok habis",
+					Class:     "w-fit",
+				})
 			</div>
 
-			<div class="pt-2 border-t border-base-300/30">
+			<div class="border-t border-base-300/50 pt-3">
 				@ui.PriceBlock("Rp", money.Rupiah(product.Price), ui.PriceSm)
-
-				@ui.CardActions("justify-end pt-3") {
+				@ui.CardActions("pt-3") {
 					@ui.ButtonLink("/catalog/"+product.ID, ui.TapActionClass(ui.IntentPrimary, "sm")+" w-full", nil) {
 						@ui.IconEye("size-4")
 						Lihat detail

@@ -99,6 +99,7 @@ func (c *AppConfig) Validate() error {
 		{"PRODUCT_LISTING_ADDRESS", c.ProductListingAddress},
 		{"PRODUCT_SEARCH_ADDRESS", c.ProductSearchAddress},
 		{"CATEGORY_ADDRESS", c.CategoryAddress},
+		{"MEDIA_ADDRESS", c.MediaAddress},
 	} {
 		address := strings.TrimSpace(upstream.address)
 		if address == "" {

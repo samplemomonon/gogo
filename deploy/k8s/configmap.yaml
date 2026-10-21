@@ -1,7 +1,7 @@
 # Shared, non-secret configuration injected into every gogo pod. Values map 1:1 to
 # internal/shared/config.
 #
-# Per-service overrides live on the Deployments, not here: SERVICE_NAME, and the four
+# Per-service overrides live on the Deployments, not here: SERVICE_NAME, and the five
 # product-platform addresses (which differ per environment and so are named explicitly
 # rather than inherited). Nothing credential-bearing belongs in this file — the Postgres
 # DSN stays in gogo-secrets.

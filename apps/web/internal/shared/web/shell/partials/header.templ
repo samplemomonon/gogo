@@ -2,6 +2,7 @@ package partials
 
 import (
 	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/site"
 	"gogo.design/system/web/ui"
 )
 
@@ -13,18 +14,38 @@ import (
 // the header's search box keeps what the reader typed. A non-storefront surface
 // passes "".
 //
+// The published site settings, when present, replace the brand, desktop menu,
+// and mobile menu on the public site. The gateway marks operator surfaces so
+// they keep the federated menu. The shell still owns the mechanics; the content
+// vertical owns only the plain data.
+//
 // The bar is opaque with no backdrop-filter, though it is sticky and translucent
 // enough to have wanted one. A backdrop-filter re-rasterizes its entire region
 // whenever anything inside it repaints, and the search box is inside it: with a
 // blur on the header, every keystroke re-blurred the full width of the bar. That
 // lag is the cost of the effect, paid on the one control a reader uses most.
 templ Header(nav []navigation.Item, path string, term string) {
+	{{ siteSettings := site.FromContext(ctx) }}
+	{{ navItems := nav }}
+	if !siteSettings.UseDefaultNavigation {
+		{{ navItems = siteSettings.Navigation(nav) }}
+	}
 	<header class="navbar sticky top-0 z-40 min-h-16 border-b border-base-300/60 bg-base-100/90 shadow-sm">
 		<div class="container mx-auto flex w-full items-center gap-2 px-4">
-			@ui.BrandLink("/", "Gogo", "Gogo — home")
+			@HeaderBrand(siteSettings)
+			if !siteSettings.UseDefaultNavigation && len(siteSettings.HeaderLinks) > 0 {
+				<details class="dropdown md:hidden">
+					<summary class="btn btn-ghost btn-sm" aria-label="Menu">Menu</summary>
+					<ul class="menu dropdown-content z-50 mt-2 w-56 rounded-box bg-base-100 p-2 shadow">
+						for _, link := range siteSettings.HeaderLinks {
+							<li><a href={ link.Href }>{ link.Label }</a></li>
+						}
+					</ul>
+				</details>
+			}
 
 			<div class="hidden flex-1 items-center md:flex">
-				@Navbar(nav, path)
+				@Navbar(navItems, path)
 			</div>
 
 			@HeaderSearch(term)
@@ -43,6 +64,19 @@ templ Header(nav []navigation.Item, path string, term string) {
 	</header>
 }
 
+// HeaderBrand renders the authored wordmark, or a logo image when the site
+// editor supplied a safe URL. The accessible name always remains the site
+// name, so a decorative or missing alt attribute cannot erase the link.
+templ HeaderBrand(siteSettings site.Settings) {
+	if siteSettings.LogoURL != "" {
+		<a href="/" class="btn btn-ghost px-1" aria-label={ siteSettings.SiteName + " — home" }>
+			<img src={ siteSettings.LogoURL } alt={ siteSettings.LogoText() } class="h-8 w-auto"/>
+		</a>
+	} else {
+		@ui.BrandLink("/", siteSettings.SiteName, siteSettings.SiteName+" — home")
+	}
+}
+
 // HeaderSearch is the global storefront search, in the top bar beside the
 // brand. It is the same SearchForm primitive a page would embed, compacted for
 // the bar. min-w-0 lets it shrink below its content width, which is what stops
@@ -58,6 +92,19 @@ templ HeaderSearch(term string) {
 			ClearLabel:  "Bersihkan pencarian",
 			Compact:     true,
 			Class:       "w-full max-w-sm min-w-0",
+			// Live search: a keystroke opens the search drawer with debounced
+			// results, while Enter still submits the full ?q= results page. The
+			// drawer fragment is rendered by the home page's /search/suggest
+			// endpoint (the one surface that owns the underlying search read
+			// model); on the seller console and other base-layout surfaces the
+			// input still globals a / query, exactly as it did before.
+			InputAttrs: templ.Attributes{
+				"hx-get":      "/search/suggest",
+				"hx-trigger":  "input changed delay:250ms, search",
+				"hx-target":   "#live-search-results",
+				"hx-swap":     "innerHTML",
+				"hx-indicator": "#live-search-status",
+			},
 		})
 	</div>
 }

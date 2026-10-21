@@ -11,7 +11,7 @@ import (
 	authports "gogo/internal/features/auth/ui/application/ports"
 	authclient "gogo/internal/features/auth/ui/infrastructure/authclient"
 	"gogo/internal/features/billing"
-	contentui "gogo/internal/features/contentcms/ui"
+	contentcmscompose "gogo/internal/features/contentcms/compose"
 	homeui "gogo/internal/features/home/ui"
 	homeports "gogo/internal/features/home/ui/application/ports"
 	homelistingclient "gogo/internal/features/home/ui/infrastructure/listingclient"
@@ -34,6 +34,7 @@ import (
 	fdi "gogo/internal/shared/foundation/di"
 	"gogo/internal/shared/httpserver"
 	"gogo/internal/shared/kernel"
+	"gogo/internal/shared/mediaconsumer"
 	"gogo/internal/shared/module"
 	"gogo/internal/shared/productconsumer"
 	"gogo/internal/shared/web/session"
@@ -52,6 +53,7 @@ const (
 	upstreamSales     = "sales"
 	upstreamAuth      = "auth"
 
+	upstreamMedia          = string(mediaconsumer.UpstreamMedia)
 	upstreamProduct        = string(productconsumer.UpstreamWrite)
 	upstreamProductListing = string(productconsumer.UpstreamBrowse)
 	upstreamProductSearch  = string(productconsumer.UpstreamSearch)
@@ -74,6 +76,7 @@ const (
 	serviceSellerInventoryClient = "gateway.sellerInventoryClient" // *sellerinventoryclient.Client
 	serviceSellerSalesClient     = "gateway.sellerSalesClient"     // *sellersalesclient.Client
 	serviceListingClient         = "gateway.listingClient"         // *homelistingclient.Client
+	serviceMediaClient           = "gateway.mediaClient"           // *mediaconsumer.Client
 	serviceAuthClient            = "gateway.authClient"            // *authconsumer.Client
 	serviceSalesCapability       = "gateway.salesInventoryCapability"
 	serviceProductPlatform       = "gateway.productPlatform" // *productPlatform
@@ -147,6 +150,31 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		}
 		gatewayLifecycle(c).Add(platform.Close)
 		return platform, nil
+	})
+
+	// The media service dials separately from the product platform: it owns a
+	// different kind of data (object metadata, not products) and must be able to
+	// fail without taking product reads with it. The client is built over the
+	// same contributed breaker as every other upstream, so metrics and readiness
+	// report one breaker per connection.
+	fdi.ProvideNamed(b, upstreamMedia, func(c *fdi.Container) (*grpc.ClientConn, error) {
+		conn, closeConn, err := connectMedia(gatewayConfig(c), gatewayLogger(c))
+		if err != nil {
+			return nil, err
+		}
+		gatewayLifecycle(c).Add(closeConn)
+		return conn, nil
+	})
+	fdi.Provide(b, serviceMediaClient, func(c *fdi.Container) (*mediaconsumer.Client, error) {
+		conn, err := fdi.ResolveNamedAs[*grpc.ClientConn](c, upstreamMedia)
+		if err != nil {
+			return nil, err
+		}
+		mediaBreaker, err := fdi.ResolveNamedAs[*breaker.Breaker](c, upstreamMedia)
+		if err != nil {
+			return nil, err
+		}
+		return mediaconsumer.New(conn, mediaBreaker), nil
 	})
 
 	// The inventory service is always in-process: the seller console consumes it
@@ -294,7 +322,11 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		if err != nil {
 			return nil, err
 		}
-		return homelistingclient.New(platform.Connections(), breakers), nil
+		media, err := fdi.ResolveAs[*mediaconsumer.Client](c, serviceMediaClient)
+		if err != nil {
+			return nil, err
+		}
+		return homelistingclient.New(platform.Connections(), breakers, media, gatewayLogger(c)), nil
 	})
 	// The auth contract is consumed by three surfaces (the seller console, the
 	// login page and the profile page), so the client over it is published once
@@ -326,31 +358,19 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 	fdi.ProvideType[homeports.Listing](b, func(c *fdi.Container) (homeports.Listing, error) {
 		return fdi.ResolveAs[*homelistingclient.Client](c, serviceListingClient)
 	})
-	fdi.ProvideType[contentui.Reader](b, func(c *fdi.Container) (contentui.Reader, error) {
-		cfg := gatewayConfig(c)
-		if cfg.BuilderPublicAPIKey == "" {
-			return contentui.DisabledReader(), nil
-		}
-		return contentui.NewBuilderReader(cfg.BuilderModel, cfg.BuilderPublicAPIKey)
-	})
+	contentcmscompose.RegisterContentCMS(b)
+
 	// The home page's editorial banner slot: the page declares the port, the
 	// contentcms reader is the source, and this adapter is the only place that
 	// sees both — no vertical imports another (D-023). The reader being
 	// disabled when Builder.io is unconfigured keeps the route composition
 	// stable: the slot simply renders nothing.
 	fdi.ProvideType[homeports.BannerSlot](b, func(c *fdi.Container) (homeports.BannerSlot, error) {
-		reader, err := fdi.ResolveType[contentui.Reader](c)
+		reader, err := fdi.ResolveType[contentcmscompose.Reader](c)
 		if err != nil {
 			return nil, err
 		}
 		return newBannerSlot(reader), nil
-	})
-	fdi.ProvideType[*contentui.PageHandler](b, func(c *fdi.Container) (*contentui.PageHandler, error) {
-		reader, err := fdi.ResolveType[contentui.Reader](c)
-		if err != nil {
-			return nil, err
-		}
-		return contentui.NewPageHandler(reader, gatewayLogger(c)), nil
 	})
 	fdi.ProvideType[sellerports.ProductCatalog](b, func(c *fdi.Container) (sellerports.ProductCatalog, error) {
 		return fdi.ResolveAs[*sellercatalogclient.Client](c, serviceSellerCatalogClient)
@@ -417,10 +437,11 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 		if err != nil {
 			return nil, err
 		}
-		contentPage, err := fdi.ResolveType[*contentui.PageHandler](c)
+		contentPage, err := fdi.ResolveType[*contentcmscompose.PageHandler](c)
 		if err != nil {
 			return nil, err
 		}
+		sitePage := newPublicSitePage(contentPage, homePage)
 
 		billingModule, err := fdi.ResolveType[*billing.Module](c)
 		if err != nil {
@@ -442,8 +463,7 @@ func buildGatewayContainer(parent context.Context, cfg *config.AppConfig, logger
 			gatewayLogger(c),
 			registry,
 			breakers,
-			homePage,
-			contentPage,
+			sitePage,
 			sellerPage,
 			authPage,
 			profilePage,

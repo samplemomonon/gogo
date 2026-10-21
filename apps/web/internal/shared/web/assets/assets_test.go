@@ -60,6 +60,42 @@ func TestHandlerServesJS(t *testing.T) {
 	}
 }
 
+func TestHandlerServesPageBuilderAssets(t *testing.T) {
+	t.Parallel()
+
+	server := newServer(t)
+	for _, path := range []string{"/assets/js/page-builder.js", "/assets/js/page-builder-core.js"} {
+		resp, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", path, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want 200", path, resp.StatusCode)
+		}
+		if len(body) == 0 {
+			t.Fatalf("GET %s returned an empty body", path)
+		}
+	}
+
+	resp, err := http.Get(server.URL + "/assets/img/placeholder.svg")
+	if err != nil {
+		t.Fatalf("GET placeholder image failed: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET placeholder image status = %d, want 200", resp.StatusCode)
+	}
+	if contentType := resp.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "image/svg+xml") {
+		t.Errorf("placeholder image Content-Type = %q, want image/svg+xml", contentType)
+	}
+	if !strings.Contains(string(body), "<svg") {
+		t.Error("placeholder asset should contain an SVG document")
+	}
+}
+
 func TestHandlerRejectsUnknownPaths(t *testing.T) {
 	t.Parallel()
 

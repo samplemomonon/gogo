@@ -1,0 +1,285 @@
+package pages
+
+import (
+	"strconv"
+
+	"gogo/internal/features/contentcms/application/ports"
+	"gogo/internal/features/contentcms/domain"
+	"gogo/internal/features/contentcms/presentation/components"
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo/internal/shared/web/shell/partials"
+	"gogo/internal/shared/web/site"
+	"gogo.design/system/web/ui"
+)
+
+templ Editor(bootstrap EditorBootstrap) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<meta name="robots" content="noindex,nofollow"/>
+			<meta name="color-scheme" content="light dark"/>
+			<title>{ "Page Builder — " + bootstrap.Page.Title }</title>
+			@partials.InlineScript(layouts.ThemeBootstrapJS)
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+		</head>
+		<body class="min-h-dvh bg-base-200 text-base-content antialiased">
+			<div class="builder-app" data-page-builder data-slug={ bootstrap.Page.Slug }>
+				<header class="builder-toolbar" role="toolbar" aria-label="Page builder">
+					<div class="builder-toolbar-group">
+						<a class="btn btn-ghost btn-sm" href="/admin/content/pages" data-navigation-guard>← Pages</a>
+						<div class="builder-title">
+							<span class="builder-eyebrow">Content Studio</span>
+							<strong data-toolbar-title>{ bootstrap.Page.Title }</strong>
+						</div>
+					</div>
+					<div class="builder-toolbar-group">
+						<div class="join" role="group" aria-label="History">
+							<button class="btn btn-ghost btn-sm join-item" type="button" data-action="undo" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled>Undo</button>
+							<button class="btn btn-ghost btn-sm join-item" type="button" data-action="redo" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>Redo</button>
+						</div>
+						<span class="builder-save-status" data-save-status data-state="saved" role="status" aria-live="polite">
+							<span class="builder-status-dot" aria-hidden="true"></span>
+							<span data-save-label>Saved</span>
+						</span>
+						<button class="btn btn-ghost btn-xs" type="button" data-action="retry-save" hidden>Retry</button>
+					</div>
+					<div class="builder-toolbar-group">
+						<div class="builder-segmented" role="group" aria-label="Canvas breakpoint">
+							<button type="button" data-breakpoint="desktop" aria-pressed="true">Desktop</button>
+							<button type="button" data-breakpoint="tablet" aria-pressed="false">Tablet</button>
+							<button type="button" data-breakpoint="mobile" aria-pressed="false">Mobile</button>
+						</div>
+						<button class="btn btn-outline btn-sm" type="button" data-action="preview">Preview</button>
+						<button class="btn btn-ghost btn-sm" type="button" data-action="history">History</button>
+						<button class="btn btn-primary btn-sm" type="button" data-action="publish">Publish</button>
+					</div>
+				</header>
+
+				<div class="builder-banner" data-builder-banner hidden role="alert">
+					<div class="builder-banner-copy">
+						<strong data-banner-title>Something needs attention</strong>
+						<p data-banner-message></p>
+					</div>
+					<div class="builder-banner-actions" data-banner-actions></div>
+				</div>
+
+				<div class="builder-workspace">
+					<aside class="builder-left" aria-label="Component library and outline">
+						<div class="builder-tabs" role="tablist" aria-label="Builder panels">
+							<button type="button" role="tab" aria-selected="true" data-panel="library">Components</button>
+							<button type="button" role="tab" aria-selected="false" data-panel="outline">Outline</button>
+							<button type="button" role="tab" aria-selected="false" data-panel="sections">Sections</button>
+						</div>
+						<section class="builder-panel" data-panel-view="library" role="tabpanel" aria-label="Component library">
+							<label class="builder-search">
+								<span class="sr-only">Search components and presets</span>
+								<input type="search" placeholder="Search components…" autocomplete="off" data-library-search/>
+							</label>
+							<div class="builder-library" data-library-results>
+								<p class="builder-muted">Loading components…</p>
+							</div>
+						</section>
+						<section class="builder-panel" data-panel-view="outline" role="tabpanel" aria-label="Component outline" hidden>
+							<div class="builder-outline-head">
+								<p class="builder-muted">Select, reorder, nest, duplicate, or hide any node.</p>
+								<button class="btn btn-ghost btn-xs" type="button" data-action="focus-canvas">Focus canvas</button>
+							</div>
+							<div class="builder-outline" data-outline>
+								<p class="builder-muted">No components yet.</p>
+							</div>
+							<div class="builder-shortcuts">
+								<p><kbd>Alt</kbd> + <kbd>↑</kbd>/<kbd>↓</kbd> move · <kbd>Alt</kbd> + <kbd>→</kbd> nest · <kbd>Alt</kbd> + <kbd>←</kbd> outdent</p>
+								<p><kbd>Ctrl/Cmd</kbd> + <kbd>D</kbd> duplicate · <kbd>Delete</kbd> remove · <kbd>Ctrl/Cmd</kbd> + <kbd>Z</kbd> undo</p>
+							</div>
+						</section>
+						<section class="builder-panel" data-panel-view="sections" role="tabpanel" aria-label="Saved sections" hidden>
+							<div class="builder-outline-head">
+								<p class="builder-muted">Sections are tenant-scoped component trees you can reuse.</p>
+								<button class="btn btn-outline btn-xs" type="button" data-action="save-section">Save selection</button>
+							</div>
+							<div class="builder-sections" data-sections>
+								<p class="builder-muted">Loading sections…</p>
+							</div>
+						</section>
+					</aside>
+
+					<main class="builder-stage" aria-label="Page canvas">
+						<div class="builder-stage-head">
+							<div>
+								<span class="builder-stage-label" data-canvas-breakpoint-label>Desktop</span>
+								<span class="builder-muted" data-canvas-width-label>1024 px</span>
+							</div>
+							<p class="builder-muted">Click to select · drag to move · drop on a container to nest</p>
+						</div>
+						<div class="builder-canvas-scroll">
+							<div class="builder-canvas" data-canvas data-breakpoint="desktop">
+								<div class="builder-canvas-empty">
+									<p class="text-sm font-medium">Your page is empty</p>
+									<p class="mt-1 text-xs text-base-content/60">Add a component from the library or drop one here.</p>
+								</div>
+							</div>
+						</div>
+					</main>
+
+					<aside class="builder-right" aria-label="Inspector">
+						<div class="builder-inspector" data-inspector>
+							<p class="builder-muted">Select a component to edit its properties.</p>
+						</div>
+					</aside>
+				</div>
+
+				<div class="builder-announcer sr-only" data-announcer aria-live="polite"></div>
+			</div>
+
+			<dialog class="builder-dialog" data-dialog="revisions" aria-labelledby="revisions-title">
+				<div class="builder-dialog-head">
+					<div>
+						<p class="builder-eyebrow">Immutable snapshots</p>
+						<h2 id="revisions-title">Revision history</h2>
+					</div>
+					<button class="btn btn-ghost btn-sm" type="button" data-dialog-close aria-label="Close">Close</button>
+				</div>
+				<div class="builder-dialog-body" data-revisions-body>
+					<p class="builder-muted">Loading revisions…</p>
+				</div>
+			</dialog>
+
+			<dialog class="builder-dialog" data-dialog="conflict" aria-labelledby="conflict-title">
+				<div class="builder-dialog-head">
+					<div>
+						<p class="builder-eyebrow">Concurrent edit</p>
+						<h2 id="conflict-title">This page changed somewhere else</h2>
+					</div>
+				</div>
+				<div class="builder-dialog-body">
+					<p class="text-sm leading-6">Another session saved a newer revision. Your unsaved changes are still in this tab. Reload the server version, or deliberately overwrite it with your current document.</p>
+					<p class="builder-muted mt-2" data-conflict-revision></p>
+					<div class="builder-dialog-actions">
+						<button class="btn btn-outline btn-sm" type="button" data-action="reload-latest">Reload latest and discard mine</button>
+						<button class="btn btn-error btn-sm" type="button" data-action="overwrite-conflict">Overwrite with my document</button>
+					</div>
+				</div>
+			</dialog>
+
+			<dialog class="builder-dialog" data-dialog="section" aria-labelledby="section-title">
+				<div class="builder-dialog-head">
+					<div>
+						<p class="builder-eyebrow">Reusable section</p>
+						<h2 id="section-title">Save selected component</h2>
+					</div>
+					<button class="btn btn-ghost btn-sm" type="button" data-dialog-close aria-label="Close">Close</button>
+				</div>
+				<form class="builder-dialog-body" data-section-form>
+					<label class="form-control">
+						<span class="label-text mb-1">Section name</span>
+						<input class="input input-bordered w-full" name="name" maxlength="120" required data-section-name/>
+					</label>
+					<p class="builder-muted" data-section-preview></p>
+					<div class="builder-dialog-actions">
+						<button class="btn btn-primary btn-sm" type="submit">Save section</button>
+					</div>
+				</form>
+			</dialog>
+
+			<dialog class="builder-dialog" data-dialog="publish" aria-labelledby="publish-title">
+				<div class="builder-dialog-head">
+					<div>
+						<p class="builder-eyebrow">Publication</p>
+						<h2 id="publish-title" data-publish-title>Publish page</h2>
+					</div>
+					<button class="btn btn-ghost btn-sm" type="button" data-dialog-close aria-label="Close">Close</button>
+				</div>
+				<div class="builder-dialog-body" data-publish-body></div>
+			</dialog>
+
+			<dialog class="builder-dialog" data-dialog="diagnostics" aria-labelledby="diagnostics-title">
+				<div class="builder-dialog-head">
+					<div>
+						<p class="builder-eyebrow">Validation</p>
+						<h2 id="diagnostics-title">Page needs attention</h2>
+					</div>
+					<button class="btn btn-ghost btn-sm" type="button" data-dialog-close aria-label="Close">Close</button>
+				</div>
+				<div class="builder-dialog-body" data-diagnostics-body></div>
+			</dialog>
+
+			<noscript>
+				<div class="fixed inset-0 z-50 grid place-items-center bg-base-100 p-8">
+					<p class="max-w-md text-center text-sm">The visual editor needs JavaScript. Public pages remain server-rendered and do not require client JavaScript.</p>
+				</div>
+			</noscript>
+
+			@templ.JSONScript("page-builder-data", bootstrap)
+			<script type="module" src="/assets/js/page-builder.js"></script>
+		</body>
+	</html>
+}
+
+templ PageList(pages []ports.Page, notice string) {
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base("Content pages", navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), "")}) {
+		<div class="space-y-6">
+			<header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-medium text-primary">Content Studio</p><h1 class="mt-1 text-3xl font-bold tracking-tight">Pages</h1><p class="mt-2 text-sm text-base-content/70">Create, edit, preview, and publish server-rendered pages.</p></div><a class="btn btn-outline btn-sm" href="/admin/content/site">Site settings</a></header>
+			<form class="grid gap-3 rounded-2xl border border-base-300 bg-base-100 p-5 sm:grid-cols-[1fr_1fr_auto]" method="post" action="/admin/content/pages" hx-post="/admin/content/pages" hx-target="#page-create-status" hx-swap="innerHTML">
+				<label class="form-control"><span class="label-text mb-1">Title</span><input class="input input-bordered" name="title" maxlength="240" required/></label>
+				<label class="form-control"><span class="label-text mb-1">Slug</span><input class="input input-bordered" name="slug" pattern="[a-z0-9-]+" maxlength="80" required/></label>
+				<button class="btn btn-primary self-end" type="submit">Create page</button>
+				<p id="page-create-status" class="text-sm text-base-content/70 sm:col-span-3" role="status">{ notice }</p>
+			</form>
+			<section class="overflow-hidden rounded-2xl border border-base-300 bg-base-100" aria-label="Existing pages">
+				<div class="grid grid-cols-[minmax(0,1fr)_120px_100px] gap-3 border-b border-base-300 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/60"><span>Page</span><span>Status</span><span>Revision</span></div>
+				if len(pages) == 0 {
+					<p class="px-4 py-10 text-center text-sm text-base-content/70">No pages yet. Create a page to start building.</p>
+				} else {
+					for _, page := range pages {
+						<a class="grid grid-cols-[minmax(0,1fr)_120px_100px] gap-3 border-b border-base-300/70 px-4 py-4 last:border-0 hover:bg-base-200" href={ "/admin/content/pages/" + page.Slug }><span><strong class="block">{ page.Title }</strong><span class="text-sm text-base-content/60">/{ page.Slug }</span></span><span class="self-center text-sm">{ page.Status }</span><span class="self-center text-sm">{ strconv.FormatInt(page.Revision, 10) }</span></a>
+					}
+				}
+			</section>
+		</div>
+	}
+}
+
+templ OperationStatus(message string, publishedURL string) {
+	<p id="save-status" class="text-sm text-success" role="status" aria-live="polite">{ message }
+		if publishedURL != "" {
+			<a class="ml-2 font-semibold underline" href={ publishedURL }>View published page</a>
+		}
+	</p>
+}
+
+templ DraftPreview(page ports.Page) {
+	{{ siteSettings := site.FromContext(ctx) }}
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base("Preview — " + page.Title, navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), ""), Narrow: true}) {
+		<div class="mb-6 flex items-center justify-between gap-4"><div><p class="text-sm font-medium text-primary">Draft preview · revision { strconv.FormatInt(page.Revision, 10) }</p><h1 class="mt-1 text-3xl font-bold">{ page.Title }</h1></div><a class="btn btn-outline btn-sm" href={ "/admin/content/pages/" + page.Slug }>Back to editor</a></div>
+		<article class="space-y-4" aria-label={ page.Title }>
+			@templ.Raw(components.StyleElement(page.Document.Components))
+			for _, component := range page.Document.Components {
+				@components.RenderComponent(component, components.RenderContext{PageTitle: page.Title, Slug: page.Slug, TenantID: page.TenantID, SiteName: siteSettings.SiteName, BindingValues: domain.BindingValuesWithSite(page.Title, page.Slug, page.TenantID, siteSettings.SiteName)})
+			}
+		</article>
+	}
+}
+
+templ PublicNativePage(page ports.Page) {
+	@PublicNativePageNotice(page, "")
+}
+
+templ PublicNativePageNotice(page ports.Page, notice string) {
+	{{ siteSettings := site.FromContext(ctx) }}
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base(page.Title, navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), ""), Narrow: true}) {
+		<article class="space-y-4" aria-label={ page.Title } data-cms-page={ page.Slug }>
+			@templ.Raw(components.StyleElement(page.Document.Components))
+			<h1 class="text-3xl font-bold tracking-tight">{ page.Title }</h1>
+			if notice != "" {
+				<p class="rounded-xl border border-success bg-success/10 px-4 py-3 text-sm text-success" role="status">{ notice }</p>
+			}
+			for _, component := range page.Document.Components {
+				@components.RenderComponent(component, components.RenderContext{PageTitle: page.Title, Slug: page.Slug, TenantID: page.TenantID, SiteName: siteSettings.SiteName, BindingValues: domain.BindingValuesWithSite(page.Title, page.Slug, page.TenantID, siteSettings.SiteName)})
+			}
+		</article>
+	}
+}
+

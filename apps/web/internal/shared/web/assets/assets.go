@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-//go:embed css/output.css js/htmx.min.js js/web-vitals.attribution.iife.js
+//go:embed css/output.css js/htmx.min.js js/web-vitals.attribution.iife.js js/page-builder.js js/page-builder-core.js img/placeholder.svg
 var files embed.FS
 
 // Handler serves the embedded assets. Mount it at /assets.
