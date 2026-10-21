@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "gogo-product-db": {
+      "command": "/home/sam/Projects/dev/webdev/sample/gogo/.devenv/profile/bin/bunx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub@1.5.0",
+        "--transport",
+        "stdio",
+        "--dsn",
+        "postgres://postgres:postgres@localhost:5432/product_db?sslmode=disable"
+      ]
+    }
+  }
+}

@@ -37,7 +37,7 @@ func TestReadModelShapeIsDeliberate(t *testing.T) {
 	t.Parallel()
 
 	assertFields(t, reflect.TypeOf(results.Product{}), "Product",
-		[]string{"Attributes", "Barcode", "Brand", "Currency", "Description", "ID", "Name", "Price", "ProductTypeID", "SchemaVersion", "Slug", "Stock", "TenantID"})
+		[]string{"Attributes", "Barcode", "Brand", "Currency", "Description", "ID", "ImageURL", "Name", "Price", "PrimaryMediaID", "ProductTypeID", "SchemaVersion", "Slug", "Stock", "TenantID"})
 	assertFields(t, reflect.TypeOf(results.Listing{}), "Listing",
 		[]string{"NextCursor", "Products", "Total"})
 	assertFields(t, reflect.TypeOf(results.Banner{}), "Banner",

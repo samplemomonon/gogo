@@ -92,7 +92,7 @@
       "rung": 1
     },
     {
-      "path": "apps/web/internal/features/contentcms/ui",
+      "path": "apps/web/internal/features/contentcms/presentation",
       "kind": "page",
       "team": "T5",
       "tier": "business",

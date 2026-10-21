@@ -19,9 +19,9 @@
 #   docker compose up -d postgres
 #   export DATABASE_URL='postgres://gogo:gogo@localhost:5432/gogo?sslmode=disable'
 #
-# The gateway still needs the platform's four gRPC endpoints to start (they are required
+# The gateway still needs the platform's five gRPC endpoints to start (they are required
 # configuration, not optional): PRODUCT_ADDRESS, PRODUCT_LISTING_ADDRESS,
-# PRODUCT_SEARCH_ADDRESS and CATEGORY_ADDRESS. Running the gateway without the platform up
+# PRODUCT_SEARCH_ADDRESS, CATEGORY_ADDRESS and MEDIA_ADDRESS. Running the gateway without the platform up
 # is a valid test of the *failure* path — it refuses to boot rather than serving an empty
 # storefront — but it is not a usable development environment.
 #
@@ -63,6 +63,7 @@ services:
       PRODUCT_LISTING_ADDRESS: dns:///product-listing-app:9093
       PRODUCT_SEARCH_ADDRESS: dns:///product-search-app:9094
       CATEGORY_ADDRESS: dns:///category-app:9090
+      MEDIA_ADDRESS: dns:///media-app:9091
       PRODUCT_PLATFORM_SERVICE_TOKEN: ${PRODUCT_PLATFORM_SERVICE_TOKEN:-local-dev-service-token-not-a-secret}
       # The product change feed. Optional — remove it and the gateway serves on its
       # island-cache TTLs alone (30s for the storefront grid) instead of dropping caches

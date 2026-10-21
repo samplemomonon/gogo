@@ -1,13 +1,16 @@
 package partials
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/a-h/templ"
 
 	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/site"
 )
 
 func icon(marker string) templ.Component {
@@ -44,6 +47,48 @@ func TestNavItems(t *testing.T) {
 	}
 	if got[1].Icon != nil {
 		t.Error("item 1 gained an icon in the mapping")
+	}
+}
+
+func TestHeaderUsesFederatedMenuOnApplicationSurfaces(t *testing.T) {
+	t.Parallel()
+	settings := site.Settings{
+		SiteName: "Toko Baru", HomePageSlug: "home", UseDefaultNavigation: true,
+		HeaderLinks: []site.Link{{Label: "CMS Menu", Href: "/cms-menu"}},
+	}
+	var out bytes.Buffer
+	err := Header([]navigation.Item{{Label: "Dashboard", Path: "/admin/content/pages"}}, "/admin/content/pages", "").
+		Render(site.WithSettings(context.Background(), settings), &out)
+	if err != nil {
+		t.Fatalf("render header: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, "Dashboard") {
+		t.Error("application header lost the federated menu")
+	}
+	if strings.Contains(body, "CMS Menu") {
+		t.Error("application header rendered the public CMS menu")
+	}
+}
+
+func TestHeaderUsesCMSMenuOnPublicSurfaces(t *testing.T) {
+	t.Parallel()
+	settings := site.Settings{
+		SiteName: "Toko Baru", HomePageSlug: "home",
+		HeaderLinks: []site.Link{{Label: "CMS Menu", Href: "/cms-menu"}},
+	}
+	var out bytes.Buffer
+	err := Header([]navigation.Item{{Label: "Dashboard", Path: "/admin/content/pages"}}, "/", "").
+		Render(site.WithSettings(context.Background(), settings), &out)
+	if err != nil {
+		t.Fatalf("render header: %v", err)
+	}
+	body := out.String()
+	if !strings.Contains(body, "CMS Menu") {
+		t.Error("public header lost the CMS menu")
+	}
+	if strings.Contains(body, "Dashboard") {
+		t.Error("public header rendered the federated application menu")
 	}
 }
 

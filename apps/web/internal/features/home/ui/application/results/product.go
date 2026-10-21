@@ -26,6 +26,16 @@ type Product struct {
 	Currency      string
 	Stock         int
 	Barcode       string
+
+	// PrimaryMediaID is the media-service id of the product's primary image. It is
+	// the product's own reference, carried here so a view can fall back to a
+	// placeholder when the image has not been resolved.
+	PrimaryMediaID string
+	// ImageURL is the presigned URL media-service returned for PrimaryMediaID, or
+	// "" when the product has no primary image or the media upstream could not be
+	// reached. It is the storefront's only use of the object store — the bytes are
+	// never proxied through this process.
+	ImageURL string
 }
 
 // Listing is one page of products plus the paging metadata the storefront needs

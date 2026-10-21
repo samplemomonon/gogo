@@ -116,6 +116,7 @@ var breakerUpstreams = []upstream{
 	{name: upstreamProductListing},
 	{name: upstreamProductSearch, optional: true},
 	{name: upstreamCategory},
+	{name: upstreamMedia, optional: true},
 	{name: upstreamInventory},
 	{name: upstreamSales},
 	{name: upstreamAuth},

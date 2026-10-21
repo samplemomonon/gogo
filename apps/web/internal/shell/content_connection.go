@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	contentui "gogo/internal/features/contentcms/ui"
+	contentcmscompose "gogo/internal/features/contentcms/compose"
 	homeports "gogo/internal/features/home/ui/application/ports"
 	"gogo/internal/features/home/ui/application/results"
 )
@@ -15,12 +15,12 @@ import (
 // no vertical imports another (D-023): home depends only on ports.BannerSlot,
 // contentcms only on contentui.Reader, and the shell is the one layer allowed
 // to see both (docs/DECISION_CONTENT_SURFACES.md §5 step 2).
-func newBannerSlot(reader contentui.Reader) homeports.BannerSlot {
+func newBannerSlot(reader contentcmscompose.Reader) homeports.BannerSlot {
 	return bannerSlot{reader: reader}
 }
 
 type bannerSlot struct {
-	reader contentui.Reader
+	reader contentcmscompose.Reader
 }
 
 // ReadBanner maps the slot's published page to the storefront's banner: the
@@ -30,13 +30,13 @@ type bannerSlot struct {
 // and degrade from.
 func (b bannerSlot) ReadBanner(ctx context.Context, slot string) (results.Banner, error) {
 	page, err := b.reader.ReadPublished(ctx, slot)
-	if errors.Is(err, contentui.ErrNotFound) {
+	if errors.Is(err, contentcmscompose.ErrNotFound) {
 		return results.Banner{}, homeports.ErrNoBanner
 	}
 	if err != nil {
 		return results.Banner{}, err
 	}
-	for _, block := range page.Blocks {
+	for _, block := range page.EditorialBlocks {
 		if block.Type != "hero" && block.Type != "banner" {
 			continue
 		}

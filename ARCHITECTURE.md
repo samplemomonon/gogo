@@ -573,9 +573,10 @@ four `Core` structs describing the same row, and a lowest-common-denominator
 Import rule [6](#2-import-rules-enforced) makes it the only package that may
 import any of them, so this cannot quietly become four.
 
-**All four addresses are required configuration.** The gateway refuses to boot
-without `PRODUCT_ADDRESS`, `PRODUCT_LISTING_ADDRESS`, `PRODUCT_SEARCH_ADDRESS`
-and `CATEGORY_ADDRESS`. The alternative — dialing lazily and degrading — was
+**All five platform addresses are required configuration.** The gateway refuses
+to boot without `PRODUCT_ADDRESS`, `PRODUCT_LISTING_ADDRESS`,
+`PRODUCT_SEARCH_ADDRESS`, `CATEGORY_ADDRESS` and `MEDIA_ADDRESS`. The
+alternative — dialing lazily and degrading — was
 rejected because its failure mode is a *permanently empty storefront that looks
 like a real answer*: no error, no log line the operator would notice, and search
 results that are legitimately empty. Failing at boot is loud and immediate.

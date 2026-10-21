@@ -23,7 +23,7 @@ K8S_DIR      := deploy/k8s
 SERVICES     := aggregator-service category-service media-service product-listing-service product-search-service product-service
 SERVICES_DIR := services
 
-.PHONY: services-vet services-test gofmt-check
+.PHONY: services-vet services-test gofmt-check page-builder-test
 
 # Build-time identity, injected into internal/shared/version and surfaced in
 # the module registry and /metrics.
@@ -68,6 +68,12 @@ dev: templ css
 
 test: assets
 	$(GO) test ./... -race
+
+# The editor's document operations, undo/redo, validation, and autosave
+# coordinator are pure ES modules, so they run under Node's built-in test
+# runner without a browser or extra dependencies.
+page-builder-test:
+	node --test apps/web/internal/shared/web/assets/js/page-builder-core.test.js
 
 vet: assets
 	$(GO) vet ./...
@@ -132,7 +138,7 @@ docs-site-preview:
 docs-site-gate-test:
 	npm --prefix docs/site test --silent
 
-check: vet test services-vet services-test gofmt-check arch-team-catalog docs-site-gate-test
+check: vet test services-vet services-test gofmt-check page-builder-test arch-team-catalog docs-site-gate-test
 	@echo "check: gateway + $(words $(SERVICES)) service modules vetted and tested, gofmt clean"
 	@before="$$(git status --porcelain -- apps/web design-system/web/ui)"; \
 	go -C design-system/web/ui tool templ generate >/dev/null 2>&1; \

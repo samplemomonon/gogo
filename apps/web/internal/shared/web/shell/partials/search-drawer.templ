@@ -1,0 +1,41 @@
+package partials
+
+import (
+	"gogo.design/system/web/ui"
+)
+
+// SearchDrawer is the live-search sheet: an overlay panel that drops below the
+// header search box while the shopper types. It is not a page — it is a
+// fragment target. The header's search input fires an htmx GET to
+// /search/suggest (home-owned), which swaps result rows into #live-search-results
+// inside this sheet; LiveSearchJS (shell scripts) shows and hides the sheet as
+// the input gains focus, empties, or a result is chosen.
+//
+// The sheet is `hidden` at rest and anchored `top-16` (below the sticky header
+// bar, which is min-h-16 and z-40). It is opaque rather than translucent so the
+// results read cleanly over a scrolled grid, and it carries its own close
+// button for keyboard and pointer users. It shares the header's z-index layer so
+// it sits above the page but below nothing it needs.
+templ SearchDrawer() {
+	<div
+		id="search-drawer"
+		class="fixed inset-x-0 top-16 z-40 px-4"
+		role="dialog"
+		aria-modal="false"
+		aria-label="Hasil pencarian"
+		hidden
+	>
+		<div class="mx-auto flex max-w-2xl flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-xl">
+			<div class="flex items-center justify-between gap-2 border-b border-base-300/60 px-4 py-3">
+				<h2 class="text-sm font-semibold text-base-content">Hasil pencarian</h2>
+				<button type="button" data-search-close class="btn btn-ghost btn-sm btn-circle" aria-label="Tutup hasil pencarian">
+					@ui.IconClose("size-4")
+				</button>
+			</div>
+			<div id="live-search-results" class="max-h-[60vh] overflow-y-auto">
+				<span class="htmx-indicator px-4 py-4 text-sm text-base-content/60">Mencari…</span>
+			</div>
+			<div id="live-search-status" class="htmx-indicator border-t border-base-300/60 px-4 py-2 text-center text-xs text-base-content/50"></div>
+		</div>
+	</div>
+}

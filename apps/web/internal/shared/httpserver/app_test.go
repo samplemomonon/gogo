@@ -16,6 +16,7 @@ import (
 	"gogo/internal/shared/config"
 	"gogo/internal/shared/module"
 	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/site"
 )
 
 // fixtureModule is a module with an observable lifecycle and an optional
@@ -267,6 +268,77 @@ func (p fixturePage) Nav() []navigation.Item {
 }
 
 var _ Page = fixturePage{}
+
+// shellSitePage contributes a route that echoes the request-scoped shell
+// settings, proving the gateway's optional provider runs before page handlers.
+type shellSitePage struct {
+	settings site.Settings
+	err      error
+}
+
+func (p shellSitePage) RegisterRoutes(r chi.Router) {
+	r.Get("/site-shell", func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte(site.FromContext(req.Context()).SiteName))
+	})
+	r.Get("/admin/site-shell", func(w http.ResponseWriter, req *http.Request) {
+		settings := site.FromContext(req.Context())
+		if settings.UseDefaultNavigation {
+			_, _ = w.Write([]byte("federated"))
+			return
+		}
+		_, _ = w.Write([]byte("cms"))
+	})
+}
+
+func (shellSitePage) Nav() []navigation.Item { return nil }
+
+func (p shellSitePage) SiteSettings(context.Context) (site.Settings, error) {
+	return p.settings, p.err
+}
+
+var _ SiteSettingsProvider = shellSitePage{}
+
+func TestPublishedSiteSettingsReachPageHandlers(t *testing.T) {
+	t.Parallel()
+	app := NewWithRegistry(
+		testConfig(), testLogger(), module.NewRegistry("gogo", "test"), nil,
+		shellSitePage{settings: site.Settings{SiteName: "Toko Baru", HomePageSlug: "home", FooterText: "footer"}},
+	)
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/site-shell", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != "Toko Baru" {
+		t.Fatalf("site shell response = %d %q, want Toko Baru", rec.Code, rec.Body.String())
+	}
+}
+
+func TestApplicationSurfacesKeepFederatedNavigation(t *testing.T) {
+	t.Parallel()
+	app := NewWithRegistry(
+		testConfig(), testLogger(), module.NewRegistry("gogo", "test"), nil,
+		shellSitePage{settings: site.Settings{
+			SiteName: "Toko Baru", HomePageSlug: "home",
+			HeaderLinks: []site.Link{{Label: "Beranda", Href: "/"}},
+		}},
+	)
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/site-shell", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != "federated" {
+		t.Fatalf("admin shell navigation = %d %q, want federated", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSiteProviderFailureFallsBackToDefaultShell(t *testing.T) {
+	t.Parallel()
+	app := NewWithRegistry(
+		testConfig(), testLogger(), module.NewRegistry("gogo", "test"), nil,
+		shellSitePage{err: context.DeadlineExceeded},
+	)
+	rec := httptest.NewRecorder()
+	app.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/site-shell", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != site.Default().SiteName {
+		t.Fatalf("fallback response = %d %q, want %q", rec.Code, rec.Body.String(), site.Default().SiteName)
+	}
+}
 
 func TestPagesRegisteredAheadOfModuleNav(t *testing.T) {
 	t.Parallel()

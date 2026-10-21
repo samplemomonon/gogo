@@ -16,12 +16,14 @@ package ui
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"gogo/internal/features/home/ui/application/ports"
 	homedetail "gogo/internal/features/home/ui/handlers/products/detail"
 	homelist "gogo/internal/features/home/ui/handlers/products/list"
+	homesearch "gogo/internal/features/home/ui/handlers/products/search"
 	fdi "gogo/internal/shared/foundation/di"
 	"gogo/internal/shared/web/navigation"
 	"gogo/internal/shared/web/pagekit"
@@ -33,6 +35,7 @@ import (
 type Page struct {
 	handler *homelist.Handler
 	detail  *homedetail.Handler
+	search  *homesearch.Handler
 }
 
 // New wires the home page around its remote listing and its editorial banner
@@ -58,6 +61,7 @@ func New(listing ports.Listing, banners ports.BannerSlot, logger *slog.Logger) *
 	return &Page{
 		handler: homelist.NewHandler(listing, banners, composer, logger),
 		detail:  homedetail.NewHandler(listing, composer, logger),
+		search:  homesearch.NewHandler(listing, logger),
 	}
 }
 
@@ -75,10 +79,27 @@ func Register(b *fdi.Builder) {
 	})
 }
 
-// RegisterRoutes mounts the home page at the gateway root.
+// RegisterRoutes mounts the home page at the gateway root. The gateway uses
+// RegisterContentRoutes plus the CMS-aware root dispatcher; tests and callers
+// that mount this page alone still get the complete, backward-compatible page.
 func (p *Page) RegisterRoutes(r chi.Router) {
-	r.Get("/", p.handler.Handle)
+	r.Get("/", p.HandleHome)
+	p.RegisterContentRoutes(r)
+}
+
+// RegisterContentRoutes mounts the routes that are not the contested homepage
+// root. The shell's composite site page owns "/" so a published CMS homepage
+// can be selected without taking over the catalog, product-detail, or search
+// routes.
+func (p *Page) RegisterContentRoutes(r chi.Router) {
 	r.Get("/catalog/{id}", p.detail.Handle)
+	r.Get("/search/suggest", p.search.Handle)
+}
+
+// HandleHome renders the existing storefront homepage. It is the fallback when
+// no native CMS page is published for the configured home slug.
+func (p *Page) HandleHome(w http.ResponseWriter, r *http.Request) {
+	p.handler.Handle(w, r)
 }
 
 // Nav returns the navigation the home page contributes to the shared shell.

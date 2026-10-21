@@ -399,6 +399,7 @@ services:
       PRODUCT_LISTING_ADDRESS: dns:///product-listing-service:9093
       PRODUCT_SEARCH_ADDRESS: dns:///product-search-service:9094
       CATEGORY_ADDRESS: dns:///category-service:9090
+      MEDIA_ADDRESS: dns:///media-service:9091
       PRODUCT_PLATFORM_SERVICE_TOKEN: *service-token
     depends_on:
       postgres:

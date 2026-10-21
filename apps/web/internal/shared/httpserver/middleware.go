@@ -143,7 +143,9 @@ func SecurityHeaders(production bool) func(http.Handler) http.Handler {
 				// uses are moved into real modules.
 				"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
 				"style-src 'self' 'unsafe-inline'",
-				"img-src 'self' data:",
+				// Editorial image fields accept safe HTTPS sources as well as
+				// same-origin paths; <img> cannot execute scripts from SVG.
+				"img-src 'self' data: https:",
 				"connect-src 'self'",
 				"object-src 'none'",
 				"frame-ancestors 'none'",

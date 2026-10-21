@@ -90,8 +90,14 @@ type AppConfig struct {
 	ProductListingAddress string
 	ProductSearchAddress  string
 	CategoryAddress       string
+	// MediaAddress is the gRPC target of media-service, the platform service that
+	// owns object metadata and hands out presigned MinIO URLs. It is required:
+	// without it the storefront would render product images as nothing and a
+	// seller could not attach a photo to a product. A standard gRPC target works.
+	MediaAddress string
 	// ProductPlatformServiceToken is the gateway's service identity accepted by
-	// the product platform's authenticated gRPC endpoints.
+	// the product platform's authenticated gRPC endpoints. media-service shares
+	// the same platform credential.
 	ProductPlatformServiceToken string
 
 	// Builder.io editorial read configuration. The public key only reads

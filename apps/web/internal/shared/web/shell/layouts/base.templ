@@ -3,6 +3,7 @@ package layouts
 import (
 	"gogo/internal/shared/web/navigation"
 	"gogo/internal/shared/web/shell/partials"
+	"gogo/internal/shared/web/site"
 )
 
 // Base is the shared document shell: head, header, the main landmark, the
@@ -20,6 +21,7 @@ import (
 //   - The bootstrap script is inline and first, so the resolved theme is on the
 //     element before the first paint. An external script would flash light.
 templ Base(title string, nav []navigation.Item, path string, term string) {
+	{{ siteSettings := site.FromContext(ctx) }}
 	<!DOCTYPE html>
 	// lang="id" because the interface is Indonesian: it drives the screen
 	// reader's pronunciation rules and the browser's own hyphenation and
@@ -33,7 +35,7 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 			<title>{ title }</title>
 			<meta
 				name="description"
-				content="Gogo — a federated modular-monolith product catalog built with Go, Chi, Templ and HTMX."
+				content={ siteSettings.Description() }
 			/>
 			<!-- Tells the browser to render native controls, scrollbars and
 			     form widgets in the resolved theme instead of forcing light. -->
@@ -47,6 +49,9 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 				rel="stylesheet"
 				href="/assets/css/output.css"
 			/>
+			if css := siteSettings.ThemeCSS(); css != "" {
+				@templ.Raw("<style>" + css + "</style>")
+			}
 		</head>
 
 		<body class="min-h-dvh bg-base-200 text-base-content flex flex-col antialiased">
@@ -68,6 +73,11 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 			     viewports; hidden from md up where the top-bar links take over. -->
 			@partials.BottomNav(nav, path)
 
+			<!-- Live-search sheet: hidden at rest, opened by the header's search
+			     input as the shopper types. It drops below the sticky header and
+			     overlays the page; LiveSearchJS toggles it. -->
+			@partials.SearchDrawer()
+
 			<!-- htmx failures are announced here. It renders nothing at rest
 			     (see .shell-status:empty) and only becomes visible when the
 			     shell's htmx config writes a message into it. -->
@@ -78,6 +88,7 @@ templ Base(title string, nav []navigation.Item, path string, term string) {
 			@partials.InlineScript(partials.HtmxConfigJS)
 			@partials.InlineScript(partials.FormGuardJS)
 			@partials.InlineScript(partials.DrawerTriggerJS)
+			@partials.InlineScript(partials.LiveSearchJS)
 			@partials.InlineScript(partials.WebVitalsJS)
 		</body>
 	</html>

@@ -50,6 +50,9 @@ func TestSecurityHeaders(t *testing.T) {
 	if got := h.Get("Strict-Transport-Security"); got != "" {
 		t.Errorf("HSTS set outside production: %q", got)
 	}
+	if csp := h.Get("Content-Security-Policy"); !strings.Contains(csp, "img-src 'self' data: https:") {
+		t.Errorf("Content-Security-Policy must permit the editorial image contract, got %q", csp)
+	}
 
 	if got := run(true).Get("Strict-Transport-Security"); !strings.Contains(got, "max-age=63072000") {
 		t.Errorf("production HSTS = %q, want max-age=63072000", got)

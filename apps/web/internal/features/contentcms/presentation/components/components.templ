@@ -1,0 +1,137 @@
+package components
+
+import (
+	"gogo/internal/features/contentcms/domain"
+)
+
+templ renderContainer(component domain.Component, context RenderContext) {
+	<div class={ ComponentRootClass(component, "rounded-2xl border border-base-300 bg-base-100 p-6") } data-cms-component={ component.Type } data-cms-id={ component.ID }>
+		for _, child := range component.Children {
+			@RenderComponent(child, context)
+		}
+	</div>
+}
+
+templ renderHeading(component domain.Component, context RenderContext) {
+	switch stringValue(component.Props, "level") {
+		case "h1":
+			<h1 class={ ComponentRootClass(component, "text-3xl font-bold tracking-tight") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ stringValue(component.Props, "text") }</h1>
+		case "h3":
+			<h3 class={ ComponentRootClass(component, "text-xl font-semibold tracking-tight") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ stringValue(component.Props, "text") }</h3>
+		case "h4":
+			<h4 class={ ComponentRootClass(component, "text-lg font-semibold") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ stringValue(component.Props, "text") }</h4>
+		default:
+			<h2 class={ ComponentRootClass(component, "text-2xl font-bold tracking-tight") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ stringValue(component.Props, "text") }</h2>
+	}
+}
+
+templ renderText(component domain.Component, context RenderContext) {
+	<p class={ ComponentRootClass(component, "leading-7") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ stringValue(component.Props, "text") }</p>
+}
+
+templ renderImage(component domain.Component, context RenderContext) {
+	if src := safeImage(stringValue(component.Props, "src")); src != "" {
+		<img class={ ComponentRootClass(component, "max-h-[32rem] w-full rounded-xl object-cover") } data-cms-component={ component.Type } data-cms-id={ component.ID } src={ src } alt={ stringValue(component.Props, "alt") } loading="lazy"/>
+	} else {
+		<div class={ ComponentRootClass(component, "flex min-h-32 items-center justify-center rounded-xl border border-dashed border-base-300 bg-base-200 p-6 text-sm text-base-content/60") } data-cms-component={ component.Type } data-cms-id={ component.ID }>
+			Image URL required
+		</div>
+	}
+}
+
+templ renderButton(component domain.Component, context RenderContext) {
+	<div class={ ComponentRootClass(component, "flex") } data-cms-component={ component.Type } data-cms-id={ component.ID }>
+		<a class={ buttonClass(component) + " " + ComponentActionClass(component) } href={ safeHref(stringValue(component.Props, "href")) }>{ stringValue(component.Props, "label") }</a>
+	</div>
+}
+
+templ renderSpacer(component domain.Component, context RenderContext) {
+	<div class={ ComponentRootClass(component, "h-4 w-full") } data-cms-component={ component.Type } data-cms-id={ component.ID } aria-hidden="true"></div>
+}
+
+templ renderNavbar(component domain.Component, context RenderContext) {
+	<nav class={ ComponentRootClass(component, "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-base-300 bg-base-100 px-5 py-3") } data-cms-component={ component.Type } data-cms-id={ component.ID } aria-label="Page navigation">
+		<span class="font-semibold">{ stringValue(component.Props, "brand") }</span>
+		<div class="flex flex-wrap items-center gap-4">
+			for _, link := range arrayObjects(component.Props["links"]) {
+				if label, _ := link["label"].(string); label != "" {
+					<a class="text-sm font-medium hover:underline" href={ safeHref(stringValue(link, "href")) }>{ label }</a>
+				}
+			}
+		</div>
+	</nav>
+}
+
+templ renderForm(component domain.Component, context RenderContext) {
+	<form id={ "form-" + component.ID } class={ ComponentRootClass(component, "space-y-4 rounded-2xl border border-base-300 bg-base-100 p-6") } data-cms-component={ component.Type } data-cms-id={ component.ID } method="post" action={ formAction(component, context) }>
+		<h2 class="text-xl font-semibold">{ stringValue(component.Props, "title") }</h2>
+		for _, field := range arrayObjects(component.Props["fields"]) {
+			@formField(field)
+		}
+		<button class="btn btn-primary" type="submit">{ stringValue(component.Props, "submitLabel") }</button>
+	</form>
+}
+
+templ formField(field map[string]any) {
+	<label class="form-control">
+		<span class="label-text mb-1">{ stringValue(field, "label") }</span>
+		if stringValue(field, "type") == "textarea" {
+			<textarea class="textarea textarea-bordered w-full" name={ fieldName(field) } rows="4" required?={ boolValue(field, "required", false) }></textarea>
+		} else if fieldType := stringValue(field, "type"); fieldType == "email" {
+			<input class="input input-bordered w-full" type="email" name={ fieldName(field) } required?={ boolValue(field, "required", false) }/>
+		} else if fieldType == "tel" {
+			<input class="input input-bordered w-full" type="tel" name={ fieldName(field) } required?={ boolValue(field, "required", false) }/>
+		} else {
+			<input class="input input-bordered w-full" type="text" name={ fieldName(field) } maxlength="2000" required?={ boolValue(field, "required", false) }/>
+		}
+	</label>
+}
+
+templ renderDataText(component domain.Component, context RenderContext) {
+	<p class={ ComponentRootClass(component, "leading-7") } data-cms-component={ component.Type } data-cms-id={ component.ID }>{ bindingText(component, context) }</p>
+}
+
+templ renderAdSlot(component domain.Component, context RenderContext) {
+	if boolValue(component.Props, "active", true) {
+		<aside class={ adSlotRootClass(component) } data-cms-component={ component.Type } data-cms-id={ component.ID } data-ad-slot={ stringValue(component.Props, "slot") } aria-label={ adLabel(component) }>
+			<span class="text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content/50">{ adLabel(component) }</span>
+			<span class="text-xs text-base-content/40">Reserved placement · { stringValue(component.Props, "slot") }</span>
+		</aside>
+	}
+}
+
+templ ComponentDiagnostic(componentType string) {
+	<div class="rounded border border-warning bg-warning/10 p-3 text-sm" role="note" data-cms-diagnostic={ componentType }>Unsupported component: { componentType }</div>
+}
+
+func buttonClass(component domain.Component) string {
+	variant := stringValue(component.Props, "variant")
+	if variant == "" {
+		variant = "primary"
+	}
+	class := "btn"
+	switch variant {
+	case "secondary", "outline", "ghost", "primary":
+		class += " btn-" + variant
+	default:
+		class += " btn-primary"
+	}
+	switch stringValue(component.Props, "size") {
+	case "sm":
+		class += " btn-sm"
+	case "lg":
+		class += " btn-lg"
+	}
+	return class
+}
+
+func fieldName(field map[string]any) string {
+	return stringValue(field, "name")
+}
+
+func adLabel(component domain.Component) string {
+	if label := stringValue(component.Props, "label"); label != "" {
+		return label
+	}
+	return "Advertisement"
+}

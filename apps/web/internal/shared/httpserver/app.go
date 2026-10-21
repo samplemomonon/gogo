@@ -21,6 +21,7 @@ import (
 	"gogo/internal/shared/web/assets"
 	"gogo/internal/shared/web/navigation"
 	"gogo/internal/shared/web/shell"
+	"gogo/internal/shared/web/site"
 )
 
 // Page is a top-level page of the gateway: a plain HTTP surface without a
@@ -35,6 +36,14 @@ type Page interface {
 	// gateway renders them ahead of the module-federated items
 	// (registry.Nav), so page entry points always lead the menu.
 	Nav() []navigation.Item
+}
+
+// SiteSettingsProvider is an optional page capability. When one page
+// implements it, the gateway resolves the tenant's published site shell once
+// per request and puts it on the context before any content or module route
+// renders. The shared layout therefore stays free of content-vertical imports.
+type SiteSettingsProvider interface {
+	SiteSettings(ctx context.Context) (site.Settings, error)
 }
 
 // App is the gateway: it owns the module registry, mounts the default
@@ -135,6 +144,32 @@ func buildRouter(
 		})
 	})
 
+	// The published site shell is resolved before any route is mounted (chi
+	// requires all middleware first), but static and operational endpoints
+	// skip the database lookup. Pages and modules registered below all receive
+	// the same tenant-scoped brand, menu, and footer. A resolution failure
+	// falls back to the built-in shell rather than taking the public site down.
+	if provider := findSiteProvider(pages); provider != nil {
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if skipSiteSettingsLookup(r.URL.Path) {
+					next.ServeHTTP(w, r)
+					return
+				}
+				settings, err := provider.SiteSettings(r.Context())
+				if err != nil {
+					logger.Warn("published site settings unavailable", "error", err)
+					settings = site.Default()
+				}
+				// The CMS menu owns the public shell. Keep the federated menu on
+				// operator and seller surfaces so publishing a public menu does not
+				// remove the links those surfaces rely on.
+				settings.UseDefaultNavigation = applicationOwnedPath(r.URL.Path)
+				next.ServeHTTP(w, r.WithContext(site.WithSettings(r.Context(), settings)))
+			})
+		})
+	}
+
 	router.Mount("/assets", assets.Handler())
 	router.Mount("/module-registry", registryHandler(registry, logger))
 	router.Mount("/metrics", metrics.Handler())
@@ -193,6 +228,44 @@ func tenantResolver(cfg *config.AppConfig, logger *slog.Logger) tenant.Resolver 
 		reg, _ = tenant.NewRegistry(tenant.Options{DefaultID: tenant.Default})
 	}
 	return tenant.NewHostResolver(reg, cfg.Tenant.TrustHeader)
+}
+
+// findSiteProvider returns the first page that can supply the published site
+// shell. There is exactly one content vertical today; returning one provider
+// keeps the middleware deterministic if another page later implements it.
+func findSiteProvider(pages []Page) SiteSettingsProvider {
+	for _, page := range pages {
+		if provider, ok := page.(SiteSettingsProvider); ok {
+			return provider
+		}
+	}
+	return nil
+}
+
+// applicationOwnedPath reports whether a route belongs to an operator or
+// seller application rather than the public website. Those surfaces keep the
+// federated menu even when the public CMS menu is published.
+func applicationOwnedPath(path string) bool {
+	for _, prefix := range []string{"/admin", "/seller", "/billing", "/profile"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// skipSiteSettingsLookup keeps static and operational endpoints off the
+// content database. They render either no shell or the default registry shell.
+func skipSiteSettingsLookup(path string) bool {
+	return strings.HasPrefix(path, "/assets/") ||
+		path == "/module-registry" ||
+		path == "/metrics" ||
+		strings.HasPrefix(path, "/metrics/") ||
+		path == "/rum" ||
+		path == "/healthz" ||
+		path == "/readyz" ||
+		path == "/livez" ||
+		strings.HasPrefix(path, "/debug/")
 }
 
 // compileNav merges the pages' nav (which always lead the menu) with the

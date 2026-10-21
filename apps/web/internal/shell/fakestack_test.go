@@ -773,7 +773,7 @@ func newTestGateway(t *testing.T, tenantCfg config.TenantConfig) *testGateway {
 	registry.AddAll(ops.NewModuleWithProbe(ops.Readiness(registry, breakerGroup(upstreamBreakers), shell.ReadinessPolicy())))
 
 	app := httpserver.NewWithRegistry(cfg, logger, registry, upstreamBreakers,
-		homeui.New(homelistingclient.New(conns, breakers), bannerSlotStub{}, logger),
+		homeui.New(homelistingclient.New(conns, breakers, nil, logger), bannerSlotStub{}, logger),
 		ui.New(
 			sellercatalogclient.New(conns, breakers),
 			sellerinventoryclient.New(inventoryConn, inventoryBreaker),

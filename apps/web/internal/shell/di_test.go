@@ -28,6 +28,7 @@ func testGatewayConfig() *config.AppConfig {
 		ProductListingAddress:       "passthrough:///127.0.0.1:19093",
 		ProductSearchAddress:        "passthrough:///127.0.0.1:19094",
 		CategoryAddress:             "passthrough:///127.0.0.1:19090",
+		MediaAddress:                "passthrough:///127.0.0.1:19091",
 		ProductPlatformServiceToken: "test-service-token-123",
 	}
 }

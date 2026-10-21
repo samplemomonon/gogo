@@ -1,4 +1,4 @@
-package ui
+package presentation
 
 import (
 	"context"
@@ -9,6 +9,14 @@ import (
 	"testing"
 
 	"gogo/internal/shared/breaker"
+
+	"gogo/internal/features/contentcms/application/ports"
+)
+
+type (
+	Page    = ports.EditorialPage
+	Block   = ports.EditorialBlock
+	FAQItem = ports.EditorialFAQItem
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -23,7 +31,7 @@ func TestPageValidateAllowsOnlyDeclaredBlocksAndSafeLinks(t *testing.T) {
 	valid := Page{
 		Slug:  "faq",
 		Title: "Pertanyaan Umum",
-		Blocks: []Block{
+		EditorialBlocks: []Block{
 			{Type: "hero", ImageURL: "/assets/faq.webp"},
 			{Type: "markdown", Body: "## Cara menggunakan layanan"},
 			{Type: "faq", Items: []FAQItem{{Question: "Bagaimana?", Answer: "Baca panduan."}}},
@@ -35,9 +43,9 @@ func TestPageValidateAllowsOnlyDeclaredBlocksAndSafeLinks(t *testing.T) {
 	}
 
 	for name, page := range map[string]Page{
-		"unknown block":     {Slug: "faq", Title: "FAQ", Blocks: []Block{{Type: "script"}}},
-		"unsafe CTA":        {Slug: "faq", Title: "FAQ", Blocks: []Block{{Type: "cta", Label: "Buka", Href: "javascript:alert(1)"}}},
-		"protocol relative": {Slug: "faq", Title: "FAQ", Blocks: []Block{{Type: "cta", Label: "Buka", Href: "//attacker.test"}}},
+		"unknown block":     {Slug: "faq", Title: "FAQ", EditorialBlocks: []Block{{Type: "script"}}},
+		"unsafe CTA":        {Slug: "faq", Title: "FAQ", EditorialBlocks: []Block{{Type: "cta", Label: "Buka", Href: "javascript:alert(1)"}}},
+		"protocol relative": {Slug: "faq", Title: "FAQ", EditorialBlocks: []Block{{Type: "cta", Label: "Buka", Href: "//attacker.test"}}},
 		"invalid slug":      {Slug: "../faq", Title: "FAQ"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -46,38 +54,6 @@ func TestPageValidateAllowsOnlyDeclaredBlocksAndSafeLinks(t *testing.T) {
 				t.Fatal("Validate() error = nil, want rejection")
 			}
 		})
-	}
-}
-
-func TestMarkdownRenderingEscapesRawHTML(t *testing.T) {
-	t.Parallel()
-
-	page := Page{
-		Slug: "faq", Title: "FAQ",
-		Blocks: []Block{{Type: "markdown", Body: "<script>alert(1)</script>\n\n**aman**"}},
-	}
-	view, err := renderPage(page)
-	if err != nil {
-		t.Fatalf("renderPage() error = %v", err)
-	}
-	body := string(view.Blocks[0].Body)
-	if strings.Contains(body, "<script>") {
-		t.Fatalf("raw script was rendered: %q", body)
-	}
-	if !strings.Contains(body, "raw HTML omitted") || !strings.Contains(body, "<strong>aman</strong>") {
-		t.Fatalf("Markdown escaping/formatting missing: %q", body)
-	}
-}
-
-func TestMarkdownRenderingRejectsDangerousLinkSchemes(t *testing.T) {
-	t.Parallel()
-	page := Page{Slug: "faq", Title: "FAQ", Blocks: []Block{{Type: "markdown", Body: "[tautan](javascript:alert(1))"}}}
-	view, err := renderPage(page)
-	if err != nil {
-		t.Fatalf("renderPage() error = %v", err)
-	}
-	if strings.Contains(strings.ToLower(string(view.Blocks[0].Body)), "href=\"javascript:") {
-		t.Fatalf("dangerous URL rendered: %q", view.Blocks[0].Body)
 	}
 }
 
@@ -110,7 +86,7 @@ func TestBuilderReaderFetchesPublishedPageAndCachesBoundedEntry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ReadPublished() error = %v", err)
 		}
-		if page.Title != "FAQ" || len(page.Blocks) != 1 {
+		if page.Title != "FAQ" || len(page.EditorialBlocks) != 1 {
 			t.Fatalf("ReadPublished() = %#v", page)
 		}
 	}

@@ -9,19 +9,19 @@ import (
 	"errors"
 	"testing"
 
-	contentui "gogo/internal/features/contentcms/ui"
+	contentcmscompose "gogo/internal/features/contentcms/compose"
 	homeports "gogo/internal/features/home/ui/application/ports"
 	"gogo/internal/features/home/ui/application/results"
 )
 
-// stubContentReader is an in-memory contentui.Reader, so the adapter's mapping
+// stubContentReader is an in-memory ports.Reader, so the adapter's mapping
 // can be asserted without Builder.io.
 type stubContentReader struct {
-	page contentui.Page
+	page contentcmscompose.EditorialPage
 	err  error
 }
 
-func (s stubContentReader) ReadPublished(context.Context, string) (contentui.Page, error) {
+func (s stubContentReader) ReadPublished(context.Context, string) (contentcmscompose.EditorialPage, error) {
 	return s.page, s.err
 }
 
@@ -31,10 +31,10 @@ func (s stubContentReader) ReadPublished(context.Context, string) (contentui.Pag
 func TestBannerSlotMapsThePublishedBlock(t *testing.T) {
 	t.Parallel()
 
-	reader := stubContentReader{page: contentui.Page{
+	reader := stubContentReader{page: contentcmscompose.EditorialPage{
 		Slug:  "home-banner",
 		Title: "Beranda",
-		Blocks: []contentui.Block{
+		EditorialBlocks: []contentcmscompose.EditorialBlock{
 			{Type: "markdown", Body: "not a banner"},
 			{Type: "hero"},
 			{Type: "hero", Title: "Promo Kemerdekaan", ImageURL: "/assets/img/promo.webp", ImageAlt: "Bendera"},
@@ -57,7 +57,7 @@ func TestBannerSlotMapsThePublishedBlock(t *testing.T) {
 func TestBannerSlotAnswersNoBannerForAnAbsentPage(t *testing.T) {
 	t.Parallel()
 
-	_, err := newBannerSlot(stubContentReader{err: contentui.ErrNotFound}).
+	_, err := newBannerSlot(stubContentReader{err: contentcmscompose.ErrNotFound}).
 		ReadBanner(context.Background(), "home-banner")
 	if !errors.Is(err, homeports.ErrNoBanner) {
 		t.Fatalf("err = %v, want ErrNoBanner for an absent page", err)
@@ -70,10 +70,10 @@ func TestBannerSlotAnswersNoBannerForAnAbsentPage(t *testing.T) {
 func TestBannerSlotAnswersNoBannerForAPageWithoutABannerBlock(t *testing.T) {
 	t.Parallel()
 
-	reader := stubContentReader{page: contentui.Page{
-		Slug:   "home-banner",
-		Title:  "Beranda",
-		Blocks: []contentui.Block{{Type: "markdown", Body: "long copy"}},
+	reader := stubContentReader{page: contentcmscompose.EditorialPage{
+		Slug:            "home-banner",
+		Title:           "Beranda",
+		EditorialBlocks: []contentcmscompose.EditorialBlock{{Type: "markdown", Body: "long copy"}},
 	}}
 
 	_, err := newBannerSlot(reader).ReadBanner(context.Background(), "home-banner")
@@ -88,12 +88,12 @@ func TestBannerSlotAnswersNoBannerForAPageWithoutABannerBlock(t *testing.T) {
 func TestBannerSlotReturnsSourceFailuresAsIs(t *testing.T) {
 	t.Parallel()
 
-	_, err := newBannerSlot(stubContentReader{err: contentui.ErrUnavailable}).
+	_, err := newBannerSlot(stubContentReader{err: contentcmscompose.ErrUnavailable}).
 		ReadBanner(context.Background(), "home-banner")
 	if errors.Is(err, homeports.ErrNoBanner) {
 		t.Fatal("a source failure was reported as an empty slot")
 	}
-	if !errors.Is(err, contentui.ErrUnavailable) {
+	if !errors.Is(err, contentcmscompose.ErrUnavailable) {
 		t.Errorf("err = %v, want the source's ErrUnavailable preserved", err)
 	}
 }

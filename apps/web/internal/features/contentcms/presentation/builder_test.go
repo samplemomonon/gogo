@@ -4,7 +4,7 @@
 // rule that the public key never reaches an error. content_test.go covers the
 // happy path and the oversized-response and cross-host-redirect guards; this
 // file covers the rest.
-package ui
+package presentation
 
 import (
 	"context"
@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"gogo/internal/shared/breaker"
+
+	"gogo/internal/features/contentcms/application/ports"
 )
 
 // testAPIKey is the public read key every test reader carries; one of the tests
@@ -118,16 +120,16 @@ func TestBuilderReaderParsesTheDocumentedFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPublished() error = %v", err)
 	}
-	if page.Slug != "faq" || page.Title != "Pertanyaan Umum" || len(page.Blocks) != 4 {
+	if page.Slug != "faq" || page.Title != "Pertanyaan Umum" || len(page.EditorialBlocks) != 4 {
 		t.Fatalf("page = %+v, want the full fixture", page)
 	}
-	if hero := page.Blocks[0]; hero.Type != "hero" || hero.ImageURL != "/assets/faq.webp" || hero.ImageAlt != "Ilustrasi bantuan" {
+	if hero := page.EditorialBlocks[0]; hero.Type != "hero" || hero.ImageURL != "/assets/faq.webp" || hero.ImageAlt != "Ilustrasi bantuan" {
 		t.Fatalf("hero block = %+v", hero)
 	}
-	if faq := page.Blocks[2]; len(faq.Items) != 1 || faq.Items[0].Question != "Bagaimana?" || faq.Items[0].Answer != "Baca panduan." {
+	if faq := page.EditorialBlocks[2]; len(faq.Items) != 1 || faq.Items[0].Question != "Bagaimana?" || faq.Items[0].Answer != "Baca panduan." {
 		t.Fatalf("faq block = %+v", faq)
 	}
-	if cta := page.Blocks[3]; cta.Label != "Hubungi kami" || cta.Href != "https://example.test/help" {
+	if cta := page.EditorialBlocks[3]; cta.Label != "Hubungi kami" || cta.Href != "https://example.test/help" {
 		t.Fatalf("cta block = %+v", cta)
 	}
 }
@@ -149,10 +151,10 @@ func TestBuilderReaderAnswersNotFoundForCleanMisses(t *testing.T) {
 
 			transport, _ := answer(tt.status, tt.body)
 			_, err := testReader(transport).ReadPublished(context.Background(), "faq")
-			if !errors.Is(err, ErrNotFound) {
-				t.Fatalf("err = %v, want ErrNotFound", err)
+			if !errors.Is(err, ports.ErrNotFound) {
+				t.Fatalf("err = %v, want ports.ErrNotFound", err)
 			}
-			if errors.Is(err, ErrUnavailable) {
+			if errors.Is(err, ports.ErrUnavailable) {
 				t.Fatalf("a clean miss is not an availability failure: %v", err)
 			}
 		})
@@ -166,10 +168,10 @@ func TestBuilderReaderTreatsCleanMissesAsNonFailures(t *testing.T) {
 	reader := testReader(transport)
 	// More misses than the breaker's failure threshold: if a clean miss counted
 	// as a failure, the circuit would open and later reads would fail as
-	// unavailable instead of the honest ErrNotFound.
+	// unavailable instead of the honest ports.ErrNotFound.
 	for i := range 8 {
-		if _, err := reader.ReadPublished(context.Background(), fmt.Sprintf("miss-%d", i)); !errors.Is(err, ErrNotFound) {
-			t.Fatalf("miss %d: err = %v, want ErrNotFound", i, err)
+		if _, err := reader.ReadPublished(context.Background(), fmt.Sprintf("miss-%d", i)); !errors.Is(err, ports.ErrNotFound) {
+			t.Fatalf("miss %d: err = %v, want ports.ErrNotFound", i, err)
 		}
 	}
 	if got := requests.Load(); got != 8 {
@@ -207,8 +209,8 @@ func TestBuilderReaderMapsFailureDetailsToUnavailable(t *testing.T) {
 
 			transport, _ := answer(tt.status, tt.body)
 			_, err := testReader(transport).ReadPublished(context.Background(), "faq")
-			if !errors.Is(err, ErrUnavailable) {
-				t.Fatalf("err = %v, want ErrUnavailable", err)
+			if !errors.Is(err, ports.ErrUnavailable) {
+				t.Fatalf("err = %v, want ports.ErrUnavailable", err)
 			}
 			if !strings.Contains(err.Error(), tt.wantDetail) {
 				t.Fatalf("err = %q, want the %q detail: enablement must tell a content problem from a wire problem", err, tt.wantDetail)
@@ -225,8 +227,8 @@ func TestBuilderReaderNeverLeaksThePublicKey(t *testing.T) {
 		return nil, &url.Error{Op: "Get", URL: r.URL.String(), Err: errors.New("dial tcp: connection refused")}
 	})
 	_, err := testReader(transport).ReadPublished(context.Background(), "faq")
-	if !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("err = %v, want ErrUnavailable", err)
+	if !errors.Is(err, ports.ErrUnavailable) {
+		t.Fatalf("err = %v, want ports.ErrUnavailable", err)
 	}
 	if strings.Contains(err.Error(), testAPIKey) {
 		t.Fatalf("err = %q leaks the public key", err)
@@ -322,8 +324,8 @@ func TestBuilderReaderRejectsAnInvalidSlugWithoutAFetch(t *testing.T) {
 
 	transport, requests := answer(http.StatusOK, publishedPageFixture)
 	_, err := testReader(transport).ReadPublished(context.Background(), "Faq/../secrets")
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("err = %v, want ErrNotFound", err)
+	if !errors.Is(err, ports.ErrNotFound) {
+		t.Fatalf("err = %v, want ports.ErrNotFound", err)
 	}
 	if got := requests.Load(); got != 0 {
 		t.Fatalf("HTTP requests = %d, want 0 (invalid slugs never reach the wire)", got)
@@ -340,13 +342,13 @@ func TestBuilderReaderReturnsIsolatedCopies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadPublished() error = %v", err)
 	}
-	first.Blocks[2].Items[0].Question = "MUTATED"
+	first.EditorialBlocks[2].Items[0].Question = "MUTATED"
 
 	second, err := reader.ReadPublished(context.Background(), "faq")
 	if err != nil {
 		t.Fatalf("ReadPublished() error = %v", err)
 	}
-	if second.Blocks[2].Items[0].Question == "MUTATED" {
+	if second.EditorialBlocks[2].Items[0].Question == "MUTATED" {
 		t.Fatal("a caller's mutation reached the cache")
 	}
 }
@@ -427,11 +429,11 @@ func TestBuilderReaderServesConcurrentReads(t *testing.T) {
 func TestNewBuilderReaderValidatesConfiguration(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewBuilderReader("", "key"); !errors.Is(err, ErrUnavailable) {
-		t.Errorf("empty model: err = %v, want ErrUnavailable", err)
+	if _, err := NewBuilderReader("", "key"); !errors.Is(err, ports.ErrUnavailable) {
+		t.Errorf("empty model: err = %v, want ports.ErrUnavailable", err)
 	}
-	if _, err := NewBuilderReader("editorial-page", ""); !errors.Is(err, ErrUnavailable) {
-		t.Errorf("empty key: err = %v, want ErrUnavailable", err)
+	if _, err := NewBuilderReader("editorial-page", ""); !errors.Is(err, ports.ErrUnavailable) {
+		t.Errorf("empty key: err = %v, want ports.ErrUnavailable", err)
 	}
 	if _, err := NewBuilderReader("Editorial_Page", "key"); err == nil {
 		t.Error("an invalid model name was accepted")

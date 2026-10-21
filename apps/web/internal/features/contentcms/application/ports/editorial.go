@@ -1,8 +1,8 @@
 // Package ui is the contentcms vertical's read-side page context: it owns the
-// gateway's read-only editorial content contract. CMS data is untrusted input:
-// renderers accept only the block types declared here and never accept
+// Builder.io editorial read contract. CMS data is untrusted input: this adapter's
+// renderer accepts only the block types declared here and never accepts
 // executable HTML or browser-side code.
-package ui
+package ports
 
 import (
 	"context"
@@ -13,43 +13,41 @@ import (
 
 var (
 	ErrUnavailable = errors.New("editorial content source unavailable")
-	ErrNotFound    = errors.New("editorial page not found")
 )
 
-// Reader is the only application-facing CMS capability. It can read published
-// page content; it has no mutation or preview operation.
+// Reader is the read-only port for the external Builder.io content source.
 type Reader interface {
-	ReadPublished(context.Context, string) (Page, error)
+	ReadPublished(context.Context, string) (EditorialPage, error)
 }
 
 type disabledReader struct{}
 
-func (disabledReader) ReadPublished(context.Context, string) (Page, error) {
-	return Page{}, ErrNotFound
+func (disabledReader) ReadPublished(context.Context, string) (EditorialPage, error) {
+	return EditorialPage{}, ErrNotFound
 }
 
 // DisabledReader keeps route composition stable when no Builder.io project is
 // configured; public editorial URLs resolve as absent rather than as failures.
 func DisabledReader() Reader { return disabledReader{} }
 
-type Page struct {
-	Slug   string  `json:"slug"`
-	Title  string  `json:"title"`
-	Blocks []Block `json:"blocks"`
+type EditorialPage struct {
+	Slug            string           `json:"slug"`
+	Title           string           `json:"title"`
+	EditorialBlocks []EditorialBlock `json:"blocks"`
 }
 
-type Block struct {
-	Type     string    `json:"type"`
-	Title    string    `json:"title,omitempty"`
-	Body     string    `json:"body,omitempty"`
-	ImageURL string    `json:"imageUrl,omitempty"`
-	ImageAlt string    `json:"imageAlt,omitempty"`
-	Label    string    `json:"label,omitempty"`
-	Href     string    `json:"href,omitempty"`
-	Items    []FAQItem `json:"items,omitempty"`
+type EditorialBlock struct {
+	Type     string             `json:"type"`
+	Title    string             `json:"title,omitempty"`
+	Body     string             `json:"body,omitempty"`
+	ImageURL string             `json:"imageUrl,omitempty"`
+	ImageAlt string             `json:"imageAlt,omitempty"`
+	Label    string             `json:"label,omitempty"`
+	Href     string             `json:"href,omitempty"`
+	Items    []EditorialFAQItem `json:"items,omitempty"`
 }
 
-type FAQItem struct {
+type EditorialFAQItem struct {
 	Question string `json:"question"`
 	Answer   string `json:"answer"`
 }
@@ -57,14 +55,14 @@ type FAQItem struct {
 // Validate checks content shape and links before it enters a renderer. The
 // list is deliberately closed so new presentation capabilities require a
 // reviewed code change and deployment.
-func (p Page) Validate() error {
+func (p EditorialPage) Validate() error {
 	if !validSlug(p.Slug) || strings.TrimSpace(p.Title) == "" || len(p.Title) > 240 {
 		return errors.New("invalid editorial page identity")
 	}
-	if len(p.Blocks) > 50 {
+	if len(p.EditorialBlocks) > 50 {
 		return errors.New("editorial page exceeds block limit")
 	}
-	for _, block := range p.Blocks {
+	for _, block := range p.EditorialBlocks {
 		if len(block.Title) > 500 || len(block.Body) > 100_000 || len(block.Label) > 200 || len(block.ImageAlt) > 500 {
 			return errors.New("editorial block exceeds field limit")
 		}
@@ -93,6 +91,12 @@ func (p Page) Validate() error {
 	}
 	return nil
 }
+
+// ValidSlug exposes the editorial slug rule to the presentation adapter.
+func ValidSlug(slug string) bool { return validSlug(slug) }
+
+// SafePublicURL exposes the editorial URL rule to the presentation adapter.
+func SafePublicURL(raw string) bool { return safePublicURL(raw) }
 
 func validSlug(slug string) bool {
 	if slug == "" || len(slug) > 80 {

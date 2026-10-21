@@ -49,6 +49,7 @@ func TestLoadFromEnvironment(t *testing.T) {
 	t.Setenv("PRODUCT_LISTING_ADDRESS", "dns:///product-listing:9093")
 	t.Setenv("PRODUCT_SEARCH_ADDRESS", "dns:///product-search:9094")
 	t.Setenv("CATEGORY_ADDRESS", "dns:///category:9090")
+	t.Setenv("MEDIA_ADDRESS", "dns:///media:9091")
 	t.Setenv("PRODUCT_PLATFORM_SERVICE_TOKEN", "test-service-token-123")
 
 	cfg, err := Load()
@@ -82,6 +83,7 @@ func TestLoadFromEnvironment(t *testing.T) {
 		{"ProductListingAddress", cfg.ProductListingAddress, "dns:///product-listing:9093"},
 		{"ProductSearchAddress", cfg.ProductSearchAddress, "dns:///product-search:9094"},
 		{"CategoryAddress", cfg.CategoryAddress, "dns:///category:9090"},
+		{"MediaAddress", cfg.MediaAddress, "dns:///media:9091"},
 	} {
 		if got.address != got.want {
 			t.Errorf("%s = %q, want %q", got.name, got.address, got.want)
@@ -222,6 +224,7 @@ func TestValidate(t *testing.T) {
 		ProductListingAddress:       "product-listing:9093",
 		ProductSearchAddress:        "product-search:9094",
 		CategoryAddress:             "category:9090",
+		MediaAddress:                "media:9091",
 		ProductPlatformServiceToken: "test-service-token-123",
 
 		Media: MediaConfig{
@@ -261,6 +264,7 @@ func TestValidate(t *testing.T) {
 		{"missing product listing address", func(c *AppConfig) { c.ProductListingAddress = "" }, "PRODUCT_LISTING_ADDRESS"},
 		{"missing product search address", func(c *AppConfig) { c.ProductSearchAddress = "" }, "PRODUCT_SEARCH_ADDRESS"},
 		{"missing category address", func(c *AppConfig) { c.CategoryAddress = "" }, "CATEGORY_ADDRESS"},
+		{"missing media address", func(c *AppConfig) { c.MediaAddress = "" }, "MEDIA_ADDRESS"},
 		{"missing product platform token", func(c *AppConfig) { c.ProductPlatformServiceToken = "" }, "PRODUCT_PLATFORM_SERVICE_TOKEN"},
 		{"Builder key without model", func(c *AppConfig) { c.BuilderPublicAPIKey = "public-key" }, "BUILDER_PUBLIC_API_KEY"},
 		{"invalid Builder model", func(c *AppConfig) { c.BuilderPublicAPIKey = "public-key"; c.BuilderModel = "Editorial Page" }, "BUILDER_CONTENT_MODEL"},
@@ -269,6 +273,7 @@ func TestValidate(t *testing.T) {
 		// opaque dial error at first request rather than at startup.
 		{"product address without a port", func(c *AppConfig) { c.ProductAddress = "product" }, "PRODUCT_ADDRESS"},
 		{"category address without a port", func(c *AppConfig) { c.CategoryAddress = "category" }, "CATEGORY_ADDRESS"},
+		{"media address without a port", func(c *AppConfig) { c.MediaAddress = "media" }, "MEDIA_ADDRESS"},
 
 		{"kafka broker without a port", func(c *AppConfig) { c.KafkaBrokers = []string{"kafka"} }, "KAFKA_BROKERS"},
 	}
@@ -335,6 +340,7 @@ func TestValidateModuleConfigs(t *testing.T) {
 		ProductListingAddress:       "product-listing:9093",
 		ProductSearchAddress:        "product-search:9094",
 		CategoryAddress:             "category:9090",
+		MediaAddress:                "media:9091",
 		ProductPlatformServiceToken: "test-service-token-123",
 
 		Media: MediaConfig{
@@ -449,6 +455,7 @@ func TestProductPlatformAddressesHaveNoDefaults(t *testing.T) {
 		"ProductListingAddress": cfg.ProductListingAddress,
 		"ProductSearchAddress":  cfg.ProductSearchAddress,
 		"CategoryAddress":       cfg.CategoryAddress,
+		"MediaAddress":          cfg.MediaAddress,
 	} {
 		if address != "" {
 			t.Errorf("%s defaults to %q, want empty so validation rejects an unconfigured gateway", name, address)

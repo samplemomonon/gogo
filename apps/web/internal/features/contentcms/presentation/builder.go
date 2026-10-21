@@ -1,6 +1,8 @@
-package ui
+package presentation
 
 import (
+	"gogo/internal/features/contentcms/application/ports"
+
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,7 +43,7 @@ type BuilderReader struct {
 }
 
 type cacheEntry struct {
-	page      Page
+	page      ports.EditorialPage
 	expiresAt time.Time
 }
 
@@ -49,9 +51,9 @@ func NewBuilderReader(model, publicAPIKey string) (*BuilderReader, error) {
 	model = strings.TrimSpace(model)
 	publicAPIKey = strings.TrimSpace(publicAPIKey)
 	if model == "" || publicAPIKey == "" {
-		return nil, ErrUnavailable
+		return nil, ports.ErrUnavailable
 	}
-	if !validSlug(model) {
+	if !ports.ValidSlug(model) {
 		return nil, errors.New("invalid Builder.io model name")
 	}
 	return &BuilderReader{
@@ -76,16 +78,16 @@ func checkBuilderRedirect(request *http.Request, via []*http.Request) error {
 
 // ReadPublished reads a single published page by its stable slug. It never
 // asks Builder for drafts or accepts client-selected model names.
-func (r *BuilderReader) ReadPublished(ctx context.Context, slug string) (Page, error) {
-	if !validSlug(slug) {
-		return Page{}, ErrNotFound
+func (r *BuilderReader) ReadPublished(ctx context.Context, slug string) (ports.EditorialPage, error) {
+	if !ports.ValidSlug(slug) {
+		return ports.EditorialPage{}, ports.ErrNotFound
 	}
 	now := time.Now()
 	r.mu.Lock()
 	if entry, ok := r.cache[slug]; ok {
 		if now.Before(entry.expiresAt) {
 			r.mu.Unlock()
-			return clonePage(entry.page), nil
+			return cloneEditorialPage(entry.page), nil
 		}
 		delete(r.cache, slug)
 	}
@@ -93,7 +95,7 @@ func (r *BuilderReader) ReadPublished(ctx context.Context, slug string) (Page, e
 
 	page, err := r.fetch(ctx, slug)
 	if err != nil {
-		return Page{}, err
+		return ports.EditorialPage{}, err
 	}
 	r.mu.Lock()
 	if len(r.cache) >= cacheCapacity {
@@ -109,19 +111,19 @@ func (r *BuilderReader) ReadPublished(ctx context.Context, slug string) (Page, e
 		r.cache[slug] = cacheEntry{page: page, expiresAt: time.Now().Add(cacheTTL)}
 	}
 	r.mu.Unlock()
-	return clonePage(page), nil
+	return cloneEditorialPage(page), nil
 }
 
-func clonePage(page Page) Page {
-	page.Blocks = append([]Block(nil), page.Blocks...)
-	for index := range page.Blocks {
-		page.Blocks[index].Items = append([]FAQItem(nil), page.Blocks[index].Items...)
+func cloneEditorialPage(page ports.EditorialPage) ports.EditorialPage {
+	page.EditorialBlocks = append([]ports.EditorialBlock(nil), page.EditorialBlocks...)
+	for index := range page.EditorialBlocks {
+		page.EditorialBlocks[index].Items = append([]ports.EditorialFAQItem(nil), page.EditorialBlocks[index].Items...)
 	}
 	return page
 }
 
-func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
-	var page Page
+func (r *BuilderReader) fetch(ctx context.Context, slug string) (ports.EditorialPage, error) {
+	var page ports.EditorialPage
 	var resultErr error
 	err := r.breaker.Execute(func() error {
 		endpoint, err := url.Parse(r.endpoint + url.PathEscape(r.model))
@@ -148,7 +150,7 @@ func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNotFound {
-			resultErr = ErrNotFound
+			resultErr = ports.ErrNotFound
 			return nil // a clean miss is not an upstream availability failure
 		}
 		if resp.StatusCode != http.StatusOK {
@@ -165,14 +167,14 @@ func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
 			return resultErr
 		}
 		var response []struct {
-			Data Page `json:"data"`
+			Data ports.EditorialPage `json:"data"`
 		}
 		if err := json.Unmarshal(body, &response); err != nil {
 			resultErr = fmt.Errorf("decode Builder.io content: %w", err)
 			return resultErr
 		}
 		if len(response) == 0 {
-			resultErr = ErrNotFound
+			resultErr = ports.ErrNotFound
 			return nil
 		}
 		page = response[0].Data
@@ -193,12 +195,12 @@ func (r *BuilderReader) fetch(ctx context.Context, slug string) (Page, error) {
 		// sentinel above, and an opened circuit has no detail, so both stay
 		// generic.
 		if resultErr != nil && !errors.Is(resultErr, errBuilderTransportFailed) {
-			return Page{}, fmt.Errorf("%w: %w", ErrUnavailable, resultErr)
+			return ports.EditorialPage{}, fmt.Errorf("%w: %w", ports.ErrUnavailable, resultErr)
 		}
-		return Page{}, fmt.Errorf("%w: upstream read failed", ErrUnavailable)
+		return ports.EditorialPage{}, fmt.Errorf("%w: upstream read failed", ports.ErrUnavailable)
 	}
 	if resultErr != nil {
-		return Page{}, resultErr
+		return ports.EditorialPage{}, resultErr
 	}
 	return page, nil
 }

@@ -1,0 +1,176 @@
+package pages
+
+import (
+	"strconv"
+
+	"gogo/internal/shared/web/navigation"
+	"gogo/internal/shared/web/shell/layouts"
+	"gogo.design/system/web/ui"
+)
+
+// SiteEditor manages the tenant-wide shell separately from page documents. It
+// is deliberately a plain server-rendered form: no client-side JSON model, no
+// raw HTML/CSS fields, and the same authorizer as the page builder.
+templ SiteEditor(data SiteEditorData) {
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base("Site settings", navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), "")}) {
+		<div class="space-y-6">
+			<header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+				<div>
+					<p class="text-sm font-medium text-primary">Content Studio</p>
+					<h1 class="mt-1 text-3xl font-bold tracking-tight">Site settings</h1>
+					<p class="mt-2 max-w-3xl text-sm text-base-content/70">Control the public header, menu, footer, homepage selection, and brand colors. Save writes a draft; Publish is the only action that changes the public website.</p>
+				</div>
+				<div class="flex flex-wrap gap-2">
+					<a class="btn btn-outline btn-sm" href={ data.PreviewURL }>Preview draft</a>
+					<a class="btn btn-ghost btn-sm" href={ data.PublicURL }>Open public site</a>
+				</div>
+			</header>
+
+			if data.Error != "" {
+				<div class="rounded-xl border border-error bg-error/10 px-4 py-3 text-sm text-error" role="alert">{ data.Error }</div>
+			}
+			if data.Saved {
+				<div class="rounded-xl border border-success bg-success/10 px-4 py-3 text-sm text-success" role="status">Draft saved. The public website is unchanged until you publish.</div>
+			}
+			if data.Published {
+				<div class="rounded-xl border border-success bg-success/10 px-4 py-3 text-sm text-success" role="status">Site settings published. The public header, menu, footer, and theme now use this revision.</div>
+			}
+
+			<section class="grid gap-4 rounded-2xl border border-base-300 bg-base-100 p-5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Site status">
+				<div><p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Status</p><p class="mt-1 font-semibold">{ data.Status }</p></div>
+				<div><p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Revision</p><p class="mt-1 font-semibold">{ strconv.FormatInt(data.Revision, 10) }</p></div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Last saved</p>
+					if data.UpdatedAt.IsZero() {
+						<p class="mt-1 font-semibold">Never</p>
+					} else {
+						<p class="mt-1 font-semibold">{ data.UpdatedAt.Format("2006-01-02 15:04") }</p>
+					}
+				</div>
+				<div>
+					<p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Last published</p>
+					if data.PublishedAt != nil {
+						<p class="mt-1 font-semibold">{ data.PublishedAt.Format("2006-01-02 15:04") }</p>
+					} else {
+						<p class="mt-1 font-semibold">Never</p>
+					}
+				</div>
+			</section>
+
+			<form class="space-y-6" method="post" action="/admin/content/site/draft">
+				<input type="hidden" name="revision" value={ strconv.FormatInt(data.Revision, 10) }/>
+
+				<section class="rounded-2xl border border-base-300 bg-base-100 p-5" aria-labelledby="site-brand-heading">
+					<h2 id="site-brand-heading" class="text-lg font-bold">Brand</h2>
+					<p class="mt-1 text-sm text-base-content/70">The site name is always the accessible link name. A logo replaces the wordmark visually.</p>
+					<div class="mt-4 grid gap-4 md:grid-cols-2">
+						<label class="form-control">
+							<span class="label-text mb-1">Site name</span>
+							<input class="input input-bordered" name="siteName" value={ data.Settings.SiteName } maxlength="80" required/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Tagline / meta description</span>
+							<input class="input input-bordered" name="tagline" value={ data.Settings.Tagline } maxlength="160"/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Logo URL</span>
+							<input class="input input-bordered" name="logoUrl" value={ data.Settings.LogoURL } maxlength="2000" placeholder="/assets/logo.svg or https://…"/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Logo alt text</span>
+							<input class="input input-bordered" name="logoAlt" value={ data.Settings.LogoAlt } maxlength="160"/>
+						</label>
+					</div>
+				</section>
+
+				<section class="rounded-2xl border border-base-300 bg-base-100 p-5" aria-labelledby="site-navigation-heading">
+					<h2 id="site-navigation-heading" class="text-lg font-bold">Header menu</h2>
+					<p class="mt-1 text-sm text-base-content/70">One link per line, formatted as <code>Label | /path</code>. Leave empty to keep the automatically registered gateway menu. Same-origin paths only.</p>
+					<label class="form-control mt-4">
+						<span class="label-text mb-1">Menu links</span>
+						<textarea class="textarea textarea-bordered min-h-32 font-mono text-sm" name="headerLinks" rows="5" placeholder="Home | /&#10;About | /pages/about">{ data.HeaderLinks }</textarea>
+					</label>
+				</section>
+
+				<section class="rounded-2xl border border-base-300 bg-base-100 p-5" aria-labelledby="site-home-heading">
+					<h2 id="site-home-heading" class="text-lg font-bold">Homepage</h2>
+					<p class="mt-1 text-sm text-base-content/70">The published native page served at <code>/</code>. If that slug is not published, the existing storefront fallback keeps serving.</p>
+					<label class="form-control mt-4 max-w-sm">
+						<span class="label-text mb-1">Home page slug</span>
+						<input class="input input-bordered" name="homePageSlug" value={ data.Settings.HomePageSlug } pattern="[a-z0-9-]+" maxlength="80" required/>
+					</label>
+				</section>
+
+				<section class="rounded-2xl border border-base-300 bg-base-100 p-5" aria-labelledby="site-footer-heading">
+					<h2 id="site-footer-heading" class="text-lg font-bold">Footer</h2>
+					<div class="mt-4 grid gap-4 md:grid-cols-2">
+						<label class="form-control">
+							<span class="label-text mb-1">Footer text</span>
+							<input class="input input-bordered" name="footerText" value={ data.Settings.FooterText } maxlength="240"/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Footer links</span>
+							<textarea class="textarea textarea-bordered min-h-24 font-mono text-sm" name="footerLinks" rows="3" placeholder="Privacy | /pages/privacy">{ data.FooterLinks }</textarea>
+						</label>
+					</div>
+				</section>
+
+				<section class="rounded-2xl border border-base-300 bg-base-100 p-5" aria-labelledby="site-theme-heading">
+					<h2 id="site-theme-heading" class="text-lg font-bold">Brand colors</h2>
+					<p class="mt-1 text-sm text-base-content/70">Optional #RGB or #RRGGBB values. Leave a field empty to inherit the built-in light and dark theme tokens.</p>
+					<div class="mt-4 grid gap-4 sm:grid-cols-3">
+						<label class="form-control">
+							<span class="label-text mb-1">Primary</span>
+							<input class="input input-bordered font-mono" name="themePrimary" value={ data.Settings.Theme.Primary } maxlength="7" placeholder="#4f46e5"/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Secondary</span>
+							<input class="input input-bordered font-mono" name="themeSecondary" value={ data.Settings.Theme.Secondary } maxlength="7" placeholder="#0f766e"/>
+						</label>
+						<label class="form-control">
+							<span class="label-text mb-1">Accent</span>
+							<input class="input input-bordered font-mono" name="themeAccent" value={ data.Settings.Theme.Accent } maxlength="7" placeholder="#f59e0b"/>
+						</label>
+					</div>
+				</section>
+
+				<div class="flex flex-wrap items-center gap-3">
+					<button class="btn btn-primary" type="submit">Save draft</button>
+					<p class="text-sm text-base-content/60">Saving never changes what visitors see.</p>
+				</div>
+			</form>
+
+			<form class="flex flex-wrap items-center gap-3 rounded-2xl border border-base-300 bg-base-100 p-5" method="post" action="/admin/content/site/publish">
+				<input type="hidden" name="revision" value={ strconv.FormatInt(data.Revision, 10) }/>
+				<button class="btn btn-success" type="submit">Publish site</button>
+				<p class="text-sm text-base-content/60">Publishes the last saved draft. Save first if the form has unsaved changes.</p>
+			</form>
+		</div>
+	}
+}
+
+templ SitePreview(data SitePreviewData) {
+	@ui.PageShell(ui.PageShellOptions{Layout: layouts.Base("Site shell preview", navigation.NavFromContext(ctx), navigation.PathFromContext(ctx), ""), Narrow: true}) {
+		<div class="space-y-6">
+			<header>
+				<p class="text-sm font-medium text-primary">Draft preview · revision { strconv.FormatInt(data.Revision, 10) }</p>
+				<h1 class="mt-1 text-3xl font-bold tracking-tight">Site shell preview</h1>
+				<p class="mt-2 text-sm text-base-content/70">The header, menu, footer, and brand colors around this message come from the saved draft. They are visible only to signed-in content editors until you publish.</p>
+			</header>
+			<section class="rounded-2xl border border-base-300 bg-base-100 p-6">
+				<h2 class="text-xl font-bold">{ data.Settings.SiteName }</h2>
+				if data.Settings.Tagline != "" {
+					<p class="mt-1 text-base-content/70">{ data.Settings.Tagline }</p>
+				}
+				<div class="mt-5 flex flex-wrap gap-2">
+					if len(data.Settings.HeaderLinks) > 0 {
+						<a class="btn btn-primary" href={ data.Settings.HeaderLinks[0].Href }>Primary action</a>
+					} else {
+						<a class="btn btn-primary" href="/">Primary action</a>
+					}
+					<a class="btn btn-outline" href="/admin/content/site">Back to site settings</a>
+				</div>
+			</section>
+		</div>
+	}
+}

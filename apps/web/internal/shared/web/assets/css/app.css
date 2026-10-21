@@ -5,6 +5,7 @@
    web primitives. Explicit paths make the Docker build cwd-independent. */
 @source "../../../../modules";
 @source "../../../../pages";
+@source "../../../../features";
 @source "../../../web";
 @source "../../../../../../../design-system/web/ui";
 @plugin "daisyui" {
@@ -475,6 +476,1033 @@
      island's own markup participates directly. */
   .ds-island {
     display: contents;
+  }
+
+  /* Published ad-slot placeholders reserve space according to the inspector's
+     Format value. The editor sets the same height inline; the public page uses
+     these static rules so the published markup never needs a user-authored
+     style attribute. */
+  [data-cms-component="ad-slot"] {
+    min-height: 90px;
+  }
+  [data-cms-component="ad-slot"].ad-slot--rectangle {
+    min-height: 250px;
+  }
+  [data-cms-component="ad-slot"].ad-slot--inline {
+    min-height: 120px;
+  }
+
+  /* --- visual page builder ------------------------------------------------
+     The editor is a full-viewport application shell. Its controls are built
+     from daisyUI primitives, while the structural classes below describe the
+     canvas, drag affordances and panels that only exist in the builder. */
+
+  .builder-app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .builder-app [hidden],
+  .builder-dialog [hidden] {
+    display: none !important;
+  }
+
+  .builder-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    flex: none;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--color-base-300);
+    background-color: var(--color-base-100);
+    box-shadow: var(--shadow-panel);
+    z-index: 20;
+  }
+
+  .builder-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .builder-title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+  }
+
+  .builder-title strong {
+    max-width: 24rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+  }
+
+  .builder-eyebrow {
+    margin: 0;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+
+  .builder-muted {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  }
+
+  .builder-save-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--color-base-200);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  }
+
+  .builder-status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background-color: currentColor;
+  }
+
+  .builder-save-status[data-state="saved"] {
+    color: var(--color-success);
+    background-color: color-mix(in oklab, var(--color-success) 10%, transparent);
+  }
+  .builder-save-status[data-state="dirty"],
+  .builder-save-status[data-state="saving"] {
+    color: var(--color-warning);
+    background-color: color-mix(in oklab, var(--color-warning) 12%, transparent);
+  }
+  .builder-save-status[data-state="saving"] .builder-status-dot {
+    animation: var(--animate-pulse-subtle);
+  }
+  .builder-save-status[data-state="error"],
+  .builder-save-status[data-state="conflict"] {
+    color: var(--color-error);
+    background-color: color-mix(in oklab, var(--color-error) 12%, transparent);
+  }
+
+  .builder-segmented {
+    display: inline-flex;
+    padding: 0.15rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
+    background-color: var(--color-base-200);
+  }
+
+  .builder-segmented button {
+    border: 0;
+    border-radius: calc(var(--radius-field) - 0.15rem);
+    background: transparent;
+    padding: 0.28rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+    cursor: pointer;
+  }
+
+  .builder-segmented button[aria-pressed="true"] {
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .builder-banner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex: none;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--color-base-300);
+    background-color: var(--color-base-100);
+  }
+
+  .builder-banner[data-tone="error"] {
+    border-bottom-color: color-mix(in oklab, var(--color-error) 45%, var(--color-base-300));
+    background-color: color-mix(in oklab, var(--color-error) 7%, var(--color-base-100));
+  }
+  .builder-banner[data-tone="warning"] {
+    border-bottom-color: color-mix(in oklab, var(--color-warning) 45%, var(--color-base-300));
+    background-color: color-mix(in oklab, var(--color-warning) 8%, var(--color-base-100));
+  }
+  .builder-banner[data-tone="success"] {
+    border-bottom-color: color-mix(in oklab, var(--color-success) 40%, var(--color-base-300));
+    background-color: color-mix(in oklab, var(--color-success) 7%, var(--color-base-100));
+  }
+
+  .builder-banner-copy {
+    min-width: 0;
+    font-size: 0.8rem;
+  }
+  .builder-banner-copy strong {
+    display: block;
+    font-size: 0.8rem;
+  }
+  .builder-banner-copy p {
+    margin: 0.15rem 0 0;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  }
+
+  .builder-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    flex: none;
+  }
+
+  .builder-workspace {
+    display: grid;
+    grid-template-columns: 18.5rem minmax(0, 1fr) 20.5rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--color-base-200);
+  }
+
+  .builder-left,
+  .builder-right {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background-color: var(--color-base-100);
+  }
+  .builder-left {
+    border-right: 1px solid var(--color-base-300);
+  }
+  .builder-right {
+    border-left: 1px solid var(--color-base-300);
+  }
+
+  .builder-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: none;
+    border-bottom: 1px solid var(--color-base-300);
+    padding: 0.35rem;
+    gap: 0.2rem;
+  }
+
+  .builder-tabs button {
+    border: 0;
+    border-radius: var(--radius-field);
+    background: transparent;
+    padding: 0.42rem 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .builder-tabs button:hover {
+    background-color: var(--color-base-200);
+  }
+  .builder-tabs button[aria-selected="true"] {
+    background-color: color-mix(in oklab, var(--color-primary) 11%, transparent);
+    color: var(--color-primary);
+  }
+
+  .builder-panel {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.85rem;
+  }
+  .builder-panel[hidden] {
+    display: none !important;
+  }
+
+  .builder-search {
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+  .builder-search input {
+    width: 100%;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
+    background-color: var(--color-base-100);
+    padding: 0.48rem 0.65rem;
+    font-size: 0.78rem;
+    outline-offset: 1px;
+  }
+  .builder-search input:focus-visible {
+    outline: 2px solid var(--color-primary);
+  }
+
+  .builder-library {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  .builder-library-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .builder-library-heading {
+    margin: 0;
+    padding: 0 0.2rem 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+  }
+  .builder-library-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    width: 100%;
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.6rem;
+    background-color: var(--color-base-100);
+    padding: 0.5rem 0.55rem;
+    text-align: left;
+    cursor: grab;
+    transition: border-color 120ms, background-color 120ms, transform 120ms;
+  }
+  .builder-library-item:hover {
+    border-color: color-mix(in oklab, var(--color-primary) 45%, var(--color-base-300));
+    background-color: color-mix(in oklab, var(--color-primary) 4%, var(--color-base-100));
+  }
+  .builder-library-item:active {
+    cursor: grabbing;
+    transform: scale(0.99);
+  }
+  .builder-library-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.45rem;
+    background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .builder-library-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    gap: 0.08rem;
+  }
+  .builder-library-copy strong {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .builder-library-copy small {
+    font-size: 0.68rem;
+    line-height: 1.35;
+    color: color-mix(in oklab, var(--color-base-content) 58%, transparent);
+  }
+  .builder-library-badge {
+    flex: none;
+    border-radius: 999px;
+    background-color: color-mix(in oklab, var(--color-accent) 16%, transparent);
+    color: color-mix(in oklab, var(--color-accent) 75%, var(--color-base-content));
+    padding: 0.08rem 0.4rem;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .builder-outline-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .builder-outline-tree,
+  .builder-outline-children {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .builder-outline-children {
+    margin-left: 0.9rem;
+    border-left: 1px solid var(--color-base-300);
+    padding-left: 0.3rem;
+  }
+  .builder-outline-item {
+    margin: 0.1rem 0;
+  }
+  .builder-outline-row {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    border-radius: 0.4rem;
+    padding: 0.12rem 0.18rem;
+  }
+  .builder-outline-row:hover {
+    background-color: var(--color-base-200);
+  }
+  .builder-outline-row.is-selected {
+    background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-primary);
+  }
+  .builder-outline-row.is-hidden .builder-outline-select {
+    opacity: 0.5;
+  }
+  .builder-outline-select {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    padding: 0.18rem 0.2rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .builder-outline-type {
+    flex: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .builder-outline-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.64rem;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+  .builder-outline-actions {
+    display: flex;
+    flex: none;
+    gap: 0.05rem;
+    opacity: 0.25;
+    transition: opacity 120ms;
+  }
+  .builder-outline-row:hover .builder-outline-actions,
+  .builder-outline-row:focus-within .builder-outline-actions,
+  .builder-outline-row.is-selected .builder-outline-actions {
+    opacity: 1;
+  }
+  .builder-outline-action {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    font-size: 0.64rem;
+    line-height: 1;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    cursor: pointer;
+  }
+  .builder-outline-action:hover:not(:disabled) {
+    background-color: var(--color-base-300);
+    color: var(--color-base-content);
+  }
+  .builder-outline-action:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .builder-shortcuts {
+    margin-top: 1rem;
+    border-top: 1px solid var(--color-base-300);
+    padding-top: 0.6rem;
+    font-size: 0.62rem;
+    line-height: 1.6;
+    color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+  }
+  .builder-shortcuts p {
+    margin: 0.15rem 0;
+  }
+  .builder-shortcuts kbd {
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.2rem;
+    background-color: var(--color-base-200);
+    padding: 0.02rem 0.22rem;
+    font-family: inherit;
+    font-size: 0.58rem;
+  }
+
+  .builder-stage {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--color-base-200);
+  }
+  .builder-stage-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex: none;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid var(--color-base-300);
+    background-color: color-mix(in oklab, var(--color-base-100) 75%, transparent);
+    font-size: 0.7rem;
+  }
+  .builder-stage-label {
+    margin-right: 0.4rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.62rem;
+  }
+
+  .builder-canvas-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.5rem;
+  }
+
+  .builder-canvas {
+    position: relative;
+    width: 100%;
+    max-width: 64rem;
+    min-height: calc(100dvh - 12rem);
+    margin-inline: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    box-shadow: var(--shadow-raised);
+    transition: max-width 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .builder-canvas[data-breakpoint="tablet"] {
+    max-width: 48rem;
+  }
+  .builder-canvas[data-breakpoint="mobile"] {
+    max-width: 24.375rem;
+  }
+  .builder-canvas.is-drop-root {
+    outline: 2px dashed var(--color-primary);
+    outline-offset: 3px;
+  }
+
+  .builder-canvas-empty {
+    display: grid;
+    place-items: center;
+    min-height: 16rem;
+    border: 2px dashed var(--color-base-300);
+    border-radius: var(--radius-box);
+    padding: 2rem;
+    text-align: center;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+
+  .builder-dropzone {
+    position: relative;
+    display: block;
+    height: 0.4rem;
+    margin-block: 0.1rem;
+    border-radius: 999px;
+    transition: height 100ms, background-color 100ms;
+  }
+  .builder-app.builder-dragging .builder-dropzone {
+    height: 1rem;
+    border: 1px dashed color-mix(in oklab, var(--color-primary) 35%, transparent);
+    background-color: color-mix(in oklab, var(--color-primary) 5%, transparent);
+  }
+  .builder-dropzone.is-over {
+    height: 1.4rem;
+    border: 2px solid var(--color-primary);
+    background-color: color-mix(in oklab, var(--color-primary) 20%, transparent);
+  }
+  /* Dropzones are editor affordances, not page content. A grid container would
+     otherwise treat each insertion line as another full-width row and silently
+     break the approved column layout. */
+  [data-cms-component="container"][style*="display: grid"] > .builder-dropzone {
+    display: none;
+  }
+
+  .builder-node {
+    position: relative;
+    border-radius: 0.4rem;
+    outline: 1px dashed transparent;
+    outline-offset: 2px;
+    transition: outline-color 100ms, background-color 100ms;
+  }
+  .builder-node:hover {
+    outline-color: color-mix(in oklab, var(--color-primary) 35%, transparent);
+  }
+  .builder-node:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  .builder-node.is-selected {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  .builder-node.is-hidden > .builder-node-content {
+    opacity: 0.42;
+  }
+  .builder-node.is-hidden > .builder-node-content::after {
+    content: "Hidden";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-base-content);
+    background-color: color-mix(in oklab, var(--color-base-100) 55%, transparent);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .builder-node.is-dragging {
+    opacity: 0.4;
+  }
+
+  .builder-node-content {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .builder-node-content img,
+  .builder-node-content a,
+  .builder-node-content button,
+  .builder-node-content input,
+  .builder-node-content select,
+  .builder-node-content textarea {
+    pointer-events: none;
+  }
+
+  .builder-node-label {
+    position: absolute;
+    z-index: 6;
+    top: -0.85rem;
+    left: -0.1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 0.3rem;
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    padding: 0.08rem 0.38rem;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.35;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 100ms;
+  }
+  .builder-node:hover > .builder-node-label,
+  .builder-node.is-selected > .builder-node-label,
+  .builder-node:focus-visible > .builder-node-label {
+    opacity: 1;
+  }
+  .builder-node-hidden-badge {
+    border-radius: 999px;
+    background-color: color-mix(in oklab, var(--color-base-100) 25%, transparent);
+    padding: 0 0.25rem;
+  }
+
+  .builder-node.is-drop-before::before,
+  .builder-node.is-drop-after::after {
+    content: "";
+    position: absolute;
+    z-index: 8;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 999px;
+    background-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 20%, transparent);
+    pointer-events: none;
+  }
+  .builder-node.is-drop-before::before {
+    top: -5px;
+  }
+  .builder-node.is-drop-after::after {
+    bottom: -5px;
+  }
+  .builder-node.is-drop-inside {
+    outline: 2px dashed var(--color-primary);
+    background-color: color-mix(in oklab, var(--color-primary) 6%, transparent);
+  }
+
+  .builder-container-empty {
+    margin: 0.35rem 0;
+    border: 1px dashed var(--color-base-300);
+    border-radius: 0.4rem;
+    padding: 0.65rem;
+    text-align: center;
+    font-size: 0.68rem;
+    color: color-mix(in oklab, var(--color-base-content) 48%, transparent);
+  }
+
+  .builder-inspector {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.85rem;
+  }
+
+  .builder-inspector-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .builder-inspector-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+  .builder-inspector-title {
+    margin: 0.1rem 0 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .builder-inspector-head .builder-muted {
+    margin-top: 0.15rem;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6rem;
+  }
+  .builder-inspector-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.1rem;
+  }
+  .builder-inspector-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding-block: 0.85rem;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+  .builder-inspector-section:last-child {
+    border-bottom: 0;
+  }
+  .builder-inspector-heading {
+    margin: 0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+  .builder-inspector-note {
+    margin: 0.5rem 0 0;
+    border-radius: 0.4rem;
+    background-color: color-mix(in oklab, var(--color-warning) 10%, transparent);
+    padding: 0.45rem 0.55rem;
+    font-size: 0.66rem;
+    line-height: 1.45;
+    color: color-mix(in oklab, var(--color-warning) 80%, var(--color-base-content));
+  }
+
+  .builder-property {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    border-left: 1px solid transparent;
+    padding-left: 0.35rem;
+  }
+  .builder-property.has-override {
+    border-left-color: var(--color-primary);
+  }
+  .builder-property-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .builder-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .builder-field-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: color-mix(in oklab, var(--color-base-content) 78%, transparent);
+  }
+  .builder-field-check {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .builder-field-check input {
+    width: 0.95rem;
+    height: 0.95rem;
+    accent-color: var(--color-primary);
+  }
+  .builder-field-help {
+    font-size: 0.62rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+  }
+  .builder-reset-prop {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .builder-inherit-hint {
+    font-size: 0.6rem;
+    font-style: italic;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  }
+  .builder-color-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .builder-array {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .builder-array-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.5rem;
+    padding: 0.55rem;
+  }
+  .builder-array-item legend {
+    padding-inline: 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  }
+
+  .builder-binding-preview {
+    margin: 0;
+    border-radius: 0.35rem;
+    background-color: var(--color-base-200);
+    padding: 0.35rem 0.5rem;
+    font-size: 0.64rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .builder-page-meta {
+    margin: 0;
+    font-size: 0.64rem;
+    overflow-wrap: anywhere;
+    color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+  }
+
+  .builder-section-list,
+  .builder-revision-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .builder-section-item,
+  .builder-revision {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.55rem;
+  }
+  .builder-section-copy,
+  .builder-revision-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.05rem;
+  }
+  .builder-section-copy strong,
+  .builder-revision-copy strong {
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .builder-section-copy small,
+  .builder-revision-copy small {
+    font-size: 0.6rem;
+    color: color-mix(in oklab, var(--color-base-content) 52%, transparent);
+  }
+  .builder-revision-copy span {
+    font-size: 0.66rem;
+    color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
+  }
+  .builder-section-actions {
+    display: flex;
+    flex: none;
+    gap: 0.15rem;
+  }
+
+  .builder-problem-list {
+    list-style: none;
+    margin: 0.65rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .builder-problem {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+    border: 1px solid color-mix(in oklab, var(--color-error) 35%, var(--color-base-300));
+    border-radius: 0.45rem;
+    background-color: color-mix(in oklab, var(--color-error) 5%, transparent);
+    padding: 0.45rem 0.55rem;
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
+  .builder-problem code {
+    flex: none;
+    border-radius: 0.25rem;
+    background-color: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+    padding: 0.05rem 0.3rem;
+    font-size: 0.62rem;
+  }
+  .builder-problem span {
+    flex: 1;
+    min-width: 10rem;
+  }
+
+  .builder-dialog {
+    width: min(34rem, calc(100vw - 2rem));
+    max-height: min(82dvh, 46rem);
+    margin: auto;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    padding: 0;
+    box-shadow: var(--shadow-float);
+    overflow: hidden;
+  }
+  .builder-dialog[data-dialog="revisions"] {
+    width: min(42rem, calc(100vw - 2rem));
+  }
+  .builder-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    animation: var(--animate-rise);
+  }
+  .builder-dialog::backdrop {
+    background-color: oklch(0% 0 0 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  .builder-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex: none;
+    padding: 1rem 1.1rem 0.85rem;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+  .builder-dialog-head h2 {
+    margin: 0.15rem 0 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .builder-dialog-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem 1.1rem 1.15rem;
+  }
+  .builder-dialog-body > :first-child {
+    margin-top: 0;
+  }
+  .builder-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    margin-top: 0.9rem;
+  }
+
+  @media (max-width: 72rem) {
+    .builder-workspace {
+      grid-template-columns: 16rem minmax(0, 1fr) 18rem;
+    }
+  }
+
+  @media (max-width: 56rem) {
+    .builder-app {
+      height: auto;
+      min-height: 100dvh;
+      overflow: visible;
+    }
+    .builder-workspace {
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+    }
+    .builder-stage {
+      order: -1;
+      min-height: 70dvh;
+    }
+    .builder-canvas-scroll {
+      overflow: visible;
+    }
+    .builder-canvas {
+      min-height: 30rem;
+    }
+    .builder-left,
+    .builder-right {
+      border: 0;
+      border-top: 1px solid var(--color-base-300);
+      max-height: 24rem;
+    }
+    .builder-panel,
+    .builder-inspector {
+      max-height: 20rem;
+    }
   }
 
   /* Chromium / Safari scrollbar. `scrollbar-width` above covers Firefox. */

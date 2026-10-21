@@ -77,6 +77,8 @@ spec:
               value: "dns:///product-search.product.svc.cluster.local:9094"
             - name: CATEGORY_ADDRESS
               value: "dns:///category.category.svc.cluster.local:9090"
+            - name: MEDIA_ADDRESS
+              value: "dns:///media.product.svc.cluster.local:9091"
           envFrom:
             - configMapRef:
                 name: gogo-config
